@@ -75,3 +75,57 @@ body {
 .perspective-1000 {
   perspective: 1000px;
 }
+
+/* Mobile Responsiveness & Platform Specifics */
+:root {
+  --safe-area-top: env(safe-area-inset-top);
+  --safe-area-bottom: env(safe-area-inset-bottom);
+}
+
+.min-h-dynamic {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.pb-safe {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+.pt-safe {
+  padding-top: var(--safe-area-top);
+}
+
+/* Platform detection classes (applied via root) */
+[data-os="ios"] .game-shadow {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-width: 2px;
+}
+
+[data-os="ios"] .game-border {
+  border-width: 2px;
+  border-radius: 2.5rem;
+}
+
+[data-os="android"] .game-shadow {
+  box-shadow: 6px 6px 0px 0px #1A1A1A;
+  border-radius: 0.75rem;
+}
+
+[data-os="android"] .game-border {
+  border-radius: 0.75rem;
+}
+
+/* Fluid Typography */
+@layer utilities {
+  .text-fluid-large {
+    font-size: clamp(2rem, 15vw, 6rem);
+  }
+  .text-fluid-medium {
+    font-size: clamp(1.25rem, 8vw, 2.5rem);
+  }
+}
+
+/* Fix for mobile tap highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

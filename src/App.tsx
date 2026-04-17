@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X } from "lucide-react";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
@@ -68,6 +68,8 @@ export default function App() {
   const [botCount, setBotCount] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [localPlayerId, setLocalPlayerId] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<"ios" | "android" | "other">("other");
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
@@ -88,6 +90,20 @@ export default function App() {
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
   });
+
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
+      setPlatform("ios");
+      document.documentElement.setAttribute("data-os", "ios");
+    } else if (ua.includes("android")) {
+      setPlatform("android");
+      document.documentElement.setAttribute("data-os", "android");
+    } else {
+      setPlatform("other");
+      document.documentElement.removeAttribute("data-os");
+    }
+  }, []);
 
   // Check for room in URL on mount
   useEffect(() => {
@@ -480,10 +496,54 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-game-bg text-game-border font-sans selection:bg-game-primary/30 overflow-x-hidden relative">
+    <div className="min-h-dynamic bg-game-bg text-game-border font-sans selection:bg-game-primary/30 overflow-x-hidden relative pt-safe pb-safe italic-none">
       <MusicalNotesBackground />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 md:py-12 min-h-screen flex flex-col relative z-10">
+      <AnimatePresence>
+        {showExitConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-game-border/40 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white border-4 border-game-border p-8 rounded-[2rem] max-w-sm w-full game-shadow text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-red-100 text-game-danger rounded-3xl mx-auto flex items-center justify-center">
+                <X className="w-12 h-12" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-game-border uppercase tracking-tight">Sair do Jogo?</h3>
+                <p className="text-game-border/60 font-medium">Seu progresso nesta partida solo será perdido. Tem certeza?</p>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className="flex-1 p-4 bg-gray-100 text-game-border font-black rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  Continuar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitConfirm(false);
+                    setView("home");
+                    setIsGameActive(false);
+                  }}
+                  className="flex-1 p-4 bg-game-danger text-white font-black rounded-xl hover:bg-red-600 transition-colors shadow-[4px_4px_0px_#450a0a]"
+                >
+                  Sair
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-12 min-h-dynamic flex flex-col relative z-10 box-border">
         
         <AnimatePresence mode="wait">
           {view === "home" && (
@@ -506,13 +566,13 @@ export default function App() {
                     repeat: Infinity, 
                     ease: "easeInOut" 
                   }}
-                  className="text-7xl md:text-9xl font-black tracking-tighter text-game-primary uppercase relative drop-shadow-[6px_6px_0px_#1A1A1A]"
+                  className="text-fluid-large font-black tracking-tighter text-game-primary uppercase relative drop-shadow-[4px_4px_0px_#1A1A1A] md:drop-shadow-[6px_6px_0px_#1A1A1A]"
                 >
                   CCB QUIZ<br/>GAME
                 </motion.h1>
               </div>
               
-              <p className="text-2xl text-game-border font-bold max-w-lg bg-white/80 p-4 rounded-2xl game-border">
+              <p className="text-lg md:text-2xl text-game-border font-bold max-w-lg bg-white/80 p-4 md:p-6 rounded-2xl game-border">
                 O desafio definitivo para testar seus conhecimentos sobre os hinos da CCB.
               </p>
 
@@ -745,7 +805,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8"
+              className="flex-grow flex flex-col lg:grid lg:grid-cols-[1fr_400px] gap-6 md:gap-8"
             >
               <div className="flex flex-col gap-6">
                 <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex-grow relative overflow-hidden game-shadow">
@@ -903,33 +963,44 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8"
+              className="flex-grow flex flex-col lg:grid lg:grid-cols-[1fr_350px] gap-6 md:gap-8"
             >
-              <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-6 md:gap-8">
                 {/* Round Header */}
-                <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-6 rounded-[2rem] game-shadow">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-game-secondary border-2 border-game-border rounded-2xl flex items-center justify-center text-game-border font-black text-2xl shadow-[2px_2px_0px_#1A1A1A]">
+                <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-3 md:p-6 rounded-[1.5rem] md:rounded-[2rem] game-shadow">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-8 h-8 md:w-14 md:h-14 bg-game-secondary border-2 border-game-border rounded-xl md:rounded-2xl flex items-center justify-center text-game-border font-black text-sm md:text-2xl shadow-[2px_2px_0px_#1A1A1A]">
                       {currentRound + 1}
                     </div>
                     <div>
-                      <p className="text-xs text-game-border font-black uppercase tracking-widest">Rodada</p>
-                      <p className="font-black text-xl text-game-primary">de {roundCount}</p>
+                      <p className="text-[8px] md:text-xs text-game-border font-black uppercase tracking-widest">Rodada</p>
+                      <p className="font-black text-xs md:text-xl text-game-primary leading-none">de {roundCount}</p>
                     </div>
                   </div>
+
+                  {isSolo && (
+                    <motion.button
+                      whileHover={{ scale: 1.1, rotate: 90 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setShowExitConfirm(true)}
+                      className="w-10 h-10 md:w-12 md:h-12 bg-white border-3 border-game-border rounded-xl flex items-center justify-center text-game-danger shadow-[2px_2px_0px_#1A1A1A] hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-6 h-6 md:w-8 md:h-8" />
+                    </motion.button>
+                  )}
                 </div>
 
                 {/* Question Area */}
-                <div className="bg-game-card game-border p-12 rounded-[3rem] flex-grow flex flex-col items-center justify-center text-center gap-10 relative overflow-hidden game-shadow">
-                  <div className="absolute top-0 left-0 w-full h-2 bg-game-secondary"></div>
+                <div className="bg-game-card game-border p-4 md:p-12 rounded-[1.5rem] md:rounded-[3rem] flex-grow flex flex-col items-center justify-center text-center gap-4 md:gap-10 relative overflow-hidden game-shadow min-h-[150px] md:min-h-[300px]">
+                  <div className="absolute top-0 left-0 w-full h-1 md:h-2 bg-game-secondary"></div>
                   
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-xs uppercase tracking-[0.4em] text-game-primary font-black">Qual é o hino?</span>
-                    <div className="w-16 h-1 bg-game-border/10 rounded-full"></div>
+                  <div className="flex flex-col items-center gap-1 md:gap-2">
+                    <span className="text-[8px] md:text-xs uppercase tracking-[0.4em] text-game-primary font-black">Qual é o hino?</span>
+                    <div className="w-8 md:w-16 h-0.5 md:h-1 bg-game-border/10 rounded-full"></div>
                   </div>
                   
                   <div className="max-w-3xl">
-                    <p className="text-4xl md:text-5xl font-black text-game-border leading-tight">
+                    <p className="text-xl md:text-5xl font-black text-game-border leading-tight line-clamp-4 md:line-clamp-none">
                        "{questions[currentRound].snippet}"
                     </p>
                   </div>
@@ -1032,10 +1103,10 @@ export default function App() {
                           "text-center p-12 bg-white border-4 border-game-border rounded-[3rem] shadow-2xl scale-110 mb-8 game-shadow",
                           feedback?.correct ? "text-game-success" : "text-game-danger"
                         )}>
-                          <h2 className="text-7xl font-black uppercase tracking-tighter mb-2 italic">
+                          <h2 className="text-4xl md:text-7xl font-black uppercase tracking-tighter mb-2 italic">
                             {feedback?.correct ? "Boa!" : (selectedOption ? "Putz!" : "Pulou!")}
                           </h2>
-                          <p className="text-xl text-game-border font-black uppercase tracking-widest">
+                          <p className="text-base md:text-xl text-game-border font-black uppercase tracking-widest">
                             {feedback?.correct ? "+ pontos na conta!" : "Quase lá, hein?"}
                           </p>
                         </div>
@@ -1055,33 +1126,33 @@ export default function App() {
 
                   <div className="w-full max-w-sm h-1 bg-game-border/5 rounded-full"></div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-6 w-full max-w-5xl">
                     {questions[currentRound].options.map((option, idx) => (
                       <motion.button
                         key={idx}
-                        whileHover={(!isGameActive && !showResult) ? {} : { scale: 1.03, rotate: idx % 2 === 0 ? 1 : -1 }}
-                        whileTap={(!isGameActive && !showResult) ? {} : { scale: 0.97 }}
+                        whileHover={(!isGameActive && !showResult) ? {} : { scale: 1.03, rotate: idx % 2 === 0 ? 0.5 : -0.5 }}
+                        whileTap={(!isGameActive && !showResult) ? {} : { scale: 0.98 }}
                         disabled={!isGameActive && !showResult}
                         onClick={() => handleAnswer(option)}
                         className={cn(
-                          "p-8 rounded-[2rem] border-3 text-xl font-black transition-all duration-300 text-left flex items-center justify-between group relative overflow-hidden focus:outline-none",
+                          "p-4 md:p-8 rounded-[1rem] md:rounded-[2rem] border-3 text-sm md:text-xl font-black transition-all duration-300 text-left flex items-center justify-between group relative overflow-hidden focus:outline-none",
                           !showResult && !selectedOption && "border-game-border bg-white hover:bg-gray-50 game-shadow-hover",
                           !showResult && selectedOption === option && "border-game-border bg-game-primary text-white shadow-[4px_4px_0px_#1A1A1A]",
                           !showResult && selectedOption && selectedOption !== option && "border-game-border bg-white opacity-50",
-                          showResult && option === questions[currentRound].options[questions[currentRound].correct] && "border-game-border bg-game-success text-white shadow-[6px_6px_0px_#1A1A1A] scale-[1.05] z-10",
+                          showResult && option === questions[currentRound].options[questions[currentRound].correct] && "border-game-border bg-game-success text-white shadow-[6px_6px_0px_#1A1A1A] scale-[1.02] md:scale-[1.05] z-10",
                           showResult && selectedOption === option && option !== questions[currentRound].options[questions[currentRound].correct] && "border-game-border bg-game-danger text-white shadow-[4px_4px_0px_#1A1A1A]",
                           showResult && option !== questions[currentRound].options[questions[currentRound].correct] && selectedOption !== option && "opacity-20 border-game-border bg-white scale-95"
                         )}
                       >
                         <div className="flex flex-col relative z-10">
-                          <span className="text-[10px] uppercase tracking-widest opacity-30 mb-1 group-hover:opacity-100 transition-opacity">Opção {idx + 1}</span>
-                          <span className="leading-tight">{option}</span>
+                          <span className="text-[8px] md:text-[11px] uppercase tracking-widest opacity-30 mb-1 group-hover:opacity-100 transition-opacity">Opção {idx + 1}</span>
+                          <span className="leading-tight line-clamp-1 md:line-clamp-none">{option}</span>
                         </div>
                         <div className={cn(
-                          "w-10 h-10 rounded-full border-3 border-game-border flex items-center justify-center transition-all duration-300 shrink-0 ml-4 bg-white shadow-[2px_2px_0px_#1A1A1A] relative z-10",
+                          "w-6 h-6 md:w-10 md:h-10 rounded-full border-2 md:border-3 border-game-border flex items-center justify-center transition-all duration-300 shrink-0 ml-2 md:ml-4 bg-white shadow-[1px_1px_0px_#1A1A1A] md:shadow-[2px_2px_0px_#1A1A1A] relative z-10",
                           selectedOption === option ? "bg-game-secondary" : ""
                         )}>
-                          {selectedOption === option && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-4 h-4 bg-game-border rounded-full" />}
+                          {selectedOption === option && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-2 h-2 md:w-4 md:h-4 bg-game-border rounded-full" />}
                         </div>
                       </motion.button>
                     ))}
@@ -1090,33 +1161,33 @@ export default function App() {
               </div>
 
               {/* Sidebar: Players Score */}
-              <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex flex-col gap-6 game-shadow">
-                <h3 className="text-2xl font-black text-game-primary uppercase tracking-widest border-b-4 border-game-border pb-4">Placar</h3>
-                <div className="space-y-4">
+              <div className="bg-game-card border-4 border-game-border p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] flex flex-col gap-4 md:gap-6 game-shadow h-fit">
+                <h3 className="text-xl md:text-2xl font-black text-game-primary uppercase tracking-widest border-b-4 border-game-border pb-4 italic">Placar</h3>
+                <div className="space-y-3">
                   {players.sort((a, b) => b.score - a.score).map((p) => (
                     <div key={p.id} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={cn(
-                          "w-4 h-4 rounded-full border-2 border-game-border",
+                          "w-3 h-3 md:w-4 md:h-4 rounded-full border-2 border-game-border",
                           p.hasAnswered ? "bg-game-success shadow-[1px_1px_0px_#1A1A1A]" : "bg-white"
                         )}></div>
-                        <span className={cn("font-black text-lg", p.id.startsWith("bot") ? "opacity-50" : "text-game-border")}>
+                        <span className={cn("font-black text-sm md:text-lg", p.id.startsWith("bot") ? "opacity-50" : "text-game-border")}>
                           {p.nickname}
                         </span>
                       </div>
-                      <span className="font-black text-xl text-game-primary bg-game-secondary px-3 py-1 rounded-xl border-2 border-game-border shadow-[2px_2px_0px_#1A1A1A]">{p.score}</span>
+                      <span className="font-black text-base md:text-xl text-game-primary bg-game-secondary px-2 md:px-3 py-0.5 md:py-1 rounded-xl border-2 border-game-border shadow-[2px_2px_0px_#1A1A1A]">{p.score}</span>
                     </div>
                   ))}
                 </div>
                 
-                <div className="mt-auto pt-6 border-t-4 border-game-border">
-                  <div className="flex items-center justify-between text-[10px] text-game-border uppercase font-black tracking-widest mb-2">
+                <div className="mt-auto pt-4 md:pt-6 border-t-4 border-game-border">
+                  <div className="flex items-center justify-between text-[8px] md:text-[10px] text-game-border uppercase font-black tracking-widest mb-2">
                     <span>Respondendo...</span>
                     <span>{players.filter(p => p.hasAnswered).length} / {players.length}</span>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1">
                     {players.map(p => (
-                      <div key={p.id} className={cn("h-3 flex-1 rounded-full border-2 border-game-border", p.hasAnswered ? "bg-game-success" : "bg-white")}></div>
+                      <div key={p.id} className={cn("h-2 md:h-3 flex-1 rounded-full border-2 border-game-border", p.hasAnswered ? "bg-game-success" : "bg-white")}></div>
                     ))}
                   </div>
                 </div>
@@ -1155,21 +1226,21 @@ export default function App() {
                       idx === 0 ? "bg-white border-game-border scale-110 z-10" : "bg-white border-game-border/10 opacity-70"
                     )}
                   >
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4 md:gap-6">
                       <span className={cn(
-                        "text-4xl font-black italic",
+                        "text-2xl md:text-4xl font-black italic",
                         idx === 0 ? "text-game-primary" : "text-game-border/30"
                       )}>
                         #{idx + 1}
                       </span>
                       <div>
-                        <p className="text-3xl font-black text-game-border">{p.nickname}</p>
-                        <p className="text-xs text-game-primary uppercase tracking-widest font-black">{p.id.startsWith("bot") ? "SIMULADO" : "VOCÊ"}</p>
+                        <p className="text-xl md:text-3xl font-black text-game-border line-clamp-1">{p.nickname}</p>
+                        <p className="text-[8px] md:text-xs text-game-primary uppercase tracking-widest font-black">{p.id.startsWith("bot") ? "SIMULADO" : "VOCÊ"}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-4xl font-black text-game-primary bg-game-secondary px-4 py-2 rounded-2xl border-3 border-game-border shadow-[3px_3px_0px_#1A1A1A]">{p.score}</p>
-                      <p className="text-[10px] text-game-border/50 uppercase font-black tracking-widest mt-1">Pontos</p>
+                      <p className="text-2xl md:text-4xl font-black text-game-primary bg-game-secondary px-3 md:px-4 py-1 md:py-2 rounded-xl md:rounded-2xl border-2 md:border-3 border-game-border shadow-[2px_2px_0px_#1A1A1A] md:shadow-[3px_3px_0px_#1A1A1A]">{p.score}</p>
+                      <p className="text-[8px] md:text-[10px] text-game-border/50 uppercase font-black tracking-widest mt-1">Pontos</p>
                     </div>
                   </motion.div>
                 ))}
