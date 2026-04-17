@@ -75,6 +75,7 @@ export default function App() {
   const [localPlayerId, setLocalPlayerId] = useState<string | null>(null);
   const [platform, setPlatform] = useState<"ios" | "android" | "other">("other");
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showUnreadyConfirm, setShowUnreadyConfirm] = useState(false);
   
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
@@ -341,7 +342,7 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleStartGameClick = async () => {
+  const handleStartGameClick = async (forceStart: boolean = false) => {
     soundService.playClick();
     if (isSolo) {
       const q = await prepareQuestions();
@@ -355,9 +356,9 @@ export default function App() {
       const me = players.find(p => p.id === localPlayerId);
       if (!me?.isHost) return;
 
-      const allReady = players.every(p => p.isReady);
-      if (!allReady) {
-        alert("Todos os jogadores precisam estar prontos!");
+      const allOthersReady = players.filter(p => !p.isHost).every(p => p.isReady);
+      if (!allOthersReady && !forceStart) {
+        setShowUnreadyConfirm(true);
         return;
       }
 
@@ -604,6 +605,51 @@ export default function App() {
           />
         )}
         
+        {showUnreadyConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-game-border/40 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white border-4 border-game-border p-8 rounded-[2rem] max-w-sm w-full game-shadow text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-yellow-100 text-yellow-600 rounded-3xl mx-auto flex items-center justify-center">
+                <Users className="w-12 h-12" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-game-border uppercase tracking-tight">Forçar Início?</h3>
+                <p className="text-game-border/60 font-medium leading-snug">Nem todos os jogadores estão prontos, deseja começar mesmo assim?</p>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    soundService.playClick();
+                    setShowUnreadyConfirm(false);
+                  }}
+                  className="flex-1 p-4 bg-gray-100 text-game-border font-black rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-widest text-sm"
+                >
+                  Esperar
+                </button>
+                <button
+                  onClick={() => {
+                    soundService.playClick();
+                    setShowUnreadyConfirm(false);
+                    handleStartGameClick(true);
+                  }}
+                  className="flex-1 p-4 bg-game-primary text-white font-black rounded-xl hover:bg-game-primary/90 transition-colors uppercase tracking-widest text-sm"
+                >
+                  Começar!
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {showExitConfirm && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1005,16 +1051,16 @@ export default function App() {
                               {p.isHost && <Trophy className="w-5 h-5 text-game-secondary drop-shadow-sm" />}
                             </div>
                             <div className="flex items-center gap-2">
-                              {p.isReady ? (
+                              {!p.isHost && (p.isReady ? (
                                 <span className="text-xs text-game-success font-black uppercase tracking-widest">Pronto!</span>
                               ) : (
                                 <span className="text-xs text-game-border/30 font-black uppercase tracking-widest">Aguardando...</span>
-                              )}
+                              ))}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          {p.id === localPlayerId && !isSolo && (
+                          {p.id === localPlayerId && !isSolo && !p.isHost && (
                             <button 
                               onClick={() => {
                                 soundService.playClick();
@@ -1055,9 +1101,9 @@ export default function App() {
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
                         soundService.playClick();
-                        handleStartGameClick();
+                        handleStartGameClick(false);
                       }}
-                      disabled={isLoading || (!isSolo && !players.every(p => p.isReady))}
+                      disabled={isLoading}
                       className="p-5 bg-game-primary text-white font-black rounded-[1.5rem] transition-transform flex-1 uppercase tracking-widest game-shadow-hover game-border disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl"
                     >
                       {isLoading ? (
