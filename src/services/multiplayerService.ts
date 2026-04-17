@@ -32,6 +32,38 @@ let _onNextRound: (() => void) | null = null;
 let _onGameReset: (() => void) | null = null;
 let _onGameStarted: ((data: { questions: any[]; roundCount: number }) => void) | null = null;
 
+const triggerSync = () => {
+  if (!channel || !currentRoomId) return;
+  const state = channel.presenceState();
+  const playersList: Player[] = [];
+  
+  Object.values(state).forEach((presences: any) => {
+    presences.forEach((p: Player) => {
+      playersList.push(p);
+    });
+  });
+
+  const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
+  const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
+  
+  _onPlayersChange?.(sortedPlayers);
+  
+  const room: Room = {
+    id: currentRoomId,
+    hostId: host?.id || '',
+    gameStarted: false, 
+    players: sortedPlayers,
+    roundCount: 5
+  };
+  
+  _onRoomUpdate?.(room);
+
+  const allAnswered = sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
+  if (allAnswered) {
+    _onRoundEnd?.();
+  }
+};
+
 export const multiplayerService = {
   async createRoom(nickname: string): Promise<{ room: Room; player: Player } | null> {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -98,43 +130,11 @@ export const multiplayerService = {
       },
     });
 
-    const handleSync = () => {
-      if (!channel) return;
-      const state = channel.presenceState();
-      const playersList: Player[] = [];
-      
-      Object.values(state).forEach((presences: any) => {
-        presences.forEach((p: Player) => {
-          playersList.push(p);
-        });
-      });
-
-      const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
-      const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
-      
-      _onPlayersChange?.(sortedPlayers);
-      
-      const room: Room = {
-        id: roomId,
-        hostId: host?.id || '',
-        gameStarted: false, 
-        players: sortedPlayers,
-        roundCount: 5
-      };
-      
-      _onRoomUpdate?.(room);
-
-      const allAnswered = sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
-      if (allAnswered) {
-        _onRoundEnd?.();
-      }
-    };
-
     // ATTACH LISTENERS BEFORE SUBSCRIBING
     channel
-      .on('presence', { event: 'sync' }, handleSync)
-      .on('presence', { event: 'join' }, handleSync)
-      .on('presence', { event: 'leave' }, handleSync)
+      .on('presence', { event: 'sync' }, triggerSync)
+      .on('presence', { event: 'join' }, triggerSync)
+      .on('presence', { event: 'leave' }, triggerSync)
       .on('broadcast', { event: 'game:start' }, ({ payload }) => {
         _onGameStarted?.(payload);
       })
@@ -236,8 +236,6 @@ export const multiplayerService = {
     onGameReset?: () => void,
     onGameStarted?: (data: { questions: any[]; roundCount: number }) => void
   ) {
-    if (!channel) return () => {};
-
     // Assign the callbacks provided by the React hook to our global variables
     _onPlayersChange = onPlayersChange;
     _onRoomUpdate = onRoomUpdate;
@@ -245,6 +243,12 @@ export const multiplayerService = {
     _onNextRound = onNextRound || null;
     _onGameReset = onGameReset || null;
     _onGameStarted = onGameStarted || null;
+
+    // If channel is already present (e.g. view changed), trigger sync immediately
+    // to populate UI with the current presence state.
+    if (channel && currentRoomId === roomId) {
+       triggerSync();
+    }
 
     return () => {
       // Clear the callbacks when the component unmounts
