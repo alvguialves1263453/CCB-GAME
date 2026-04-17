@@ -133,13 +133,18 @@ export default function App() {
         setPlayers(prev => {
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
+            // Preserve local answered status to avoid flickering during presence sync delays
+            const hasAnswered = dbp.id === localPlayerId 
+              ? (existing?.hasAnswered || dbp.hasAnswered || false) 
+              : (dbp.hasAnswered || false);
+
             return {
               id: dbp.id,
               nickname: dbp.nickname,
               isHost: dbp.isHost,
               isReady: dbp.isReady,
               score: dbp.score || 0,
-              hasAnswered: dbp.hasAnswered || false,
+              hasAnswered,
               lastAnswerTime: existing?.lastAnswerTime || 0
             };
           });
@@ -183,6 +188,10 @@ export default function App() {
         setCurrentRound(0);
         startRound(0);
         setView("game");
+      },
+      (data) => {
+        // onPlayerAnswered
+        setPlayers(prev => prev.map(p => p.id === data.playerId ? { ...p, hasAnswered: true } : p));
       }
     );
 
@@ -415,6 +424,10 @@ export default function App() {
     
     // Reset players for the round
     setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
+
+    if (!isSolo && roomId) {
+      multiplayerService.resetPlayerRoundState();
+    }
     
     // Simulate bots answering after some time (adjust for difficulty)
     players.filter(p => p.id.startsWith("bot")).forEach(bot => {

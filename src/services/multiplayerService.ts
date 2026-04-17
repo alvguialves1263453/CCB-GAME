@@ -32,6 +32,7 @@ let _onRoundEnd: (() => void) | null = null;
 let _onNextRound: (() => void) | null = null;
 let _onGameReset: (() => void) | null = null;
 let _onGameStarted: ((data: { questions: any[]; roundCount: number; difficulty: string }) => void) | null = null;
+let _onPlayerAnswered: ((data: { playerId: string; correct: boolean }) => void) | null = null;
 
 const triggerSync = () => {
   if (!channel || !currentRoomId) return;
@@ -60,7 +61,7 @@ const triggerSync = () => {
   
   _onRoomUpdate?.(room);
 
-  const allAnswered = sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
+  const allAnswered = isGameStarted && sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
   if (allAnswered) {
     _onRoundEnd?.();
   }
@@ -153,6 +154,9 @@ export const multiplayerService = {
       .on('broadcast', { event: 'game:reset' }, () => {
         isGameStarted = false;
         _onGameReset?.();
+      })
+      .on('broadcast', { event: 'player:answered' }, ({ payload }) => {
+        _onPlayerAnswered?.(payload);
       });
 
     return new Promise((resolve, reject) => {
@@ -221,8 +225,7 @@ export const multiplayerService = {
 
   nextRound(roomId: string) {
     if (channel && localPlayer) {
-      localPlayer.hasAnswered = false;
-      channel.track(localPlayer);
+      this.resetPlayerRoundState();
 
       channel.send({
         type: 'broadcast',
@@ -232,11 +235,21 @@ export const multiplayerService = {
     }
   },
 
+  resetPlayerRoundState() {
+    if (channel && localPlayer) {
+      localPlayer.hasAnswered = false;
+      channel.track(localPlayer);
+    }
+  },
+
   leaveRoom() {
     if (channel) {
       supabase.removeChannel(channel);
       channel = null;
     }
+    isGameStarted = false;
+    currentRoomId = null;
+    localPlayer = null;
   },
 
   subscribeToRoom(
@@ -246,7 +259,8 @@ export const multiplayerService = {
     onRoundEnd?: () => void,
     onNextRound?: () => void,
     onGameReset?: () => void,
-    onGameStarted?: (data: { questions: any[]; roundCount: number; difficulty: string }) => void
+    onGameStarted?: (data: { questions: any[]; roundCount: number; difficulty: string }) => void,
+    onPlayerAnswered?: (data: { playerId: string; correct: boolean }) => void
   ) {
     // Assign the callbacks provided by the React hook to our global variables
     _onPlayersChange = onPlayersChange;
@@ -255,6 +269,7 @@ export const multiplayerService = {
     _onNextRound = onNextRound || null;
     _onGameReset = onGameReset || null;
     _onGameStarted = onGameStarted || null;
+    _onPlayerAnswered = onPlayerAnswered || null;
 
     // If channel is already present (e.g. view changed), trigger sync immediately
     // to populate UI with the current presence state.
