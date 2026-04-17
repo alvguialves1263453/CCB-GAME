@@ -23,6 +23,7 @@ export interface Room {
 let channel: RealtimeChannel | null = null;
 let currentRoomId: string | null = null;
 let localPlayer: Player | null = null;
+let isGameStarted = false;
 
 // Global callbacks to be assigned when React component mounts
 let _onPlayersChange: ((players: Player[]) => void) | null = null;
@@ -52,7 +53,7 @@ const triggerSync = () => {
   const room: Room = {
     id: currentRoomId,
     hostId: host?.id || '',
-    gameStarted: false, 
+    gameStarted: isGameStarted, 
     players: sortedPlayers,
     roundCount: 5
   };
@@ -143,12 +144,14 @@ export const multiplayerService = {
       .on('presence', { event: 'join' }, triggerSync)
       .on('presence', { event: 'leave' }, triggerSync)
       .on('broadcast', { event: 'game:start' }, ({ payload }) => {
+        isGameStarted = true;
         _onGameStarted?.(payload);
       })
       .on('broadcast', { event: 'game:next_round' }, () => {
         _onNextRound?.();
       })
       .on('broadcast', { event: 'game:reset' }, () => {
+        isGameStarted = false;
         _onGameReset?.();
       });
 
@@ -190,6 +193,7 @@ export const multiplayerService = {
 
   startGameWithQuestions(roomId: string, questions: any[], roundCount: number, difficulty: string) {
     if (channel) {
+      isGameStarted = true;
       channel.send({
         type: 'broadcast',
         event: 'game:start',
@@ -200,6 +204,7 @@ export const multiplayerService = {
 
   resetRoom(roomId: string) {
     if (channel && localPlayer) {
+      isGameStarted = false;
       // Reset local player first
       localPlayer.score = 0;
       localPlayer.hasAnswered = false;
