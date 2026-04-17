@@ -8,6 +8,7 @@ export interface Player {
   isReady: boolean;
   score: number;
   hasAnswered: boolean;
+  round: number;
   joinedAt: number;
 }
 
@@ -24,6 +25,8 @@ let channel: RealtimeChannel | null = null;
 let currentRoomId: string | null = null;
 let localPlayer: Player | null = null;
 let isGameStarted = false;
+let discoveryChannel: RealtimeChannel | null = null;
+let clientIp: string | null = null;
 
 // Global callbacks to be assigned when React component mounts
 let _onPlayersChange: ((players: Player[]) => void) | null = null;
@@ -32,7 +35,20 @@ let _onRoundEnd: (() => void) | null = null;
 let _onNextRound: (() => void) | null = null;
 let _onGameReset: (() => void) | null = null;
 let _onGameStarted: ((data: { questions: any[]; roundCount: number; difficulty: string }) => void) | null = null;
-let _onPlayerAnswered: ((data: { playerId: string; correct: boolean }) => void) | null = null;
+let _onPlayerAnswered: ((data: { playerId: string; correct: boolean; round: number }) => void) | null = null;
+let _onNearbyRoomsChange: ((rooms: { id: string; hostName: string }[]) => void) | null = null;
+
+const getClientIp = async () => {
+  if (clientIp) return clientIp;
+  try {
+    const res = await fetch('https://api64.ipify.org?format=json');
+    const data = await res.json();
+    clientIp = data.ip;
+    return clientIp;
+  } catch (e) {
+    return 'unknown';
+  }
+};
 
 const triggerSync = () => {
   if (!channel || !currentRoomId) return;
@@ -60,11 +76,6 @@ const triggerSync = () => {
   };
   
   _onRoomUpdate?.(room);
-
-  const allAnswered = isGameStarted && sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
-  if (allAnswered) {
-    _onRoundEnd?.();
-  }
 };
 
 export const multiplayerService = {
@@ -82,6 +93,7 @@ export const multiplayerService = {
       isReady: false,
       score: 0,
       hasAnswered: false,
+      round: 0,
       joinedAt: Date.now(),
     };
 
@@ -95,6 +107,8 @@ export const multiplayerService = {
 
     try {
       await this.initChannel(roomId, player);
+      // Start broadcasting for discovery
+      this.startDiscoveryBroadcast(roomId, player.nickname);
       return { room, player };
     } catch (error) {
       console.error("Error creating room:", error);
@@ -110,6 +124,7 @@ export const multiplayerService = {
       isReady: false,
       score: 0,
       hasAnswered: false,
+      round: 0,
       joinedAt: Date.now(),
     };
 
@@ -180,17 +195,18 @@ export const multiplayerService = {
     }
   },
 
-  updateScore(roomId: string, correct: boolean, score: number) {
+  updateScore(roomId: string, correct: boolean, score: number, round: number) {
     if (channel && localPlayer) {
       localPlayer.score += score;
       localPlayer.hasAnswered = true;
+      localPlayer.round = round;
       channel.track(localPlayer);
       
       // If correct, broadcast answer event if needed (optional)
       channel.send({
         type: 'broadcast',
         event: 'player:answered',
-        payload: { playerId: localPlayer.id, correct }
+        payload: { playerId: localPlayer.id, correct, round }
       });
     }
   },
@@ -198,6 +214,8 @@ export const multiplayerService = {
   startGameWithQuestions(roomId: string, questions: any[], roundCount: number, difficulty: string) {
     if (channel) {
       isGameStarted = true;
+      // Stop broadcasting for discovery when game starts
+      this.stopDiscoveryBroadcast();
       channel.send({
         type: 'broadcast',
         event: 'game:start',
@@ -235,9 +253,10 @@ export const multiplayerService = {
     }
   },
 
-  resetPlayerRoundState() {
+  resetPlayerRoundState(round: number) {
     if (channel && localPlayer) {
       localPlayer.hasAnswered = false;
+      localPlayer.round = round;
       channel.track(localPlayer);
     }
   },
@@ -250,6 +269,63 @@ export const multiplayerService = {
     isGameStarted = false;
     currentRoomId = null;
     localPlayer = null;
+    this.stopDiscoveryBroadcast();
+  },
+
+  async startDiscoveryBroadcast(roomId: string, hostName: string) {
+    const ip = await getClientIp();
+    if (discoveryChannel) supabase.removeChannel(discoveryChannel);
+
+    discoveryChannel = supabase.channel('lobby_discovery', {
+      config: { presence: { key: roomId } }
+    });
+
+    discoveryChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await discoveryChannel!.track({ roomId, hostName, ip, createdAt: Date.now() });
+      }
+    });
+  },
+
+  stopDiscoveryBroadcast() {
+    if (discoveryChannel) {
+      supabase.removeChannel(discoveryChannel);
+      discoveryChannel = null;
+    }
+  },
+
+  async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
+    _onNearbyRoomsChange = onNearbyRoomsChange;
+    const myIp = await getClientIp();
+
+    if (discoveryChannel) supabase.removeChannel(discoveryChannel);
+
+    discoveryChannel = supabase.channel('lobby_discovery');
+
+    discoveryChannel.on('presence', { event: 'sync' }, () => {
+      const state = discoveryChannel!.presenceState();
+      const rooms: { id: string; hostName: string }[] = [];
+      
+      Object.values(state).forEach((presences: any) => {
+        presences.forEach((p: any) => {
+          // Only show rooms on the same IP and not too old (e.g. 1 hour)
+          if (p.ip === myIp && p.roomId && (Date.now() - p.createdAt < 3600000)) {
+            if (!rooms.find(r => r.id === p.roomId)) {
+               rooms.push({ id: p.roomId, hostName: p.hostName });
+            }
+          }
+        });
+      });
+      
+      _onNearbyRoomsChange?.(rooms);
+    });
+
+    discoveryChannel.subscribe();
+  },
+
+  stopDiscoveryListener() {
+    this.stopDiscoveryBroadcast();
+    _onNearbyRoomsChange = null;
   },
 
   subscribeToRoom(
@@ -260,7 +336,7 @@ export const multiplayerService = {
     onNextRound?: () => void,
     onGameReset?: () => void,
     onGameStarted?: (data: { questions: any[]; roundCount: number; difficulty: string }) => void,
-    onPlayerAnswered?: (data: { playerId: string; correct: boolean }) => void
+    onPlayerAnswered?: (data: { playerId: string; correct: boolean; round: number }) => void
   ) {
     // Assign the callbacks provided by the React hook to our global variables
     _onPlayersChange = onPlayersChange;

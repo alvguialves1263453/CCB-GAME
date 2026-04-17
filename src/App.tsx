@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal } from "lucide-react";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
@@ -17,6 +17,7 @@ interface Player {
   hasAnswered: boolean;
   lastAnswerTime: number;
   isReady?: boolean;
+  round?: number;
 }
 
 const ROUNDS_COUNT = 5;
@@ -55,6 +56,7 @@ type Difficulty = 'facil' | 'medio' | 'dificil';
 export default function App() {
   const [view, setView] = useState<ViewState>("home");
   const [players, setPlayers] = useState<Player[]>([]);
+  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string }[]>([]);
   const [nickname, setNickname] = useState("");
   const [hymns, setHymns] = useState<Hymn[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -80,6 +82,7 @@ export default function App() {
 
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
+  const lastHandledRoundRef = useRef<number>(-1);
 
   // Refs for reliable socket callbacks
   const isGameActiveRef = useRef(isGameActive);
@@ -133,10 +136,10 @@ export default function App() {
         setPlayers(prev => {
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
-            // Preserve local answered status to avoid flickering during presence sync delays
+            // Preserve local answered status if the round matches, to avoid flickering
             const hasAnswered = dbp.id === localPlayerId 
-              ? (existing?.hasAnswered || dbp.hasAnswered || false) 
-              : (dbp.hasAnswered || false);
+              ? (existing?.hasAnswered || (dbp.hasAnswered && dbp.round === currentRoundRef.current)) 
+              : (dbp.hasAnswered && dbp.round === currentRoundRef.current);
 
             return {
               id: dbp.id,
@@ -144,7 +147,8 @@ export default function App() {
               isHost: dbp.isHost,
               isReady: dbp.isReady,
               score: dbp.score || 0,
-              hasAnswered,
+              hasAnswered: !!hasAnswered,
+              round: dbp.round,
               lastAnswerTime: existing?.lastAnswerTime || 0
             };
           });
@@ -153,18 +157,13 @@ export default function App() {
       (room) => {
         if (room.gameStarted && view !== "game" && room.questions) {
           setQuestions(room.questions);
-          setCurrentRound(0);
-          startRound(0);
-          setView("game");
+          // Don't auto-start here, let broadcast game:start handle it
         } else if (!room.gameStarted && (view === "game" || view === "ranking")) {
           setView("lobby");
         }
       },
       () => {
-        // onRoundEnd
-        if (isGameActiveRef.current) {
-          handleRoundEnd();
-        }
+        // onRoundEnd - we handle this via useEffect now
       },
       () => {
         // onNextRound
@@ -191,24 +190,38 @@ export default function App() {
       },
       (data) => {
         // onPlayerAnswered
-        setPlayers(prev => prev.map(p => p.id === data.playerId ? { ...p, hasAnswered: true } : p));
+        setPlayers(prev => prev.map(p => (p.id === data.playerId && data.round === currentRoundRef.current) ? { ...p, hasAnswered: true } : p));
       }
     );
 
     return () => unsubscribe();
   }, [roomId, isSolo, view]);
 
-  // Check if all players answered (Critical for Solo with Bots)
+  // Check if all players answered (Unified for Solo and Multi)
   useEffect(() => {
-    if (isSolo && isGameActive && !showResult) {
+    if (isGameActive && !showResult && players.length > 0) {
       const allAnswered = players.every(p => p.hasAnswered);
       if (allAnswered) {
-        setTimeout(() => {
+        // Debounce slightly to allow UI to show final answer states
+        const timer = setTimeout(() => {
           handleRoundEnd();
         }, 1000);
+        return () => clearTimeout(timer);
       }
     }
-  }, [players, isGameActive, showResult, isSolo, roundCount]);
+  }, [players, isGameActive, showResult]);
+
+  // Discovery listener
+  useEffect(() => {
+    if (view === "multiplayer_join") {
+      multiplayerService.startDiscoveryListener((rooms) => {
+        setNearbyRooms(rooms);
+      });
+      return () => {
+        multiplayerService.stopDiscoveryListener();
+      };
+    }
+  }, [view]);
 
   // Load all hymns
   const loadHymns = async () => {
@@ -426,7 +439,7 @@ export default function App() {
     setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
 
     if (!isSolo && roomId) {
-      multiplayerService.resetPlayerRoundState();
+      multiplayerService.resetPlayerRoundState(roundIndex);
     }
     
     // Simulate bots answering after some time (adjust for difficulty)
@@ -487,7 +500,7 @@ export default function App() {
     setFeedback({ correct: isUserCorrect, option: option || "Tempo Esgotado" });
 
     if (!isSolo && localPlayerId && roomId) {
-      multiplayerService.updateScore(roomId, isUserCorrect, pointsToAdd);
+      multiplayerService.updateScore(roomId, isUserCorrect, pointsToAdd, currentRound);
     }
 
     setPlayers(prev => prev.map(p => {
@@ -537,7 +550,9 @@ export default function App() {
   }, [isGameActive, difficulty, showResult]);
 
   const handleRoundEnd = () => {
-    if (!isGameActiveRef.current) return;
+    if (!isGameActiveRef.current || lastHandledRoundRef.current === currentRoundRef.current) return;
+    lastHandledRoundRef.current = currentRoundRef.current;
+    
     setIsGameActive(false);
     setShowResult(true);
 
@@ -964,6 +979,51 @@ export default function App() {
                   >
                     Avançar <ArrowRight className="w-5 h-5 ml-2 inline-block" />
                   </motion.button>
+                </div>
+
+                {/* Jogos na mesma rede section */}
+                <div className="mt-10 pt-8 border-t-4 border-game-border/10">
+                  <div className="flex items-center justify-center gap-2 mb-4 text-game-border/60">
+                    <Wifi className="w-4 h-4" />
+                    <span className="text-xs font-black uppercase tracking-widest">Jogos na mesma rede</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {nearbyRooms.length > 0 ? (
+                      nearbyRooms.map(room => (
+                        <motion.button
+                          key={room.id}
+                          whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,1)" }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            soundService.playClick();
+                            setJoinRoomCode(room.id);
+                            setRoomId(room.id);
+                            setView("multiplayer_setup");
+                          }}
+                          className="w-full p-4 bg-gray-50 border-2 border-game-border rounded-2xl flex items-center justify-between group hover:border-game-primary transition-all"
+                        >
+                          <div className="flex flex-col items-start px-2">
+                            <span className="text-xs uppercase text-game-border/50 font-black tracking-tighter mb-0.5">Sala de</span>
+                            <span className="text-game-border font-black text-lg group-hover:text-game-primary transition-colors">
+                              {room.hostName || "Anônimo"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                             <div className="px-3 py-1 bg-game-secondary border-2 border-game-border rounded-full text-[10px] font-black uppercase text-game-border group-hover:bg-game-primary group-hover:text-white transition-colors">
+                               {room.id}
+                             </div>
+                             <ChevronRight className="w-5 h-5 text-game-border/30 group-hover:text-game-primary" />
+                          </div>
+                        </motion.button>
+                      ))
+                    ) : (
+                      <div className="py-8 text-center bg-gray-50/50 rounded-2xl border-2 border-dashed border-game-border/20 flex flex-col items-center gap-2">
+                        <Loader2 className="w-5 h-5 text-game-border/20 animate-spin" />
+                        <p className="text-[10px] uppercase font-black tracking-widest text-game-border/40">Procurando partidas...</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
