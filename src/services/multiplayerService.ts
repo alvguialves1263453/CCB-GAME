@@ -1,4 +1,5 @@
-import { io, Socket } from "socket.io-client";
+import { supabase } from "../lib/supabase";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface Player {
   id: string;
@@ -16,55 +17,159 @@ export interface Room {
   gameStarted: boolean;
   players: Player[];
   questions?: any[];
+  roundCount: number;
 }
 
-// In Socket.io mode, we connect to the same origin
-const socket: Socket = io();
+let channel: RealtimeChannel | null = null;
+let currentRoomId: string | null = null;
+let localPlayer: Player | null = null;
 
 export const multiplayerService = {
-  socket,
+  async createRoom(nickname: string): Promise<{ room: Room; player: Player } | null> {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const player: Player = {
+      id: Math.random().toString(36).substring(2, 10),
+      nickname,
+      isHost: true,
+      isReady: false,
+      score: 0,
+      hasAnswered: false,
+      joinedAt: Date.now(),
+    };
 
-  createRoom(nickname: string): Promise<{ room: Room; player: Player } | null> {
-    return new Promise((resolve) => {
-      socket.emit("room:create", { nickname });
-      socket.once("room:joined", (data) => resolve(data));
-      // Add timeout for safety
-      setTimeout(() => resolve(null), 5000);
-    });
+    const room: Room = {
+      id: roomId,
+      hostId: player.id,
+      gameStarted: false,
+      players: [player],
+      roundCount: 5,
+    };
+
+    try {
+      await this.initChannel(roomId, player);
+      return { room, player };
+    } catch (error) {
+      console.error("Error creating room:", error);
+      return null;
+    }
   },
 
-  joinRoom(roomId: string, nickname: string): Promise<Player | null> {
-    return new Promise((resolve) => {
-      socket.emit("room:join", { roomId: roomId.toUpperCase(), nickname });
-      socket.once("room:joined", (data) => resolve(data.player));
-      socket.once("error", () => resolve(null));
-      setTimeout(() => resolve(null), 5000);
+  async joinRoom(roomId: string, nickname: string): Promise<Player | null> {
+    const player: Player = {
+      id: Math.random().toString(36).substring(2, 10),
+      nickname,
+      isHost: false,
+      isReady: false,
+      score: 0,
+      hasAnswered: false,
+      joinedAt: Date.now(),
+    };
+
+    try {
+      await this.initChannel(roomId.toUpperCase(), player);
+      return player;
+    } catch (error) {
+      console.error("Error joining room:", error);
+      return null;
+    }
+  },
+
+  async initChannel(roomId: string, player: Player) {
+    if (channel) {
+      await supabase.removeChannel(channel);
+    }
+
+    currentRoomId = roomId;
+    localPlayer = player;
+    
+    channel = supabase.channel(`room:${roomId}`, {
+      config: {
+        presence: {
+          key: player.id,
+        },
+      },
+    });
+
+    return new Promise((resolve, reject) => {
+      channel!
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel!.track(player);
+            resolve(true);
+          }
+          if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+            reject(new Error("Supabase signal timeout"));
+          }
+        });
     });
   },
 
   toggleReady(roomId: string, isReady: boolean) {
-    socket.emit("player:ready", { roomId, isReady });
+    if (channel && localPlayer) {
+      localPlayer.isReady = isReady;
+      channel.track(localPlayer);
+    }
   },
 
   updateScore(roomId: string, correct: boolean, score: number) {
-    socket.emit("game:answer", { roomId, correct, score });
+    if (channel && localPlayer) {
+      localPlayer.score += score;
+      localPlayer.hasAnswered = true;
+      channel.track(localPlayer);
+      
+      // If correct, broadcast answer event if needed (optional)
+      channel.send({
+        type: 'broadcast',
+        event: 'player:answered',
+        payload: { playerId: localPlayer.id, correct }
+      });
+    }
   },
 
   startGameWithQuestions(roomId: string, questions: any[], roundCount: number) {
-    socket.emit("game:start", { roomId, questions, roundCount });
+    if (channel) {
+      channel.send({
+        type: 'broadcast',
+        event: 'game:start',
+        payload: { questions, roundCount }
+      });
+    }
   },
 
   resetRoom(roomId: string) {
-    socket.emit("game:reset", { roomId });
+    if (channel && localPlayer) {
+      // Reset local player first
+      localPlayer.score = 0;
+      localPlayer.hasAnswered = false;
+      localPlayer.isReady = false;
+      channel.track(localPlayer);
+      
+      channel.send({
+        type: 'broadcast',
+        event: 'game:reset',
+        payload: {}
+      });
+    }
   },
 
   nextRound(roomId: string) {
-    socket.emit("game:next_round", { roomId });
+    if (channel && localPlayer) {
+      localPlayer.hasAnswered = false;
+      channel.track(localPlayer);
+
+      channel.send({
+        type: 'broadcast',
+        event: 'game:next_round',
+        payload: {}
+      });
+    }
   },
 
   leaveRoom() {
-    socket.disconnect();
-    socket.connect();
+    if (channel) {
+      supabase.removeChannel(channel);
+      channel = null;
+    }
   },
 
   subscribeToRoom(
@@ -76,31 +181,63 @@ export const multiplayerService = {
     onGameReset?: () => void,
     onGameStarted?: (data: { questions: any[]; roundCount: number }) => void
   ) {
-    const handleUpdate = (room: Room) => {
-      if (room.id === roomId) {
-        onRoomUpdate(room);
-        onPlayersChange(room.players);
+    if (!channel) return () => {};
+
+    const handleSync = () => {
+      const state = channel!.presenceState();
+      const playersList: Player[] = [];
+      
+      Object.values(state).forEach((presences: any) => {
+        presences.forEach((p: Player) => {
+          playersList.push(p);
+        });
+      });
+
+      // Sort by joinedAt to keep host consistent if needed, but here we trust isHost flag
+      const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
+      
+      // Find host
+      const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
+      
+      onPlayersChange(sortedPlayers);
+      
+      // Construct a room-like object
+      const room: Room = {
+        id: roomId,
+        hostId: host?.id || '',
+        gameStarted: false, // We'll update this via broadcast
+        players: sortedPlayers,
+        roundCount: 5
+      };
+      
+      onRoomUpdate(room);
+
+      // Logical check for round end locally
+      const allAnswered = sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
+      if (allAnswered) {
+        onRoundEnd?.();
       }
     };
 
-    const handleError = (err: any) => {
-      console.error("Socket error:", err);
-    };
-
-    socket.on("room:update", handleUpdate);
-    socket.on("game:started", onGameStarted || (() => {}));
-    socket.on("round:end", () => onRoundEnd?.());
-    socket.on("round:next", () => onNextRound?.());
-    socket.on("game:reseted", () => onGameReset?.());
-    socket.on("error", handleError);
+    channel
+      .on('presence', { event: 'sync' }, handleSync)
+      .on('presence', { event: 'join' }, handleSync)
+      .on('presence', { event: 'leave' }, handleSync)
+      .on('broadcast', { event: 'game:start' }, ({ payload }) => {
+        onGameStarted?.(payload);
+      })
+      .on('broadcast', { event: 'game:next_round' }, () => {
+        onNextRound?.();
+      })
+      .on('broadcast', { event: 'game:reset' }, () => {
+        onGameReset?.();
+      });
 
     return () => {
-      socket.off("room:update", handleUpdate);
-      socket.off("game:started");
-      socket.off("round:end");
-      socket.off("round:next");
-      socket.off("game:reseted");
-      socket.off("error", handleError);
+      // Supabase RealtimeChannel doesn't have a direct .off() for all events.
+      // Usually you'd use channel.unsubscribe() to close the whole channel,
+      // or manage listeners using internal state if needed.
+      // For this app, sub/unsub is handled at the room level.
     };
   },
 };
