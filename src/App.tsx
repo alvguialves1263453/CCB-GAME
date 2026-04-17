@@ -57,6 +57,8 @@ export default function App() {
   const [view, setView] = useState<ViewState>("home");
   const [players, setPlayers] = useState<Player[]>([]);
   const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string }[]>([]);
+  const [gameCountdown, setGameCountdown] = useState<number | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [nickname, setNickname] = useState("");
   const [hymns, setHymns] = useState<Hymn[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -160,15 +162,17 @@ export default function App() {
           // Don't auto-start here, let broadcast game:start handle it
         } else if (!room.gameStarted && (view === "game" || view === "ranking")) {
           setView("lobby");
+          setIsPreparing(false);
+          setGameCountdown(null);
         }
       },
       () => {
         // onRoundEnd - we handle this via useEffect now
       },
-      () => {
+      (roundIndex) => {
         // onNextRound
-        if (currentRoundRef.current + 1 < roundCount) {
-          startRound(currentRoundRef.current + 1);
+        if (roundIndex < roundCountRef.current) {
+          startRound(roundIndex);
         } else {
           setView("ranking");
         }
@@ -176,6 +180,8 @@ export default function App() {
       () => {
         // onGameReset
         setView("lobby");
+        setIsPreparing(false);
+        setGameCountdown(null);
       },
       (data) => {
         // onGameStarted
@@ -184,9 +190,11 @@ export default function App() {
         if (data.difficulty) {
           setDifficulty(data.difficulty as Difficulty);
         }
-        setCurrentRound(0);
-        startRound(0);
+        
+        // Start Countdown
+        setIsPreparing(true);
         setView("game");
+        setGameCountdown(3);
       },
       (data) => {
         // onPlayerAnswered
@@ -222,6 +230,21 @@ export default function App() {
       };
     }
   }, [view]);
+
+  // Countdown Timer
+  useEffect(() => {
+    if (gameCountdown !== null && gameCountdown > 0) {
+      const timer = setTimeout(() => {
+        setGameCountdown(gameCountdown - 1);
+        soundService.playTick();
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (gameCountdown === 0) {
+      setIsPreparing(false);
+      setGameCountdown(null);
+      startRound(0);
+    }
+  }, [gameCountdown]);
 
   // Load all hymns
   const loadHymns = async () => {
@@ -513,6 +536,8 @@ export default function App() {
 
   const lastTickTimeRef = useRef<number>(0);
   const hasRungBellRef = useRef<boolean>(false);
+  const roundCountRef = useRef<number>(roundCount);
+  useEffect(() => { roundCountRef.current = roundCount; }, [roundCount]);
 
   // Timer Tick
   useEffect(() => {
@@ -556,6 +581,9 @@ export default function App() {
     setIsGameActive(false);
     setShowResult(true);
 
+    // Stop and clear the timer immediately
+    setTimeLeft(null);
+
     let finalIsCorrect = false;
 
     // Ensure feedback is set even if user didn't answer
@@ -582,17 +610,16 @@ export default function App() {
       soundService.playWrong();
     }
 
-    // Auto-advance to next round
+    // Auto-advance to next round after 4 seconds
     const isHost = isSolo || players.find(p => p.id === localPlayerId)?.isHost;
-    
     if (isHost) {
       setTimeout(() => {
-        nextRound();
-      }, 2000);
+        nextRoundLocal();
+      }, 4000);
     }
   };
 
-  const nextRound = () => {
+  const nextRoundLocal = () => {
     const nextIdx = currentRoundRef.current + 1;
     if (isSolo) {
       if (nextIdx < roundCount) {
@@ -601,7 +628,7 @@ export default function App() {
         setView("ranking");
       }
     } else if (roomId) {
-      multiplayerService.nextRound(roomId);
+      multiplayerService.nextRound(roomId, nextIdx);
     }
   };
 
@@ -1369,8 +1396,31 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-grow flex flex-col lg:grid lg:grid-cols-[1fr_350px] gap-6 md:gap-8"
+              className="flex-grow flex flex-col lg:grid lg:grid-cols-[1fr_350px] gap-6 md:gap-8 relative"
             >
+              {/* Game Countdown Overlay */}
+              <AnimatePresence>
+                {isPreparing && gameCountdown !== null && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-game-primary/95 backdrop-blur-xl"
+                  >
+                    <motion.div
+                      key={gameCountdown}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 1.5, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      className="text-[180px] md:text-[300px] font-black text-white italic drop-shadow-[10px_10px_0px_#1A1A1A]"
+                    >
+                      {gameCountdown === 0 ? "BORA!" : gameCountdown}
+                    </motion.div>
+                    <p className="text-white/60 font-black uppercase text-xl md:text-3xl tracking-[0.5em] mt-[-40px]">Prepare-se!</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="flex flex-col gap-6 md:gap-8">
                 {/* Round Header */}
                 <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-3 md:p-6 rounded-[1.5rem] md:rounded-[2rem] game-shadow">
@@ -1540,18 +1590,7 @@ export default function App() {
                           </p>
                         </div>
                         
-                        {!isSolo && players.find(p => p.id === localPlayerId)?.isHost && players.every(p => p.hasAnswered) && (
-                          <button
-                            onClick={() => {
-                              soundService.playClick();
-                              nextRound();
-                            }}
-                            className="p-6 bg-game-primary text-white font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform game-border game-shadow flex items-center gap-3 text-xl"
-                          >
-                            <span>Bora pra Proxima!</span>
-                            <ArrowRight className="w-8 h-8" />
-                          </button>
-                        )}
+                        {/* Removed manual Next Round button - now automatic */}
                       </motion.div>
                     )}
                   </AnimatePresence>

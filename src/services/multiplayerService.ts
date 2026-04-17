@@ -32,7 +32,7 @@ let clientIp: string | null = null;
 let _onPlayersChange: ((players: Player[]) => void) | null = null;
 let _onRoomUpdate: ((room: Room) => void) | null = null;
 let _onRoundEnd: (() => void) | null = null;
-let _onNextRound: (() => void) | null = null;
+let _onNextRound: ((round: number) => void) | null = null;
 let _onGameReset: (() => void) | null = null;
 let _onGameStarted: ((data: { questions: any[]; roundCount: number; difficulty: string }) => void) | null = null;
 let _onPlayerAnswered: ((data: { playerId: string; correct: boolean; round: number }) => void) | null = null;
@@ -175,8 +175,8 @@ export const multiplayerService = {
         isGameStarted = true;
         _onGameStarted?.(payload);
       })
-      .on('broadcast', { event: 'game:next_round' }, () => {
-        _onNextRound?.();
+      .on('broadcast', { event: 'game:next_round' }, ({ payload }) => {
+        _onNextRound?.(payload?.round ?? 0);
       })
       .on('broadcast', { event: 'game:reset' }, () => {
         isGameStarted = false;
@@ -253,14 +253,14 @@ export const multiplayerService = {
     }
   },
 
-  nextRound(roomId: string) {
+  nextRound(roomId: string, nextRoundIndex: number) {
     if (channel && localPlayer) {
-      this.resetPlayerRoundState();
+      this.resetPlayerRoundState(nextRoundIndex);
 
       channel.send({
         type: 'broadcast',
         event: 'game:next_round',
-        payload: {}
+        payload: { round: nextRoundIndex }
       });
     }
   },
@@ -361,7 +361,7 @@ export const multiplayerService = {
     onPlayersChange: (players: Player[]) => void,
     onRoomUpdate: (room: Room) => void,
     onRoundEnd?: () => void,
-    onNextRound?: () => void,
+    onNextRound?: (round: number) => void,
     onGameReset?: () => void,
     onGameStarted?: (data: { questions: any[]; roundCount: number; difficulty: string }) => void,
     onPlayerAnswered?: (data: { playerId: string; correct: boolean; round: number }) => void
