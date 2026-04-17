@@ -24,6 +24,14 @@ let channel: RealtimeChannel | null = null;
 let currentRoomId: string | null = null;
 let localPlayer: Player | null = null;
 
+// Global callbacks to be assigned when React component mounts
+let _onPlayersChange: ((players: Player[]) => void) | null = null;
+let _onRoomUpdate: ((room: Room) => void) | null = null;
+let _onRoundEnd: (() => void) | null = null;
+let _onNextRound: (() => void) | null = null;
+let _onGameReset: (() => void) | null = null;
+let _onGameStarted: ((data: { questions: any[]; roundCount: number }) => void) | null = null;
+
 export const multiplayerService = {
   async createRoom(nickname: string): Promise<{ room: Room; player: Player } | null> {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -89,6 +97,53 @@ export const multiplayerService = {
         },
       },
     });
+
+    const handleSync = () => {
+      if (!channel) return;
+      const state = channel.presenceState();
+      const playersList: Player[] = [];
+      
+      Object.values(state).forEach((presences: any) => {
+        presences.forEach((p: Player) => {
+          playersList.push(p);
+        });
+      });
+
+      const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
+      const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
+      
+      _onPlayersChange?.(sortedPlayers);
+      
+      const room: Room = {
+        id: roomId,
+        hostId: host?.id || '',
+        gameStarted: false, 
+        players: sortedPlayers,
+        roundCount: 5
+      };
+      
+      _onRoomUpdate?.(room);
+
+      const allAnswered = sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
+      if (allAnswered) {
+        _onRoundEnd?.();
+      }
+    };
+
+    // ATTACH LISTENERS BEFORE SUBSCRIBING
+    channel
+      .on('presence', { event: 'sync' }, handleSync)
+      .on('presence', { event: 'join' }, handleSync)
+      .on('presence', { event: 'leave' }, handleSync)
+      .on('broadcast', { event: 'game:start' }, ({ payload }) => {
+        _onGameStarted?.(payload);
+      })
+      .on('broadcast', { event: 'game:next_round' }, () => {
+        _onNextRound?.();
+      })
+      .on('broadcast', { event: 'game:reset' }, () => {
+        _onGameReset?.();
+      });
 
     return new Promise((resolve, reject) => {
       channel!
@@ -183,61 +238,22 @@ export const multiplayerService = {
   ) {
     if (!channel) return () => {};
 
-    const handleSync = () => {
-      const state = channel!.presenceState();
-      const playersList: Player[] = [];
-      
-      Object.values(state).forEach((presences: any) => {
-        presences.forEach((p: Player) => {
-          playersList.push(p);
-        });
-      });
-
-      // Sort by joinedAt to keep host consistent if needed, but here we trust isHost flag
-      const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
-      
-      // Find host
-      const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
-      
-      onPlayersChange(sortedPlayers);
-      
-      // Construct a room-like object
-      const room: Room = {
-        id: roomId,
-        hostId: host?.id || '',
-        gameStarted: false, // We'll update this via broadcast
-        players: sortedPlayers,
-        roundCount: 5
-      };
-      
-      onRoomUpdate(room);
-
-      // Logical check for round end locally
-      const allAnswered = sortedPlayers.length > 0 && sortedPlayers.every(p => p.hasAnswered);
-      if (allAnswered) {
-        onRoundEnd?.();
-      }
-    };
-
-    channel
-      .on('presence', { event: 'sync' }, handleSync)
-      .on('presence', { event: 'join' }, handleSync)
-      .on('presence', { event: 'leave' }, handleSync)
-      .on('broadcast', { event: 'game:start' }, ({ payload }) => {
-        onGameStarted?.(payload);
-      })
-      .on('broadcast', { event: 'game:next_round' }, () => {
-        onNextRound?.();
-      })
-      .on('broadcast', { event: 'game:reset' }, () => {
-        onGameReset?.();
-      });
+    // Assign the callbacks provided by the React hook to our global variables
+    _onPlayersChange = onPlayersChange;
+    _onRoomUpdate = onRoomUpdate;
+    _onRoundEnd = onRoundEnd || null;
+    _onNextRound = onNextRound || null;
+    _onGameReset = onGameReset || null;
+    _onGameStarted = onGameStarted || null;
 
     return () => {
-      // Supabase RealtimeChannel doesn't have a direct .off() for all events.
-      // Usually you'd use channel.unsubscribe() to close the whole channel,
-      // or manage listeners using internal state if needed.
-      // For this app, sub/unsub is handled at the room level.
+      // Clear the callbacks when the component unmounts
+      _onPlayersChange = null;
+      _onRoomUpdate = null;
+      _onRoundEnd = null;
+      _onNextRound = null;
+      _onGameReset = null;
+      _onGameStarted = null;
     };
   },
 };
