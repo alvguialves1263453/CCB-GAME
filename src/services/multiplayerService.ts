@@ -30,19 +30,20 @@ let _onRoomUpdate: ((room: Room) => void) | null = null;
 let _onRoundEnd: (() => void) | null = null;
 let _onNextRound: (() => void) | null = null;
 let _onGameReset: (() => void) | null = null;
-let _onGameStarted: ((data: { questions: any[]; roundCount: number }) => void) | null = null;
+let _onGameStarted: ((data: { questions: any[]; roundCount: number; difficulty: string }) => void) | null = null;
 
 const triggerSync = () => {
   if (!channel || !currentRoomId) return;
   const state = channel.presenceState();
-  const playersList: Player[] = [];
+  const uniquePlayers = new Map<string, Player>();
   
   Object.values(state).forEach((presences: any) => {
     presences.forEach((p: Player) => {
-      playersList.push(p);
+      uniquePlayers.set(p.id, p);
     });
   });
 
+  const playersList = Array.from(uniquePlayers.values());
   const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
   const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
   
@@ -181,12 +182,12 @@ export const multiplayerService = {
     }
   },
 
-  startGameWithQuestions(roomId: string, questions: any[], roundCount: number) {
+  startGameWithQuestions(roomId: string, questions: any[], roundCount: number, difficulty: string) {
     if (channel) {
       channel.send({
         type: 'broadcast',
         event: 'game:start',
-        payload: { questions, roundCount }
+        payload: { questions, roundCount, difficulty }
       });
     }
   },
@@ -234,7 +235,7 @@ export const multiplayerService = {
     onRoundEnd?: () => void,
     onNextRound?: () => void,
     onGameReset?: () => void,
-    onGameStarted?: (data: { questions: any[]; roundCount: number }) => void
+    onGameStarted?: (data: { questions: any[]; roundCount: number; difficulty: string }) => void
   ) {
     // Assign the callbacks provided by the React hook to our global variables
     _onPlayersChange = onPlayersChange;

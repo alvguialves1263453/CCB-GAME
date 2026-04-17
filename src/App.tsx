@@ -5,6 +5,7 @@ import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
+import { soundService } from "./lib/soundService";
 
 type ViewState = "home" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list";
 
@@ -49,6 +50,8 @@ const MusicalNotesBackground = () => {
   );
 };
 
+type Difficulty = 'facil' | 'medio' | 'dificil';
+
 export default function App() {
   const [view, setView] = useState<ViewState>("home");
   const [players, setPlayers] = useState<Player[]>([]);
@@ -57,6 +60,8 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
   const [roundCount, setRoundCount] = useState(5);
+  const [difficulty, setDifficulty] = useState<Difficulty>('facil');
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -170,6 +175,9 @@ export default function App() {
         // onGameStarted
         setQuestions(data.questions);
         setRoundCount(data.roundCount);
+        if (data.difficulty) {
+          setDifficulty(data.difficulty as Difficulty);
+        }
         setCurrentRound(0);
         startRound(0);
         setView("game");
@@ -314,6 +322,7 @@ export default function App() {
   };
 
   const toggleReady = async () => {
+    soundService.playClick();
     if (!localPlayerId || isSolo || !roomId) return;
     const me = players.find(p => p.id === localPlayerId);
     if (me) {
@@ -324,6 +333,7 @@ export default function App() {
   };
 
   const copyRoomLink = () => {
+    soundService.playClick();
     if (!roomId) return;
     const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
     navigator.clipboard.writeText(url);
@@ -332,6 +342,7 @@ export default function App() {
   };
 
   const handleStartGameClick = async () => {
+    soundService.playClick();
     if (isSolo) {
       const q = await prepareQuestions();
       if (q) {
@@ -353,7 +364,7 @@ export default function App() {
       const q = await prepareQuestions();
       if (q && roomId) {
         setIsLoading(true);
-        multiplayerService.startGameWithQuestions(roomId, q, roundCount);
+        multiplayerService.startGameWithQuestions(roomId, q, roundCount, difficulty);
         setIsLoading(false);
       }
     }
@@ -384,26 +395,45 @@ export default function App() {
     // This is now handled by handleStartGameClick or real-time room updates
   };
 
+  // Time limits mapping
+  const timeLimitMap = {
+    facil: Infinity,
+    medio: 20,
+    dificil: 10
+  };
+
   const startRound = (roundIndex: number) => {
     setCurrentRound(roundIndex);
     setIsGameActive(true);
     setSelectedOption(null);
     setFeedback(null);
     setShowResult(false);
+    setTimeLeft(difficulty === 'facil' ? null : timeLimitMap[difficulty]);
     startTimeRef.current = Date.now();
     
     // Reset players for the round
     setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
     
-    // Simulate bots answering after some time
+    // Simulate bots answering after some time (adjust for difficulty)
     players.filter(p => p.id.startsWith("bot")).forEach(bot => {
-      const delay = Math.random() * 5000 + 1000; // 1-6 seconds
+      const isHard = difficulty === 'dificil';
+      const delay = isHard ? Math.random() * 3000 + 1000 : Math.random() * 5000 + 1000;
       setTimeout(() => {
+        if (!isGameActiveRef.current) return;
         setPlayers(current => current.map(p => {
           if (p.id === bot.id) {
             const isCorrect = Math.random() > 0.3;
-            // Constant points without timer
-            const points = isCorrect ? 100 : 0;
+            let points = 0;
+            if (isCorrect) {
+              const timeSpentBot = delay / 1000;
+              if (difficulty === 'facil') {
+                points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
+              } else if (difficulty === 'medio') {
+                points = Math.max(100, Math.floor(((20 - timeSpentBot) / 20) * 1000));
+              } else {
+                points = Math.max(100, Math.floor(((10 - timeSpentBot) / 10) * 1000));
+              }
+            }
             return { ...p, hasAnswered: true, score: p.score + points };
           }
           return p;
@@ -412,27 +442,39 @@ export default function App() {
     });
   };
 
-  const handleAnswer = (option: string) => {
+  const handleAnswer = (option: string | null) => {
     if (!isGameActive || selectedOption) return; // Prevent multiple answers
     
+    // Play click sound if manual answer
+    if (option) {
+       soundService.playClick();
+    }
+
     const timeSpent = (Date.now() - startTimeRef.current) / 1000;
     lastHitTimeRef.current = timeSpent;
     
-    setSelectedOption(option);
+    setSelectedOption(option || "Tempo Esgotado");
     
     const currentQuestion = questions[currentRound];
-    const isUserCorrect = option.trim().toLowerCase() === currentQuestion.options[currentQuestion.correct].trim().toLowerCase();
-    // Simplified points without timer limit
-    const pointsToAdd = isUserCorrect ? 100 : 0;
+    const isUserCorrect = option ? option.trim().toLowerCase() === currentQuestion.options[currentQuestion.correct].trim().toLowerCase() : false;
+    
+    let pointsToAdd = 0;
+    if (isUserCorrect) {
+      if (difficulty === 'facil') {
+        pointsToAdd = Math.max(100, Math.floor(1000 - (timeSpent * 20)));
+      } else if (difficulty === 'medio') {
+        pointsToAdd = Math.max(100, Math.floor(((20 - timeSpent) / 20) * 1000));
+      } else {
+        pointsToAdd = Math.max(100, Math.floor(((10 - timeSpent) / 10) * 1000));
+      }
+    }
 
-    // Set feedback immediately for local individual experience
-    setFeedback({ correct: isUserCorrect, option: option });
+    setFeedback({ correct: isUserCorrect, option: option || "Tempo Esgotado" });
 
     if (!isSolo && localPlayerId && roomId) {
       multiplayerService.updateScore(roomId, isUserCorrect, pointsToAdd);
     }
 
-    // Local state update for immediate feedback in the UI
     setPlayers(prev => prev.map(p => {
       if (p.id === localPlayerId) {
         return { ...p, hasAnswered: true, score: p.score + pointsToAdd };
@@ -441,10 +483,50 @@ export default function App() {
     }));
   };
 
+  const lastTickTimeRef = useRef<number>(0);
+  const hasRungBellRef = useRef<boolean>(false);
+
+  // Timer Tick
+  useEffect(() => {
+    if (!isGameActive || difficulty === 'facil' || showResult) return;
+    
+    hasRungBellRef.current = false;
+    lastTickTimeRef.current = 0;
+
+    const interval = setInterval(() => {
+      const timeSpent = (Date.now() - startTimeRef.current) / 1000;
+      const limit = timeLimitMap[difficulty];
+      const remaining = Math.max(0, limit - timeSpent);
+      
+      setTimeLeft(remaining);
+      
+      // Tension tick sound
+      if (remaining <= 3 && remaining > 0) {
+        const now = Date.now();
+        if (now - lastTickTimeRef.current > 200) {
+          soundService.playTick();
+          lastTickTimeRef.current = now;
+        }
+      }
+
+      if (remaining <= 0) {
+         if (!hasRungBellRef.current) {
+            hasRungBellRef.current = true;
+            soundService.playBell();
+         }
+         handleAnswer(null); // Time out
+      }
+    }, 50);
+    
+    return () => clearInterval(interval);
+  }, [isGameActive, difficulty, showResult]);
+
   const handleRoundEnd = () => {
     if (!isGameActiveRef.current) return;
     setIsGameActive(false);
     setShowResult(true);
+
+    let finalIsCorrect = false;
 
     // Ensure feedback is set even if user didn't answer
     if (!feedbackRef.current) {
@@ -454,10 +536,20 @@ export default function App() {
         ? currentSelected.trim().toLowerCase() === currentQuestion.options[currentQuestion.correct].trim().toLowerCase()
         : false;
       
+      finalIsCorrect = isUserCorrect;
       setFeedback({ 
         correct: isUserCorrect, 
         option: currentSelected || "Não Respondido" 
       });
+    } else {
+      finalIsCorrect = feedbackRef.current.correct;
+    }
+
+    // Play result sound
+    if (finalIsCorrect) {
+      soundService.playCorrect();
+    } else {
+      soundService.playWrong();
     }
 
     // Auto-advance to next round
@@ -496,10 +588,22 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-dynamic bg-game-bg text-game-border font-sans selection:bg-game-primary/30 overflow-x-hidden relative pt-safe pb-safe italic-none">
+    <div className={cn(
+      "min-h-dynamic text-game-border font-sans selection:bg-game-primary/30 overflow-x-hidden relative pt-safe pb-safe italic-none transition-colors duration-500",
+      view === "game" && isGameActive && difficulty !== 'facil' && timeLeft !== null && timeLeft <= 3 && timeLeft > 0 ? "bg-red-50" : "bg-game-bg"
+    )}>
       <MusicalNotesBackground />
 
       <AnimatePresence>
+        {view === "game" && isGameActive && difficulty !== 'facil' && timeLeft !== null && timeLeft <= 3 && timeLeft > 0 && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 pointer-events-none bg-red-500/10 z-[1] mix-blend-multiply" 
+          />
+        )}
+        
         {showExitConfirm && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -522,13 +626,17 @@ export default function App() {
               </div>
               <div className="flex gap-4">
                 <button
-                  onClick={() => setShowExitConfirm(false)}
+                  onClick={() => {
+                    soundService.playClick();
+                    setShowExitConfirm(false);
+                  }}
                   className="flex-1 p-4 bg-gray-100 text-game-border font-black rounded-xl hover:bg-gray-200 transition-colors"
                 >
                   Continuar
                 </button>
                 <button
                   onClick={() => {
+                    soundService.playClick();
                     setShowExitConfirm(false);
                     setView("home");
                     setIsGameActive(false);
@@ -581,6 +689,7 @@ export default function App() {
                   whileHover={{ scale: 1.05, rotate: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
+                    soundService.playClick();
                     setIsSolo(true);
                     setRoomId(null);
                     setView("multiplayer_setup");
@@ -593,6 +702,7 @@ export default function App() {
                   whileHover={{ scale: 1.05, rotate: 2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
+                    soundService.playClick();
                     setIsSolo(false);
                     setRoomId(null);
                     setView("multiplayer_setup");
@@ -606,7 +716,10 @@ export default function App() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setView("hymn_list")}
+                onClick={() => {
+                  soundService.playClick();
+                  setView("hymn_list");
+                }}
                 className="w-full max-w-md p-4 bg-white text-game-border game-border rounded-2xl hover:bg-gray-50 transition-all game-shadow-hover uppercase tracking-widest text-sm font-black flex items-center justify-center gap-2"
               >
                 <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
@@ -634,7 +747,10 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <motion.button 
                     whileHover={{ x: -5 }}
-                    onClick={() => setView("home")} 
+                    onClick={() => {
+                      soundService.playClick();
+                      setView("home");
+                    }} 
                     className="flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
@@ -676,7 +792,10 @@ export default function App() {
                 </div>
                 
                 <button 
-                  onClick={loadHymns}
+                  onClick={() => {
+                    soundService.playClick();
+                    loadHymns();
+                  }}
                   className="w-full p-4 bg-game-secondary text-game-border game-border rounded-2xl hover:bg-game-secondary/80 transition-all font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 game-shadow-hover"
                 >
                   <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
@@ -695,7 +814,10 @@ export default function App() {
               className="flex-grow flex flex-col items-center justify-center gap-8"
             >
               <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow">
-                <button onClick={() => setView("home")} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
+                <button onClick={() => {
+                  soundService.playClick();
+                  setView("home");
+                }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
                 </button>
                 
@@ -723,23 +845,61 @@ export default function App() {
 
                   {/* Round Selection */}
                   {(isSolo || (!roomId && !localPlayerId)) && (
-                    <div className="space-y-3">
-                      <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Quantidade de Rodadas</label>
-                      <div className="grid grid-cols-4 gap-3">
-                        {[5, 10, 15, 20].map((num) => (
-                          <button
-                            key={num}
-                            onClick={() => setRoundCount(num)}
-                            className={cn(
-                              "p-3 rounded-2xl text-sm font-black transition-all border-3",
-                              roundCount === num 
-                                ? "bg-game-secondary text-game-border border-game-border shadow-[2px_2px_0px_#1A1A1A]" 
-                                : "bg-white border-game-border text-game-border opacity-50 hover:opacity-100"
-                            )}
-                          >
-                            {num}
-                          </button>
-                        ))}
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Quantidade de Rodadas</label>
+                        <div className="grid grid-cols-4 gap-3">
+                          {[5, 10, 15, 20].map((num) => (
+                            <button
+                              key={num}
+                              onClick={() => {
+                                soundService.playClick();
+                                setRoundCount(num);
+                              }}
+                              className={cn(
+                                "p-3 rounded-2xl text-sm font-black transition-all border-3",
+                                roundCount === num 
+                                  ? "bg-game-secondary text-game-border border-game-border shadow-[2px_2px_0px_#1A1A1A]" 
+                                  : "bg-white border-game-border text-game-border opacity-50 hover:opacity-100"
+                              )}
+                            >
+                              {num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Difficulty Selection */}
+                      <div className="space-y-3">
+                        <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Dificuldade</label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { id: 'facil', label: 'Fácil', colorClass: 'bg-game-success text-white' },
+                            { id: 'medio', label: 'Médio', colorClass: 'bg-yellow-500 text-white' },
+                            { id: 'dificil', label: 'Difícil', colorClass: 'bg-game-danger text-white' }
+                          ].map((diff) => (
+                            <button
+                              key={diff.id}
+                              onClick={() => {
+                                soundService.playClick();
+                                setDifficulty(diff.id as Difficulty);
+                              }}
+                              className={cn(
+                                "p-3 rounded-2xl text-sm font-black transition-all border-3 uppercase tracking-widest",
+                                difficulty === diff.id 
+                                  ? `${diff.colorClass} border-game-border shadow-[2px_2px_0px_#1A1A1A]` 
+                                  : "bg-white border-game-border text-game-border opacity-50 hover:opacity-100 shadow-none"
+                              )}
+                            >
+                              {diff.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-game-border mt-3 uppercase font-bold leading-tight bg-game-primary/10 p-3 rounded-xl border-2 border-game-primary/20">
+                          {difficulty === 'facil' && "Sem tempo limite. Pontos baseados em quem acerta e em quem é o mais rápido."}
+                          {difficulty === 'medio' && "20 segundos para responder. Menos tempo = menos pontos. Fique atento!"}
+                          {difficulty === 'dificil' && "Apenas 10 segundos! Um verdadeiro desafio para quem conhece o hinário."}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -767,7 +927,10 @@ export default function App() {
                         {[0, 1, 2, 3, 4, 5].map((num) => (
                           <button
                             key={num}
-                            onClick={() => setBotCount(num)}
+                            onClick={() => {
+                              soundService.playClick();
+                              setBotCount(num);
+                            }}
                             className={cn(
                               "w-12 h-12 rounded-xl font-black transition-all border-3",
                               botCount === num 
@@ -788,7 +951,10 @@ export default function App() {
                   <motion.button
                     whileHover={{ scale: 1.05, rotate: 1 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={handleJoinGame}
+                    onClick={() => {
+                      soundService.playClick();
+                      handleJoinGame();
+                    }}
                     disabled={isLoading || !nickname.trim()}
                     className="w-full p-5 bg-game-primary text-white font-black rounded-2xl hover:bg-game-primary/90 transition-colors uppercase tracking-widest disabled:opacity-50 game-border game-shadow-hover text-xl"
                   >
@@ -850,7 +1016,10 @@ export default function App() {
                         <div className="flex items-center gap-3">
                           {p.id === localPlayerId && !isSolo && (
                             <button 
-                              onClick={toggleReady}
+                              onClick={() => {
+                                soundService.playClick();
+                                toggleReady();
+                              }}
                               className={cn(
                                 "px-4 py-2 rounded-xl text-xs font-black uppercase transition-all border-2 border-game-border game-shadow-hover",
                                 p.isReady ? "bg-game-success text-white" : "bg-white text-game-border"
@@ -871,6 +1040,7 @@ export default function App() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={async () => {
+                      soundService.playClick();
                       if (localPlayerId && !isSolo) await multiplayerService.leaveRoom();
                       setView("home");
                       setRoomId(null);
@@ -883,7 +1053,10 @@ export default function App() {
                     <motion.button
                       whileHover={{ scale: 1.05, rotate: 2 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={handleStartGameClick}
+                      onClick={() => {
+                        soundService.playClick();
+                        handleStartGameClick();
+                      }}
                       disabled={isLoading || (!isSolo && !players.every(p => p.isReady))}
                       className="p-5 bg-game-primary text-white font-black rounded-[1.5rem] transition-transform flex-1 uppercase tracking-widest game-shadow-hover game-border disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl"
                     >
@@ -909,7 +1082,10 @@ export default function App() {
                 
                 {!isSolo && roomId && (
                   <button
-                    onClick={copyRoomLink}
+                    onClick={() => {
+                      soundService.playClick();
+                      copyRoomLink();
+                    }}
                     className="w-full p-6 bg-game-secondary/10 border-3 border-game-border rounded-[1.5rem] flex flex-col items-center gap-2 group hover:bg-game-secondary/20 transition-all relative overflow-hidden"
                   >
                     <AnimatePresence mode="wait">
@@ -968,7 +1144,7 @@ export default function App() {
               <div className="flex flex-col gap-6 md:gap-8">
                 {/* Round Header */}
                 <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-3 md:p-6 rounded-[1.5rem] md:rounded-[2rem] game-shadow">
-                  <div className="flex items-center gap-3 md:gap-4">
+                  <div className="flex items-center gap-3 md:gap-4 shrink-0 z-10 relative">
                     <div className="w-8 h-8 md:w-14 md:h-14 bg-game-secondary border-2 border-game-border rounded-xl md:rounded-2xl flex items-center justify-center text-game-border font-black text-sm md:text-2xl shadow-[2px_2px_0px_#1A1A1A]">
                       {currentRound + 1}
                     </div>
@@ -978,12 +1154,35 @@ export default function App() {
                     </div>
                   </div>
 
+                  {difficulty !== 'facil' && timeLeft !== null && (
+                    <div className="flex flex-col flex-1 mx-4 lg:mx-8 z-10 relative">
+                      <div className="w-full bg-white/50 backdrop-blur-sm rounded-full h-3 md:h-5 overflow-hidden border-2 border-game-border shadow-[inset_0px_2px_4px_rgba(0,0,0,0.1)]">
+                        <div 
+                          className={cn(
+                            "h-full linear", 
+                            timeLeft <= 3 ? "bg-game-danger" : "bg-game-primary"
+                          )} 
+                          style={{ width: `${Math.max(0, (timeLeft / timeLimitMap[difficulty]) * 100)}%` }}
+                        />
+                      </div>
+                      <div className={cn(
+                          "text-right font-black uppercase text-xl md:text-2xl mt-1 tracking-tighter tabular-nums",
+                          timeLeft <= 3 ? "text-game-danger animate-pulse" : "text-game-border"
+                      )}>
+                        {timeLeft.toFixed(2)}s
+                      </div>
+                    </div>
+                  )}
+
                   {isSolo && (
                     <motion.button
                       whileHover={{ scale: 1.1, rotate: 90 }}
                       whileTap={{ scale: 0.9 }}
-                      onClick={() => setShowExitConfirm(true)}
-                      className="w-10 h-10 md:w-12 md:h-12 bg-white border-3 border-game-border rounded-xl flex items-center justify-center text-game-danger shadow-[2px_2px_0px_#1A1A1A] hover:bg-red-50 transition-colors"
+                      onClick={() => {
+                        soundService.playClick();
+                        setShowExitConfirm(true);
+                      }}
+                      className="w-10 h-10 md:w-12 md:h-12 bg-white border-3 border-game-border rounded-xl flex items-center justify-center text-game-danger shadow-[2px_2px_0px_#1A1A1A] hover:bg-red-50 transition-colors shrink-0 z-10 relative"
                     >
                       <X className="w-6 h-6 md:w-8 md:h-8" />
                     </motion.button>
@@ -1104,7 +1303,7 @@ export default function App() {
                           feedback?.correct ? "text-game-success" : "text-game-danger"
                         )}>
                           <h2 className="text-4xl md:text-7xl font-black uppercase tracking-tighter mb-2 italic">
-                            {feedback?.correct ? "Boa!" : (selectedOption ? "Putz!" : "Pulou!")}
+                            {feedback?.correct ? "Boa!" : (selectedOption === "Tempo Esgotado" ? "Passou do tempo!" : (selectedOption ? "Putz!" : "Pulou!"))}
                           </h2>
                           <p className="text-base md:text-xl text-game-border font-black uppercase tracking-widest">
                             {feedback?.correct ? "+ pontos na conta!" : "Quase lá, hein?"}
@@ -1113,7 +1312,10 @@ export default function App() {
                         
                         {!isSolo && players.find(p => p.id === localPlayerId)?.isHost && players.every(p => p.hasAnswered) && (
                           <button
-                            onClick={nextRound}
+                            onClick={() => {
+                              soundService.playClick();
+                              nextRound();
+                            }}
                             className="p-6 bg-game-primary text-white font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform game-border game-shadow flex items-center gap-3 text-xl"
                           >
                             <span>Bora pra Proxima!</span>
@@ -1250,7 +1452,10 @@ export default function App() {
                 <motion.button
                   whileHover={{ scale: 1.05, rotate: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={resetGame}
+                  onClick={() => {
+                    soundService.playClick();
+                    resetGame();
+                  }}
                   className="flex-1 p-6 bg-game-primary text-white font-black rounded-[2rem] uppercase tracking-widest text-xl game-border game-shadow-hover"
                 >
                   Jogar Denovo!
@@ -1258,7 +1463,10 @@ export default function App() {
                 <motion.button
                   whileHover={{ scale: 1.05, rotate: 2 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setView("home")}
+                  onClick={() => {
+                    soundService.playClick();
+                    setView("home");
+                  }}
                   className="flex-1 p-6 bg-white text-game-border font-black rounded-[2rem] hover:bg-gray-50 transition-colors uppercase tracking-widest text-xl game-border game-shadow-hover"
                 >
                   Cansei...
