@@ -21,6 +21,7 @@ interface Room {
   gameStarted: boolean;
   players: Player[];
   questions?: any[];
+  roundCount: number;
 }
 
 const rooms = new Map<string, Room>();
@@ -57,6 +58,7 @@ async function startServer() {
         hostId: socket.id,
         gameStarted: false,
         players: [player],
+        roundCount: 5, // Default
       };
 
       rooms.set(roomId, room);
@@ -105,15 +107,16 @@ async function startServer() {
       }
     });
 
-    socket.on("game:start", ({ roomId, questions }) => {
+    socket.on("game:start", ({ roomId, questions, roundCount }) => {
       const room = rooms.get(roomId);
       if (room && room.hostId === socket.id) {
         room.gameStarted = true;
         room.questions = questions;
+        if (roundCount) room.roundCount = roundCount;
         room.players.forEach(p => {
           p.hasAnswered = false;
         });
-        io.to(roomId).emit("game:started", { questions });
+        io.to(roomId).emit("game:started", { questions, roundCount: room.roundCount });
         io.to(roomId).emit("room:update", room);
       }
     });

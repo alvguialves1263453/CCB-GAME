@@ -50,8 +50,8 @@ export const multiplayerService = {
     socket.emit("game:answer", { roomId, correct, score });
   },
 
-  startGameWithQuestions(roomId: string, questions: any[]) {
-    socket.emit("game:start", { roomId, questions });
+  startGameWithQuestions(roomId: string, questions: any[], roundCount: number) {
+    socket.emit("game:start", { roomId, questions, roundCount });
   },
 
   resetRoom(roomId: string) {
@@ -73,7 +73,8 @@ export const multiplayerService = {
     onRoomUpdate: (room: Room) => void,
     onRoundEnd?: () => void,
     onNextRound?: () => void,
-    onGameReset?: () => void
+    onGameReset?: () => void,
+    onGameStarted?: (data: { questions: any[]; roundCount: number }) => void
   ) {
     const handleUpdate = (room: Room) => {
       if (room.id === roomId) {
@@ -87,6 +88,7 @@ export const multiplayerService = {
     };
 
     socket.on("room:update", handleUpdate);
+    socket.on("game:started", onGameStarted || (() => {}));
     socket.on("round:end", () => onRoundEnd?.());
     socket.on("round:next", () => onNextRound?.());
     socket.on("game:reseted", () => onGameReset?.());
@@ -94,6 +96,7 @@ export const multiplayerService = {
 
     return () => {
       socket.off("room:update", handleUpdate);
+      socket.off("game:started");
       socket.off("round:end");
       socket.off("round:next");
       socket.off("game:reseted");

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Timer, Loader2, RefreshCw } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
@@ -19,7 +19,35 @@ interface Player {
 }
 
 const ROUNDS_COUNT = 5;
-const ROUND_TIME = 10; // seconds
+
+const MusicalNotesBackground = () => {
+  const notes = ["♪", "♫", "♬", "♩", "♭", "♮", "♯"];
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-20">
+      {[...Array(15)].map((_, i) => {
+        const note = notes[Math.floor(Math.random() * notes.length)];
+        const left = Math.random() * 100;
+        const delay = Math.random() * 20;
+        const duration = 15 + Math.random() * 20;
+        const size = 20 + Math.random() * 40;
+        return (
+          <div
+            key={i}
+            className="absolute bottom-[-100px] animate-float-note text-game-primary font-bold"
+            style={{
+              left: `${left}%`,
+              animationDelay: `${delay}s`,
+              animationDuration: `${duration}s`,
+              fontSize: `${size}px`,
+            }}
+          >
+            {note}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export default function App() {
   const [view, setView] = useState<ViewState>("home");
@@ -28,7 +56,7 @@ export default function App() {
   const [hymns, setHymns] = useState<Hymn[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(ROUND_TIME * 1000);
+  const [roundCount, setRoundCount] = useState(5);
   const [isGameActive, setIsGameActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -41,7 +69,6 @@ export default function App() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [localPlayerId, setLocalPlayerId] = useState<string | null>(null);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
 
@@ -107,13 +134,13 @@ export default function App() {
       },
       () => {
         // onRoundEnd
-        if (isGameActiveRef.current && !showResultRef.current) {
+        if (isGameActiveRef.current) {
           handleRoundEnd();
         }
       },
       () => {
         // onNextRound
-        if (currentRoundRef.current + 1 < ROUNDS_COUNT) {
+        if (currentRoundRef.current + 1 < roundCount) {
           startRound(currentRoundRef.current + 1);
         } else {
           setView("ranking");
@@ -122,11 +149,31 @@ export default function App() {
       () => {
         // onGameReset
         setView("lobby");
+      },
+      (data) => {
+        // onGameStarted
+        setQuestions(data.questions);
+        setRoundCount(data.roundCount);
+        setCurrentRound(0);
+        startRound(0);
+        setView("game");
       }
     );
 
     return () => unsubscribe();
   }, [roomId, isSolo, view]);
+
+  // Check if all players answered (Critical for Solo with Bots)
+  useEffect(() => {
+    if (isSolo && isGameActive && !showResult) {
+      const allAnswered = players.every(p => p.hasAnswered);
+      if (allAnswered) {
+        setTimeout(() => {
+          handleRoundEnd();
+        }, 1000);
+      }
+    }
+  }, [players, isGameActive, showResult, isSolo, roundCount]);
 
   // Load all hymns
   const loadHymns = async () => {
@@ -164,40 +211,6 @@ export default function App() {
       supabase.removeChannel(hymnSubscription);
     };
   }, []);
-
-  // Check if all players answered
-  useEffect(() => {
-    if (isGameActive && !showResult) {
-      const allAnswered = players.every(p => p.hasAnswered);
-      if (allAnswered) {
-        // Accelerate timer to end in 100ms
-        setTimeout(() => {
-          handleRoundEnd();
-        }, 100);
-      }
-    }
-  }, [players, isGameActive, showResult]);
-
-  // Timer logic
-  useEffect(() => {
-    if (isGameActive && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        const now = Date.now();
-        const elapsed = now - startTimeRef.current;
-        const remaining = Math.max(0, ROUND_TIME * 1000 - elapsed);
-        setTimeLeft(remaining);
-        
-        if (remaining === 0) {
-          handleRoundEnd();
-        }
-      }, 10);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isGameActive, timeLeft]);
 
   const handleJoinGame = async () => {
     if (!nickname.trim()) return;
@@ -324,7 +337,7 @@ export default function App() {
       const q = await prepareQuestions();
       if (q && roomId) {
         setIsLoading(true);
-        multiplayerService.startGameWithQuestions(roomId, q);
+        multiplayerService.startGameWithQuestions(roomId, q, roundCount);
         setIsLoading(false);
       }
     }
@@ -345,7 +358,7 @@ export default function App() {
     }
 
     const shuffledForGame = [...currentHymns].sort(() => 0.5 - Math.random());
-    const roundHymns = shuffledForGame.slice(0, ROUNDS_COUNT);
+    const roundHymns = shuffledForGame.slice(0, roundCount);
     const q = generateQuestions(roundHymns, currentHymns);
     setIsLoading(false);
     return q;
@@ -357,7 +370,6 @@ export default function App() {
 
   const startRound = (roundIndex: number) => {
     setCurrentRound(roundIndex);
-    setTimeLeft(ROUND_TIME * 1000);
     setIsGameActive(true);
     setSelectedOption(null);
     setFeedback(null);
@@ -374,7 +386,8 @@ export default function App() {
         setPlayers(current => current.map(p => {
           if (p.id === bot.id) {
             const isCorrect = Math.random() > 0.3;
-            const points = isCorrect ? Math.floor((ROUND_TIME - delay/1000) * 10) : 0;
+            // Constant points without timer
+            const points = isCorrect ? 100 : 0;
             return { ...p, hasAnswered: true, score: p.score + points };
           }
           return p;
@@ -393,7 +406,8 @@ export default function App() {
     
     const currentQuestion = questions[currentRound];
     const isUserCorrect = option.trim().toLowerCase() === currentQuestion.options[currentQuestion.correct].trim().toLowerCase();
-    const pointsToAdd = isUserCorrect ? Math.max(0, Math.floor((ROUND_TIME - timeSpent) * 10)) : 0;
+    // Simplified points without timer limit
+    const pointsToAdd = isUserCorrect ? 100 : 0;
 
     // Set feedback immediately for local individual experience
     setFeedback({ correct: isUserCorrect, option: option });
@@ -412,11 +426,11 @@ export default function App() {
   };
 
   const handleRoundEnd = () => {
-    if (showResultRef.current) return;
+    if (!isGameActiveRef.current) return;
     setIsGameActive(false);
     setShowResult(true);
 
-    // Ensure feedback is set even if user didn't answer (timeout)
+    // Ensure feedback is set even if user didn't answer
     if (!feedbackRef.current) {
       const currentQuestion = questionsRef.current[currentRoundRef.current];
       const currentSelected = selectedOptionRef.current;
@@ -426,25 +440,25 @@ export default function App() {
       
       setFeedback({ 
         correct: isUserCorrect, 
-        option: currentSelected || "Tempo Esgotado" 
+        option: currentSelected || "Não Respondido" 
       });
     }
 
-    if (isSolo) {
+    // Auto-advance to next round
+    const isHost = isSolo || players.find(p => p.id === localPlayerId)?.isHost;
+    
+    if (isHost) {
       setTimeout(() => {
-        if (currentRoundRef.current < ROUNDS_COUNT - 1) {
-          startRound(currentRoundRef.current + 1);
-        } else {
-          setView("ranking");
-        }
-      }, 3000);
+        nextRound();
+      }, 2000);
     }
   };
 
   const nextRound = () => {
+    const nextIdx = currentRoundRef.current + 1;
     if (isSolo) {
-      if (currentRound + 1 < ROUNDS_COUNT) {
-        startRound(currentRound + 1);
+      if (nextIdx < roundCount) {
+        startRound(nextIdx);
       } else {
         setView("ranking");
       }
@@ -466,13 +480,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-page text-text-primary font-sans selection:bg-accent-gold/20 overflow-x-hidden relative">
-      {/* Delicate Atmospheric Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-accent-gold/5 blur-[100px] rounded-full animate-pulse opacity-70"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-accent-gold/10 blur-[120px] rounded-full opacity-60"></div>
-        <div className="absolute top-[20%] right-[10%] w-[30vw] h-[30vw] bg-success/5 blur-[100px] rounded-full opacity-40"></div>
-      </div>
+    <div className="min-h-screen bg-game-bg text-game-border font-sans selection:bg-game-primary/30 overflow-x-hidden relative">
+      <MusicalNotesBackground />
 
       <div className="max-w-7xl mx-auto px-4 py-8 md:py-12 min-h-screen flex flex-col relative z-10">
         
@@ -483,55 +492,71 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="flex-grow flex flex-col items-center justify-center text-center gap-10"
+              className="flex-grow flex flex-col items-center justify-center text-center gap-8"
             >
               <div className="relative">
-                <div className="absolute -inset-8 bg-white/40 blur-2xl rounded-full"></div>
-                <h1 className="text-5xl md:text-7xl font-serif text-text-primary relative leading-tight">
-                  <span className="italic font-medium text-accent-gold">Desafio</span><br/>
-                  <span className="font-semibold tracking-wide">Hinos CCB</span>
-                </h1>
+                <div className="absolute -inset-4 bg-white/30 blur-3xl rounded-full"></div>
+                <motion.h1 
+                  animate={{ 
+                    rotate: [0, -1, 1, -1, 1, 0],
+                    scale: [1, 1.02, 1, 1.02, 1]
+                  }}
+                  transition={{ 
+                    duration: 5, 
+                    repeat: Infinity, 
+                    ease: "easeInOut" 
+                  }}
+                  className="text-7xl md:text-9xl font-black tracking-tighter text-game-primary uppercase relative drop-shadow-[6px_6px_0px_#1A1A1A]"
+                >
+                  CCB QUIZ<br/>GAME
+                </motion.h1>
               </div>
               
-              <p className="text-lg text-text-secondary max-w-md font-light leading-relaxed">
-                Um momento de meditação e alegria. Teste seus conhecimentos sobre os hinos sacros de forma delicada e envolvente.
+              <p className="text-2xl text-game-border font-bold max-w-lg bg-white/80 p-4 rounded-2xl game-border">
+                O desafio definitivo para testar seus conhecimentos sobre os hinos da CCB.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm mt-4">
-                <button
+              <div className="flex flex-col sm:flex-row gap-6 w-full max-w-md">
+                <motion.button
+                  whileHover={{ scale: 1.05, rotate: -2 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setIsSolo(true);
                     setRoomId(null);
                     setView("multiplayer_setup");
                   }}
-                  className="flex-1 px-6 py-4 bg-accent-gold text-white font-medium rounded-full hover:bg-btn-hover transition-all active:scale-95 shadow-[0_4px_20px_var(--color-accent-gold-glow)] tracking-wide"
+                  className="flex-1 p-6 bg-game-primary text-white font-black rounded-3xl game-border game-shadow-hover uppercase tracking-wider text-xl"
                 >
                   Jogar Solo
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05, rotate: 2 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setIsSolo(false);
                     setRoomId(null);
                     setView("multiplayer_setup");
                   }}
-                  className="flex-1 px-6 py-4 bg-transparent border border-accent-gold text-accent-gold font-medium rounded-full hover:bg-accent-gold/5 transition-all tracking-wide"
+                  className="flex-1 p-6 bg-game-secondary text-game-border font-black rounded-3xl game-border game-shadow-hover uppercase tracking-wider text-xl"
                 >
                   Multiplayer
-                </button>
+                </motion.button>
               </div>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setView("hymn_list")}
-                className="mt-6 w-full max-w-sm py-3 text-text-secondary hover:text-accent-gold transition-colors text-sm flex items-center justify-center gap-2"
+                className="w-full max-w-md p-4 bg-white text-game-border game-border rounded-2xl hover:bg-gray-50 transition-all game-shadow-hover uppercase tracking-widest text-sm font-black flex items-center justify-center gap-2"
               >
                 <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-                <span className="underline decoration-border-soft underline-offset-4">Visualizar coleção de hinos</span>
-              </button>
+                Lista de Hinos
+              </motion.button>
               
               {isLoading && (
-                <div className="flex items-center gap-2 text-accent-gold animate-pulse mt-4">
+                <div className="flex items-center gap-2 text-game-primary animate-pulse">
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm font-medium tracking-wide">Despertando melodias...</span>
+                  <span className="text-sm font-black uppercase tracking-widest">Carregando Hinos...</span>
                 </div>
               )}
             </motion.div>
@@ -540,17 +565,21 @@ export default function App() {
           {view === "hymn_list" && (
             <motion.div
               key="hymn_list"
-              initial={{ opacity: 0, scale: 0.98 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="flex-grow flex flex-col gap-6 max-w-3xl w-full mx-auto"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex-grow flex flex-col gap-6 max-w-4xl w-full mx-auto"
             >
-              <div className="bg-bg-card border border-border-soft p-6 md:p-10 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col gap-8">
+              <div className="bg-game-card game-border game-shadow p-8 rounded-[2rem] flex flex-col gap-6">
                 <div className="flex items-center justify-between">
-                  <button onClick={() => setView("home")} className="flex items-center text-text-secondary hover:text-text-primary transition-colors text-sm font-medium">
+                  <motion.button 
+                    whileHover={{ x: -5 }}
+                    onClick={() => setView("home")} 
+                    className="flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest"
+                  >
                     <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
-                  </button>
-                  <h2 className="text-2xl font-serif italic text-accent-gold">Nossos Hinos</h2>
+                  </motion.button>
+                  <h2 className="text-2xl font-black text-game-primary uppercase tracking-widest">Hinos no Supabase</h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -567,32 +596,31 @@ export default function App() {
                         .sort((a, b) => a.id - b.id);
                       
                       return uniqueHymns.map((h) => (
-                        <div key={h.id} className="p-4 bg-bg-page border border-border-soft rounded-2xl flex items-center justify-between group hover:border-accent-gold/40 transition-colors shadow-sm">
+                        <div key={h.id} className="p-4 bg-gray-50 border-2 border-game-border rounded-2xl flex items-center justify-between group hover:border-game-primary transition-colors">
                           <div className="flex flex-col">
-                            <span className="text-text-primary font-medium group-hover:text-accent-gold transition-colors">
+                            <span className="text-game-border font-black text-lg">
                               {h.title.replace(/^\d+[\s.-]*/, '')}
                             </span>
                           </div>
-                          <div className="w-8 h-8 rounded-full bg-white border border-border-soft flex items-center justify-center text-accent-gold text-xs font-medium shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-game-secondary border-2 border-game-border flex items-center justify-center text-game-border text-sm font-black">
                             {h.id}
                           </div>
                         </div>
                       ));
                     })()
                   ) : (
-                    <div className="col-span-full py-16 text-center text-text-secondary">
-                      <p className="font-serif italic text-lg">Nenhum hino encontrado em nossa coleção.</p>
-                      <p className="text-sm mt-3 font-light">A base de dados parece estar vazia.</p>
+                    <div className="col-span-full py-12 text-center text-game-border">
+                      <p className="font-bold">Nenhum hino encontrado no Supabase.</p>
                     </div>
                   )}
                 </div>
                 
                 <button 
                   onClick={loadHymns}
-                  className="w-full py-4 bg-bg-page border border-border-soft text-text-secondary rounded-full hover:text-accent-gold hover:border-accent-gold/30 transition-all text-sm flex items-center justify-center gap-2 shadow-sm"
+                  className="w-full p-4 bg-game-secondary text-game-border game-border rounded-2xl hover:bg-game-secondary/80 transition-all font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 game-shadow-hover"
                 >
                   <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-                  Sincronizar acervo
+                  Sincronizar com Supabase
                 </button>
               </div>
             </motion.div>
@@ -606,42 +634,65 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="flex-grow flex flex-col items-center justify-center gap-8"
             >
-              <div className="w-full max-w-md bg-bg-card border border-border-soft p-8 md:p-10 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                <button onClick={() => setView("home")} className="mb-8 flex items-center text-text-secondary hover:text-accent-gold transition-colors text-sm font-medium tracking-wide">
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Retornar
+              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow">
+                <button onClick={() => setView("home")} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
                 </button>
                 
-                <h2 className="text-3xl md:text-4xl font-serif text-accent-gold mb-8 leading-tight">
-                  <span className="italic">{isSolo ? "Sua identificação" : (roomId ? `Sala ${roomId}` : "Nova Sala")}</span>
+                <h2 className="text-3xl font-black text-game-primary mb-6 uppercase">
+                  {isSolo ? "Quem está jogando?" : (roomId ? `Entrar na Sala ${roomId}` : "Criar Nova Sala")}
                 </h2>
                 
-                <div className="space-y-8">
+                <div className="space-y-6">
                   {!isSolo && !roomId && (
-                    <div className="p-4 bg-accent-gold/5 border border-accent-gold/20 rounded-2xl">
-                      <p className="text-sm text-center text-accent-gold/80 italic">Você será o guia desta sala</p>
+                    <div className="p-4 bg-game-primary/10 border-2 border-game-primary rounded-2xl">
+                      <p className="text-xs text-game-primary uppercase font-black tracking-widest text-center">Você será o Host desta sala</p>
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm text-text-secondary mb-3 tracking-wide">Como deseja ser chamado?</label>
+                    <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Seu Nickname</label>
                     <input
                       type="text"
                       value={nickname}
                       onChange={(e) => setNickname(e.target.value)}
                       placeholder="Ex: Irmão Lucas"
-                      className="w-full p-4 bg-bg-page border border-border-soft rounded-2xl text-text-primary outline-none focus:border-accent-gold focus:ring-1 focus:ring-accent-gold transition-all text-lg font-medium shadow-inner"
+                      className="w-full p-4 bg-gray-50 border-3 border-game-border rounded-2xl text-game-border outline-none focus:bg-white transition-colors text-lg font-bold"
                       autoFocus
                     />
                   </div>
 
+                  {/* Round Selection */}
+                  {(isSolo || (!roomId && !localPlayerId)) && (
+                    <div className="space-y-3">
+                      <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Quantidade de Rodadas</label>
+                      <div className="grid grid-cols-4 gap-3">
+                        {[5, 10, 15, 20].map((num) => (
+                          <button
+                            key={num}
+                            onClick={() => setRoundCount(num)}
+                            className={cn(
+                              "p-3 rounded-2xl text-sm font-black transition-all border-3",
+                              roundCount === num 
+                                ? "bg-game-secondary text-game-border border-game-border shadow-[2px_2px_0px_#1A1A1A]" 
+                                : "bg-white border-game-border text-game-border opacity-50 hover:opacity-100"
+                            )}
+                          >
+                            {num}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Pre-lobby players list if joining via link */}
                   {roomId && !localPlayerId && players.length > 0 && (
-                    <div className="p-5 bg-bg-page rounded-2xl border border-border-soft shadow-sm">
-                      <p className="text-xs text-text-secondary mb-3 flex items-center gap-2 tracking-wide">
-                        <Users className="w-4 h-4" /> Presentes na sala:
+                    <div className="p-4 bg-game-primary/5 rounded-2xl border-2 border-game-primary/20">
+                      <p className="text-[10px] text-game-primary mb-3 flex items-center gap-2 uppercase tracking-widest font-black">
+                        <Users className="w-3 h-3" /> Já na sala:
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {players.map(p => (
-                          <span key={p.id} className="px-3 py-1.5 bg-white border border-border-soft shadow-sm rounded-full text-xs font-medium text-text-primary">
+                          <span key={p.id} className="px-3 py-1 bg-white border-2 border-game-border rounded-full text-[10px] font-black text-game-border uppercase tracking-tight">
                             {p.nickname}
                           </span>
                         ))}
@@ -650,37 +701,39 @@ export default function App() {
                   )}
                   
                   {isSolo && (
-                    <div className="pt-6 border-t border-border-soft">
-                      <label className="block text-sm text-text-secondary mb-4 tracking-wide">Participantes Virtuais (Opcional)</label>
+                    <div className="pt-4 border-t-4 border-game-border">
+                      <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-4">Adicionar Bots (Opcional)</label>
                       <div className="flex items-center justify-between gap-2">
                         {[0, 1, 2, 3, 4, 5].map((num) => (
                           <button
                             key={num}
                             onClick={() => setBotCount(num)}
                             className={cn(
-                              "w-10 h-10 rounded-full font-medium transition-all shadow-sm",
+                              "w-12 h-12 rounded-xl font-black transition-all border-3",
                               botCount === num 
-                                ? "bg-accent-gold text-white" 
-                                : "bg-white text-text-secondary border border-border-soft hover:border-accent-gold/50 hover:text-accent-gold"
+                                ? "bg-game-primary text-white border-game-border shadow-[2px_2px_0px_#1A1A1A]" 
+                                : "bg-white text-game-border border-game-border opacity-50 hover:opacity-100"
                             )}
                           >
-                            {num === 0 ? "0" : num}
+                            {num === 0 ? "Off" : num}
                           </button>
                         ))}
                       </div>
-                      <p className="text-xs text-text-secondary mt-4 italic text-center">
-                        {botCount === 0 ? "Você meditará sozinho." : `Você estará acompanhado de ${botCount} irmãos virtuais.`}
+                      <p className="text-[10px] text-game-border mt-3 uppercase tracking-wider font-bold">
+                        {botCount === 0 ? "Você jogará sozinho." : `Você jogará contra ${botCount} bots.`}
                       </p>
                     </div>
                   )}
                   
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05, rotate: 1 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={handleJoinGame}
                     disabled={isLoading || !nickname.trim()}
-                    className="w-full py-4 bg-accent-gold text-white font-medium rounded-full shadow-[0_4px_20px_var(--color-accent-gold-glow)] hover:bg-btn-hover hover:-translate-y-0.5 transition-all tracking-wide disabled:opacity-50 disabled:hover:translate-y-0"
+                    className="w-full p-5 bg-game-primary text-white font-black rounded-2xl hover:bg-game-primary/90 transition-colors uppercase tracking-widest disabled:opacity-50 game-border game-shadow-hover text-xl"
                   >
-                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : (isSolo ? "Iniciar Preparação" : (roomId ? "Ingressar na Sala" : "Estabelecer Sala"))}
-                  </button>
+                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : (isSolo ? "Bora jogar!" : (roomId ? "Entrar na Sala" : "Criar Sala"))}
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
@@ -689,49 +742,47 @@ export default function App() {
            {view === "lobby" && (
             <motion.div
               key="lobby"
-              initial={{ opacity: 0, scale: 0.98 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8 max-w-6xl w-full mx-auto"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8"
             >
               <div className="flex flex-col gap-6">
-                <div className="bg-bg-card border border-border-soft p-8 md:p-10 rounded-[2.5rem] flex-grow relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                  <div className="absolute top-0 right-0 p-8 opacity-5 text-accent-gold">
+                <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex-grow relative overflow-hidden game-shadow">
+                  <div className="absolute top-0 right-0 p-8 opacity-5">
                     <Users className="w-48 h-48" />
                   </div>
                   
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 relative z-10">
-                    <h2 className="text-4xl md:text-5xl font-serif text-text-primary">
-                      Lobby <span className="italic text-accent-gold">da Sala</span>
-                    </h2>
+                  <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-5xl font-black text-game-primary uppercase drop-shadow-md">Lobby</h2>
                     {!isSolo && roomId && (
-                      <div className="sm:text-right bg-bg-page px-6 py-4 rounded-2xl border border-border-soft shadow-sm">
-                        <p className="text-xs text-text-secondary uppercase tracking-widest mb-1 font-medium">Passaporte</p>
-                        <p className="text-2xl font-mono text-accent-gold">{roomId}</p>
+                      <div className="text-right bg-game-secondary p-3 rounded-2xl border-2 border-game-border shadow-[3px_3px_0px_#1A1A1A]">
+                        <p className="text-[10px] text-game-border uppercase font-black tracking-widest">Código</p>
+                        <p className="text-3xl font-black text-game-border tracking-widest leading-none">{roomId}</p>
                       </div>
                     )}
                   </div>
                   
-                  <div className="space-y-4 relative z-10">
+                  <div className="space-y-4">
                     {players.map((p) => (
-                      <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-bg-page border border-border-soft rounded-2xl shadow-sm gap-4">
+                      <div key={p.id} className="flex items-center justify-between p-4 bg-gray-50 border-3 border-game-border rounded-[1.5rem]">
                         <div className="flex items-center gap-4">
                           <div className={cn(
-                            "w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-sm border",
-                            p.isReady ? "bg-success/10 text-success border-success/30" : "bg-white text-text-secondary border-border-soft"
+                            "w-12 h-12 rounded-full border-2 border-game-border flex items-center justify-center transition-colors shadow-[2px_2px_0px_#1A1A1A]",
+                            p.isReady ? "bg-game-success text-white" : "bg-white text-game-border"
                           )}>
-                            <User className="w-5 h-5" />
+                            <User className="w-6 h-6" />
                           </div>
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium text-lg text-text-primary">{p.nickname}</p>
-                              {p.isHost && <Trophy className="w-4 h-4 text-accent-gold" />}
+                            <div className="flex items-center gap-2">
+                              <p className="font-black text-xl">{p.nickname}</p>
+                              {p.isHost && <Trophy className="w-5 h-5 text-game-secondary drop-shadow-sm" />}
                             </div>
-                            <div className="flex items-center">
+                            <div className="flex items-center gap-2">
                               {p.isReady ? (
-                                <span className="text-xs text-success tracking-wide">Alma Preparada</span>
+                                <span className="text-xs text-game-success font-black uppercase tracking-widest">Pronto!</span>
                               ) : (
-                                <span className="text-xs text-text-secondary tracking-wide">Em reflexão...</span>
+                                <span className="text-xs text-game-border/30 font-black uppercase tracking-widest">Aguardando...</span>
                               )}
                             </div>
                           </div>
@@ -741,64 +792,65 @@ export default function App() {
                             <button 
                               onClick={toggleReady}
                               className={cn(
-                                "px-5 py-2.5 rounded-full text-xs font-medium transition-all shadow-sm",
-                                p.isReady ? "bg-success text-white shadow-[0_4px_15px_rgba(139,168,146,0.3)]" : "bg-white border border-border-soft text-text-primary hover:border-accent-gold hover:text-accent-gold"
+                                "px-4 py-2 rounded-xl text-xs font-black uppercase transition-all border-2 border-game-border game-shadow-hover",
+                                p.isReady ? "bg-game-success text-white" : "bg-white text-game-border"
                               )}
                             >
-                              {p.isReady ? "Pronto" : "Sinalizar Prontidão"}
+                              {p.isReady ? "Tô Pronto!" : "Tô Pronto?"}
                             </button>
                           )}
-                          {p.isHost && <span className="px-4 py-1.5 bg-accent-gold/10 text-accent-gold text-xs font-medium rounded-full border border-accent-gold/20">Guia</span>}
+                          {p.isHost && <span className="px-3 py-1 bg-game-primary text-white text-xs font-black rounded-full uppercase border-2 border-game-border shadow-[2px_2px_0px_#1A1A1A]">Host</span>}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <button 
+                <div className="flex gap-4">
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={async () => {
                       if (localPlayerId && !isSolo) await multiplayerService.leaveRoom();
                       setView("home");
                       setRoomId(null);
                     }} 
-                    className="py-4 px-8 bg-bg-card text-text-secondary font-medium rounded-full border border-border-soft hover:border-danger hover:text-danger hover:bg-danger/5 transition-all shadow-sm tracking-wide flex-1 sm:flex-none"
+                    className="p-5 bg-white text-game-border font-black rounded-[1.5rem] border-3 border-game-border hover:bg-gray-50 transition-colors uppercase tracking-widest flex-1 game-shadow-hover"
                   >
-                    Retirar-se
-                  </button>
+                    Sair
+                  </motion.button>
                   {(!isSolo && players.find(p => p.id === localPlayerId)?.isHost) || isSolo ? (
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.05, rotate: 2 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={handleStartGameClick}
                       disabled={isLoading || (!isSolo && !players.every(p => p.isReady))}
-                      className="py-4 px-8 bg-accent-gold text-white font-medium rounded-full hover:-translate-y-0.5 transition-all shadow-[0_4px_20px_var(--color-accent-gold-glow)] tracking-wide disabled:opacity-50 disabled:hover:translate-y-0 flex-1 flex items-center justify-center gap-2"
+                      className="p-5 bg-game-primary text-white font-black rounded-[1.5rem] transition-transform flex-1 uppercase tracking-widest game-shadow-hover game-border disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl"
                     >
                       {isLoading ? (
                         <>
                           <Loader2 className="w-5 h-5 animate-spin" />
-                          Preparando...
+                          Carregando...
                         </>
                       ) : (
-                        <>
-                          <Play className="w-5 h-5 fill-current" /> Começar Hinos
-                        </>
+                        "Bora Começar!"
                       )}
-                    </button>
+                    </motion.button>
                   ) : (
-                    <div className="flex-1 py-4 bg-bg-card border border-border-soft rounded-full flex items-center justify-center text-text-secondary text-sm shadow-sm gap-2">
-                       <Loader2 className="w-4 h-4 animate-spin text-accent-gold" />
-                       Aguardando o Guia
+                    <div className="flex-1 p-5 bg-white border-3 border-game-border rounded-[1.5rem] flex items-center justify-center text-game-border/50 font-black uppercase tracking-widest text-sm">
+                      Esperando o Host...
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="bg-bg-card border border-border-soft p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col gap-6">
-                <h3 className="text-xl font-serif text-text-primary text-center">Reunião Fraternal</h3>
+              <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex flex-col gap-6 game-shadow">
+                <h3 className="text-2xl font-black text-game-primary uppercase tracking-widest">Sala Permanente</h3>
                 
                 {!isSolo && roomId && (
                   <button
                     onClick={copyRoomLink}
-                    className="w-full p-6 bg-bg-page border border-border-soft rounded-2xl flex flex-col items-center gap-2 group hover:border-accent-gold/40 transition-all relative overflow-hidden shadow-sm"
+                    className="w-full p-6 bg-game-secondary/10 border-3 border-game-border rounded-[1.5rem] flex flex-col items-center gap-2 group hover:bg-game-secondary/20 transition-all relative overflow-hidden"
                   >
                     <AnimatePresence mode="wait">
                       {copied ? (
@@ -809,9 +861,8 @@ export default function App() {
                           exit={{ y: -20, opacity: 0 }}
                           className="flex flex-col items-center gap-2"
                         >
-                          <Trophy className="w-8 h-8 text-success mb-2" />
-                          <span className="font-medium text-success text-sm">Copiado!</span>
-                          <span className="text-[10px] text-success/60 uppercase tracking-widest">Link em mãos</span>
+                          <Trophy className="w-10 h-10 text-game-success mb-2" />
+                          <span className="font-black text-game-success uppercase tracking-widest text-sm">Copiado!</span>
                         </motion.div>
                       ) : (
                         <motion.div
@@ -821,25 +872,24 @@ export default function App() {
                           exit={{ y: -20, opacity: 0 }}
                           className="flex flex-col items-center gap-2"
                         >
-                          <Users className="w-8 h-8 text-accent-gold mb-2 group-hover:scale-110 transition-transform" />
-                          <span className="font-medium text-accent-gold text-sm tracking-wide">Convidar Irmãos</span>
-                          <span className="text-[10px] text-text-secondary uppercase tracking-widest group-hover:text-accent-gold/80">Copiar Link</span>
+                          <Users className="w-10 h-10 text-game-primary mb-2 group-hover:scale-110 transition-transform" />
+                          <span className="font-black text-game-border uppercase tracking-widest text-sm text-center leading-tight">Mandar pra Galera</span>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </button>
                 )}
 
-                <div className="p-6 bg-bg-page border border-border-soft rounded-2xl shadow-sm mt-auto">
-                  <h4 className="font-serif italic text-accent-gold text-lg mb-4 text-center">Harmonia do Jogo</h4>
-                  <ul className="space-y-4 text-sm text-text-secondary font-light">
+                <div className="p-6 bg-gray-50 border-3 border-game-border rounded-[1.5rem]">
+                  <h4 className="font-black text-game-primary uppercase tracking-widest text-sm mb-4">Regras do Multiplayer</h4>
+                  <ul className="space-y-4 text-sm text-game-border font-bold">
                     <li className="flex gap-3">
-                      <div className="w-1 h-1 rounded-full bg-accent-gold shrink-0 mt-2"></div>
-                      Todos devem sinalizar que estão com a alma preparada.
+                      <div className="w-4 h-4 rounded-full bg-game-secondary border-2 border-game-border shrink-0 mt-0.5"></div>
+                      Todos os jogadores devem marcar <strong className="text-game-primary">Estou Pronto</strong> para o Host iniciar.
                     </li>
                     <li className="flex gap-3">
-                      <div className="w-1 h-1 rounded-full bg-accent-gold shrink-0 mt-2"></div>
-                      Medite na letra para acumular conhecimento e pontos simultaneamente.
+                      <div className="w-4 h-4 rounded-full bg-game-primary border-2 border-game-border shrink-0 mt-0.5"></div>
+                      A pontuação é real e atualizada para todos ao final de cada rodada.
                     </li>
                   </ul>
                 </div>
@@ -853,160 +903,220 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8 max-w-7xl w-full mx-auto"
+              className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8"
             >
               <div className="flex flex-col gap-8">
                 {/* Round Header */}
-                <div className="flex items-center justify-between bg-bg-card border border-border-soft p-6 md:p-8 rounded-[2rem] shadow-sm">
+                <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-6 rounded-[2rem] game-shadow">
                   <div className="flex items-center gap-4">
-                    <div className="w-[3rem] h-[3rem] rounded-full border border-border-soft flex items-center justify-center text-accent-gold font-medium text-xl shadow-inner">
+                    <div className="w-14 h-14 bg-game-secondary border-2 border-game-border rounded-2xl flex items-center justify-center text-game-border font-black text-2xl shadow-[2px_2px_0px_#1A1A1A]">
                       {currentRound + 1}
                     </div>
                     <div>
-                      <p className="text-xs text-text-secondary tracking-widest uppercase">Estrofe</p>
-                      <p className="font-medium text-lg text-text-primary">de {ROUNDS_COUNT}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-2 text-text-secondary">
-                      <Timer className="w-5 h-5 text-accent-gold" />
-                      <span className="font-mono text-2xl font-medium tracking-tighter">
-                        {(timeLeft / 1000).toFixed(2)}s
-                      </span>
-                    </div>
-                    <div className="w-40 h-1 bg-border-soft rounded-full mt-3 overflow-hidden">
-                      <motion.div
-                        className="h-full bg-accent-gold"
-                        initial={{ width: "100%" }}
-                        animate={{ width: `${(timeLeft / (ROUND_TIME * 1000)) * 100}%` }}
-                        transition={{ duration: 0.01 }}
-                      />
+                      <p className="text-xs text-game-border font-black uppercase tracking-widest">Rodada</p>
+                      <p className="font-black text-xl text-game-primary">de {roundCount}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Question Area */}
-                <div className="bg-bg-card border border-border-soft p-10 md:p-14 rounded-[2.5rem] flex-grow flex flex-col items-center justify-center text-center gap-10 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                  <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-accent-gold/30 to-transparent"></div>
+                <div className="bg-game-card game-border p-12 rounded-[3rem] flex-grow flex flex-col items-center justify-center text-center gap-10 relative overflow-hidden game-shadow">
+                  <div className="absolute top-0 left-0 w-full h-2 bg-game-secondary"></div>
                   
-                  <div className="flex flex-col items-center gap-3">
-                    <span className="text-xs uppercase tracking-[0.3em] text-accent-gold font-medium">Lembrança do Hino</span>
-                    <div className="w-8 h-px bg-accent-gold/40"></div>
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-xs uppercase tracking-[0.4em] text-game-primary font-black">Qual é o hino?</span>
+                    <div className="w-16 h-1 bg-game-border/10 rounded-full"></div>
                   </div>
                   
                   <div className="max-w-3xl">
-                    <p className="text-4xl md:text-5xl lg:text-6xl font-serif italic text-text-primary leading-tight font-medium">
-                      "{questions[currentRound].snippet}"
+                    <p className="text-4xl md:text-5xl font-black text-game-border leading-tight">
+                       "{questions[currentRound].snippet}"
                     </p>
                   </div>
 
                   <AnimatePresence>
+                    {!showResult && selectedOption && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-game-primary/30 backdrop-blur-sm rounded-[2.5rem]"
+                      >
+                        <motion.div 
+                          initial={{ scale: 0.9, y: 10 }}
+                          animate={{ scale: 1, y: 0 }}
+                          className="bg-white border-4 border-game-border p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-8 max-w-sm w-full game-shadow"
+                        >
+                          <div className="relative">
+                            <motion.div
+                              animate={{ 
+                                scale: [1, 1.2, 1],
+                                opacity: [0.3, 0.1, 0.3]
+                              }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                              className="absolute inset-[-10px] border-4 border-game-primary rounded-full"
+                            />
+                            
+                            <svg className="w-24 h-24 transform -rotate-90">
+                              <circle
+                                cx="48"
+                                cy="48"
+                                r="44"
+                                className="stroke-gray-100 fill-none"
+                                strokeWidth="10"
+                              />
+                              <motion.circle
+                                cx="48"
+                                cy="48"
+                                r="44"
+                                className="stroke-game-primary fill-none"
+                                strokeWidth="10"
+                                strokeLinecap="round"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                              />
+                            </svg>
+                            
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Loader2 className="w-10 h-10 text-game-primary animate-spin" />
+                            </div>
+                          </div>
+
+                          <div className="text-center space-y-2">
+                            <motion.h3 
+                              animate={{ opacity: [1, 0.5, 1] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                              className="text-3xl font-black text-game-border"
+                            >
+                              Esperando...
+                            </motion.h3>
+                            <p className="text-game-border/50 font-black uppercase text-xs tracking-widest">Geral tá decidindo!</p>
+                          </div>
+                          
+                          <div className="w-full flex flex-col gap-4 bg-gray-50 p-6 rounded-2xl border-2 border-game-border">
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-game-primary font-black text-center">Status</p>
+                            <div className="flex flex-wrap justify-center gap-3">
+                              {players.map(p => (
+                                <div 
+                                  key={p.id} 
+                                  className="flex flex-col items-center gap-1"
+                                >
+                                  <div className={cn(
+                                    "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-500",
+                                    p.hasAnswered 
+                                      ? "bg-game-success border-game-border text-white shadow-[2px_2px_0px_#1A1A1A]" 
+                                      : "bg-white border-game-border text-game-border opacity-20"
+                                  )}>
+                                    <User className="w-4 h-4" />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
+                      </motion.div>
+                    )}
+
                     {showResult && (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md bg-white/70 rounded-[2.5rem]"
+                        exit={{ opacity: 0, scale: 0.5 }}
+                        className={cn(
+                          "absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md rounded-[2.5rem]",
+                          feedback?.correct ? "bg-game-success/20" : "bg-game-danger/20"
+                        )}
                       >
                         <div className={cn(
-                          "text-center p-10 md:p-12 bg-white border rounded-[3rem] shadow-xl mb-8 transition-colors",
-                          feedback?.correct ? "border-success/30 shadow-[0_10px_40px_rgba(139,168,146,0.15)]" : "border-danger/20 shadow-[0_10px_40px_rgba(199,139,139,0.1)]"
+                          "text-center p-12 bg-white border-4 border-game-border rounded-[3rem] shadow-2xl scale-110 mb-8 game-shadow",
+                          feedback?.correct ? "text-game-success" : "text-game-danger"
                         )}>
-                          <h2 className={cn(
-                            "text-4xl md:text-6xl font-serif italic mb-4",
-                            feedback?.correct ? "text-success" : "text-danger"
-                          )}>
-                            {feedback?.correct ? "Harmonia Perfeita" : (selectedOption ? "Nota Dissonante" : "Tempo Esgotado")}
+                          <h2 className="text-7xl font-black uppercase tracking-tighter mb-2 italic">
+                            {feedback?.correct ? "Boa!" : (selectedOption ? "Putz!" : "Pulou!")}
                           </h2>
-                          <p className="text-lg text-text-secondary font-light">
-                            {feedback?.correct ? "Sua memória e coração estão afinados!" : "Continue ouvindo e meditando para acertar na próxima."}
+                          <p className="text-xl text-game-border font-black uppercase tracking-widest">
+                            {feedback?.correct ? "+ pontos na conta!" : "Quase lá, hein?"}
                           </p>
                         </div>
                         
-                        {!isSolo && players.find(p => p.id === localPlayerId)?.isHost && (
+                        {!isSolo && players.find(p => p.id === localPlayerId)?.isHost && players.every(p => p.hasAnswered) && (
                           <button
                             onClick={nextRound}
-                            className="px-8 py-4 bg-accent-gold text-white font-medium rounded-full hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-3 tracking-wide"
+                            className="p-6 bg-game-primary text-white font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform game-border game-shadow flex items-center gap-3 text-xl"
                           >
-                            <span>Próxima Estrofe</span>
-                            <ArrowRight className="w-5 h-5" />
+                            <span>Bora pra Proxima!</span>
+                            <ArrowRight className="w-8 h-8" />
                           </button>
                         )}
                       </motion.div>
                     )}
                   </AnimatePresence>
 
-                  <div className="w-full max-w-sm h-px bg-gradient-to-r from-transparent via-border-soft to-transparent my-2"></div>
+                  <div className="w-full max-w-sm h-1 bg-game-border/5 rounded-full"></div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full max-w-4xl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl">
                     {questions[currentRound].options.map((option, idx) => (
-                      <button
+                      <motion.button
                         key={idx}
+                        whileHover={(!isGameActive && !showResult) ? {} : { scale: 1.03, rotate: idx % 2 === 0 ? 1 : -1 }}
+                        whileTap={(!isGameActive && !showResult) ? {} : { scale: 0.97 }}
                         disabled={!isGameActive && !showResult}
                         onClick={() => handleAnswer(option)}
                         className={cn(
-                          "p-6 md:p-8 rounded-[2rem] border transition-all duration-300 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between group shadow-sm bg-white",
-                          !showResult && !selectedOption && "border-border-soft hover:border-accent-gold/40 hover:shadow-md",
-                          !showResult && selectedOption === option && "border-accent-gold bg-accent-gold/5 shadow-md",
-                          !showResult && selectedOption && selectedOption !== option && "border-border-soft opacity-60",
-                          showResult && option === questions[currentRound].options[questions[currentRound].correct] && "border-success bg-success/10 shadow-md ring-1 ring-success/50 z-10",
-                          showResult && selectedOption === option && option !== questions[currentRound].options[questions[currentRound].correct] && "border-danger bg-danger/5 text-danger opacity-90",
-                          showResult && option !== questions[currentRound].options[questions[currentRound].correct] && selectedOption !== option && "opacity-40 border-border-soft grayscale"
-                        )
-                      }
-                    >
-                        <div className="flex flex-col">
-                          <span className={cn(
-                            "text-[10px] uppercase tracking-widest mb-1.5 transition-opacity",
-                            showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "text-success" : "text-text-secondary"
-                          )}>Hino {idx + 1}</span>
-                          <span className={cn(
-                            "text-lg sm:text-xl font-medium tracking-tight",
-                            showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "text-success" : "text-text-primary"
-                          )}>{option}</span>
+                          "p-8 rounded-[2rem] border-3 text-xl font-black transition-all duration-300 text-left flex items-center justify-between group relative overflow-hidden focus:outline-none",
+                          !showResult && !selectedOption && "border-game-border bg-white hover:bg-gray-50 game-shadow-hover",
+                          !showResult && selectedOption === option && "border-game-border bg-game-primary text-white shadow-[4px_4px_0px_#1A1A1A]",
+                          !showResult && selectedOption && selectedOption !== option && "border-game-border bg-white opacity-50",
+                          showResult && option === questions[currentRound].options[questions[currentRound].correct] && "border-game-border bg-game-success text-white shadow-[6px_6px_0px_#1A1A1A] scale-[1.05] z-10",
+                          showResult && selectedOption === option && option !== questions[currentRound].options[questions[currentRound].correct] && "border-game-border bg-game-danger text-white shadow-[4px_4px_0px_#1A1A1A]",
+                          showResult && option !== questions[currentRound].options[questions[currentRound].correct] && selectedOption !== option && "opacity-20 border-game-border bg-white scale-95"
+                        )}
+                      >
+                        <div className="flex flex-col relative z-10">
+                          <span className="text-[10px] uppercase tracking-widest opacity-30 mb-1 group-hover:opacity-100 transition-opacity">Opção {idx + 1}</span>
+                          <span className="leading-tight">{option}</span>
                         </div>
                         <div className={cn(
-                          "w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-300 shrink-0 mt-4 sm:mt-0 ml-0 sm:ml-4",
-                          selectedOption === option ? "border-accent-gold scale-110" : "border-border-soft group-hover:border-accent-gold/40",
-                          showResult && option === questions[currentRound].options[questions[currentRound].correct] && "border-success"
+                          "w-10 h-10 rounded-full border-3 border-game-border flex items-center justify-center transition-all duration-300 shrink-0 ml-4 bg-white shadow-[2px_2px_0px_#1A1A1A] relative z-10",
+                          selectedOption === option ? "bg-game-secondary" : ""
                         )}>
-                          {selectedOption === option && <div className={cn("w-4 h-4 rounded-full", showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "bg-success" : "bg-accent-gold")} />}
+                          {selectedOption === option && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-4 h-4 bg-game-border rounded-full" />}
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>
               </div>
 
               {/* Sidebar: Players Score */}
-              <div className="bg-bg-card border border-border-soft p-8 rounded-[2rem] flex flex-col gap-6 shadow-sm">
-                <h3 className="text-xl font-serif text-accent-gold italic border-b border-border-soft pb-4">Confraternização</h3>
+              <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex flex-col gap-6 game-shadow">
+                <h3 className="text-2xl font-black text-game-primary uppercase tracking-widest border-b-4 border-game-border pb-4">Placar</h3>
                 <div className="space-y-4">
                   {players.sort((a, b) => b.score - a.score).map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-bg-page transition-colors">
+                    <div key={p.id} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          p.hasAnswered ? "bg-success shadow-[0_0_8px_rgba(139,168,146,0.6)]" : "bg-border-soft/60"
+                          "w-4 h-4 rounded-full border-2 border-game-border",
+                          p.hasAnswered ? "bg-game-success shadow-[1px_1px_0px_#1A1A1A]" : "bg-white"
                         )}></div>
-                        <span className={cn("font-medium text-sm", p.id.startsWith("bot") ? "text-text-secondary" : "text-text-primary")}>
+                        <span className={cn("font-black text-lg", p.id.startsWith("bot") ? "opacity-50" : "text-game-border")}>
                           {p.nickname}
                         </span>
                       </div>
-                      <span className="font-mono font-medium text-accent-gold">{p.score}</span>
+                      <span className="font-black text-xl text-game-primary bg-game-secondary px-3 py-1 rounded-xl border-2 border-game-border shadow-[2px_2px_0px_#1A1A1A]">{p.score}</span>
                     </div>
                   ))}
                 </div>
                 
-                <div className="mt-auto pt-6 border-t border-border-soft">
-                  <div className="flex items-center justify-between text-[10px] text-text-secondary uppercase tracking-widest mb-3 font-medium">
-                    <span>Acompanhamento</span>
-                    <span>{players.filter(p => p.hasAnswered).length} / {players.length} concluídos</span>
+                <div className="mt-auto pt-6 border-t-4 border-game-border">
+                  <div className="flex items-center justify-between text-[10px] text-game-border uppercase font-black tracking-widest mb-2">
+                    <span>Respondendo...</span>
+                    <span>{players.filter(p => p.hasAnswered).length} / {players.length}</span>
                   </div>
                   <div className="flex gap-1.5">
                     {players.map(p => (
-                      <div key={p.id} className={cn("h-1 flex-1 rounded-full", p.hasAnswered ? "bg-success/60" : "bg-border-soft")}></div>
+                      <div key={p.id} className={cn("h-3 flex-1 rounded-full border-2 border-game-border", p.hasAnswered ? "bg-game-success" : "bg-white")}></div>
                     ))}
                   </div>
                 </div>
@@ -1017,62 +1127,71 @@ export default function App() {
           {view === "ranking" && (
             <motion.div
               key="ranking"
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="flex-grow flex flex-col items-center justify-center gap-10 w-full max-w-4xl mx-auto"
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="flex-grow flex flex-col items-center justify-center gap-12"
             >
               <div className="text-center">
-                <Trophy className="w-16 h-16 text-accent-gold mx-auto mb-6 opacity-80" />
-                <h2 className="text-5xl md:text-6xl font-serif text-accent-gold italic tracking-tight mb-2">Fim de Jogo</h2>
-                <p className="text-text-secondary text-lg font-light">Uma linda jornada de lembranças concluída.</p>
+                <div className="relative inline-block mb-6">
+                  <div className="absolute -inset-4 bg-white/50 blur-2xl rounded-full"></div>
+                  <Trophy className="w-28 h-28 text-game-secondary mx-auto relative drop-shadow-[4px_4px_0px_#1A1A1A] animate-bounce" />
+                </div>
+                <h2 className="text-7xl font-black text-game-primary uppercase tracking-tighter drop-shadow-[4px_4px_0px_#1A1A1A]">Fim de Jogo!</h2>
+                <div className="bg-game-secondary inline-block px-6 py-2 rounded-2xl border-3 border-game-border game-shadow mt-4">
+                  <p className="text-game-border text-xl uppercase tracking-widest font-black">Resultados Finais</p>
+                </div>
               </div>
 
-              <div className="w-full space-y-4">
+              <div className="w-full max-w-2xl space-y-5">
                 {players.sort((a, b) => b.score - a.score).map((p, idx) => (
                   <motion.div
                     key={p.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
                     className={cn(
-                      "flex items-center justify-between p-6 md:p-8 rounded-[2rem] border transition-all bg-bg-card shadow-sm",
-                      idx === 0 ? "border-accent-gold/40 shadow-md ring-1 ring-accent-gold/10" : "border-border-soft"
+                      "flex items-center justify-between p-6 rounded-[2rem] border-4 transition-all game-shadow",
+                      idx === 0 ? "bg-white border-game-border scale-110 z-10" : "bg-white border-game-border/10 opacity-70"
                     )}
                   >
                     <div className="flex items-center gap-6">
                       <span className={cn(
-                        "text-3xl font-serif italic opacity-70",
-                        idx === 0 ? "text-accent-gold" : "text-text-secondary"
+                        "text-4xl font-black italic",
+                        idx === 0 ? "text-game-primary" : "text-game-border/30"
                       )}>
                         #{idx + 1}
                       </span>
                       <div>
-                        <p className="text-xl font-medium text-text-primary">{p.nickname}</p>
-                        <p className="text-xs text-text-secondary tracking-wide uppercase mt-1">{p.id.startsWith("bot") ? "Virtuais" : "Irmandade"}</p>
+                        <p className="text-3xl font-black text-game-border">{p.nickname}</p>
+                        <p className="text-xs text-game-primary uppercase tracking-widest font-black">{p.id.startsWith("bot") ? "SIMULADO" : "VOCÊ"}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-3xl font-mono text-accent-gold">{p.score}</p>
-                      <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">Pontos Finais</p>
+                      <p className="text-4xl font-black text-game-primary bg-game-secondary px-4 py-2 rounded-2xl border-3 border-game-border shadow-[3px_3px_0px_#1A1A1A]">{p.score}</p>
+                      <p className="text-[10px] text-game-border/50 uppercase font-black tracking-widest mt-1">Pontos</p>
                     </div>
                   </motion.div>
                 ))}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 w-full mt-4 max-w-lg mx-auto">
-                <button
+              <div className="flex flex-col sm:flex-row gap-6 w-full max-w-md">
+                <motion.button
+                  whileHover={{ scale: 1.05, rotate: -2 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={resetGame}
-                  className="flex-1 py-4 px-6 bg-accent-gold text-white font-medium rounded-full hover:-translate-y-0.5 transition-all shadow-md flex items-center justify-center gap-2"
+                  className="flex-1 p-6 bg-game-primary text-white font-black rounded-[2rem] uppercase tracking-widest text-xl game-border game-shadow-hover"
                 >
-                  <RefreshCw className="w-4 h-4" /> Meditar Novamente
-                </button>
-                <button
+                  Jogar Denovo!
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05, rotate: 2 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setView("home")}
-                  className="flex-1 py-4 px-6 bg-bg-page border border-border-soft text-text-primary rounded-full hover:border-accent-gold/40 hover:text-accent-gold transition-colors text-sm font-medium"
+                  className="flex-1 p-6 bg-white text-game-border font-black rounded-[2rem] hover:bg-gray-50 transition-colors uppercase tracking-widest text-xl game-border game-shadow-hover"
                 >
-                  Voltar ao Início
-                </button>
+                  Cansei...
+                </motion.button>
               </div>
             </motion.div>
           )}

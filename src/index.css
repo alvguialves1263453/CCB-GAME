@@ -1,43 +1,77 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
-  --color-bg-page: #FAF9F6;
-  --color-bg-card: #FFFFFF;
-  --color-accent-gold: #C4A77D;
-  --color-accent-gold-glow: rgba(196, 167, 125, 0.4);
-  --color-text-primary: #2C2A29;
-  --color-text-secondary: #7A7571;
-  --color-btn-hover: #D4BA94;
-  --color-border-soft: #E8E5DF;
-  --color-success: #8BA892;
-  --color-danger: #C78B8B;
+  --font-sans: "Fredoka", ui-sans-serif, system-ui, sans-serif;
+  --color-game-bg: #87CEEB;
+  --color-game-card: #FFFFFF;
+  --color-game-primary: #5865F2;
+  --color-game-secondary: #FFD700;
+  --color-game-accent: #FF6B6B;
+  --color-game-success: #4ECB71;
+  --color-game-danger: #FF4757;
+  --color-game-border: #1A1A1A;
+  --shadow-game: 4px 4px 0px 0px #1A1A1A;
+  --shadow-game-h: 6px 6px 0px 0px #1A1A1A;
 }
 
 body {
-  font-family: inherit;
-  background-color: var(--color-bg-page);
-  color: var(--color-text-primary);
+  font-family: "Fredoka", sans-serif;
+  background-color: var(--color-game-bg);
+  color: var(--color-game-border);
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 20%),
+    radial-gradient(circle at 90% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 20%);
   min-height: 100vh;
-  margin: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom subtle scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.game-shadow {
+  box-shadow: var(--shadow-game);
 }
-::-webkit-scrollbar-track {
+
+.game-shadow-hover:hover {
+  box-shadow: var(--shadow-game-h);
+  transform: translate(-2px, -2px);
+}
+
+.game-border {
+  border: 3px solid var(--color-game-border);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--color-border-soft);
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-game-border);
   border-radius: 10px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent-gold);
+
+@keyframes float-note {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.3;
+  }
+  90% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(-100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-float-note {
+  animation: float-note linear infinite;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
 }
