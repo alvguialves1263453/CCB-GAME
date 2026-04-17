@@ -40,14 +40,26 @@ let _onNearbyRoomsChange: ((rooms: { id: string; hostName: string }[]) => void) 
 
 const getClientIp = async () => {
   if (clientIp) return clientIp;
-  try {
-    const res = await fetch('https://api64.ipify.org?format=json');
-    const data = await res.json();
-    clientIp = data.ip;
-    return clientIp;
-  } catch (e) {
-    return 'unknown';
+  const services = [
+    'https://api64.ipify.org?format=json',
+    'https://api.ipify.org?format=json',
+    'https://ipapi.co/json/'
+  ];
+
+  for (const url of services) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      clientIp = data.ip || data.query;
+      if (clientIp) return clientIp;
+    } catch (e) {
+      continue;
+    }
   }
+  return 'unknown';
 };
 
 const triggerSync = () => {
@@ -274,15 +286,20 @@ export const multiplayerService = {
 
   async startDiscoveryBroadcast(roomId: string, hostName: string) {
     const ip = await getClientIp();
-    if (discoveryChannel) supabase.removeChannel(discoveryChannel);
+    if (discoveryChannel) {
+       await supabase.removeChannel(discoveryChannel);
+    }
 
     discoveryChannel = supabase.channel('lobby_discovery', {
-      config: { presence: { key: roomId } }
+      config: { 
+        presence: { key: roomId },
+        broadcast: { self: true }
+      }
     });
 
     discoveryChannel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await discoveryChannel!.track({ roomId, hostName, ip, createdAt: Date.now() });
+        await discoveryChannel!.track({ roomId, hostName, ip, createdAt: Date.now(), isLobby: true });
       }
     });
   },
@@ -298,18 +315,25 @@ export const multiplayerService = {
     _onNearbyRoomsChange = onNearbyRoomsChange;
     const myIp = await getClientIp();
 
-    if (discoveryChannel) supabase.removeChannel(discoveryChannel);
+    if (discoveryChannel) {
+      await supabase.removeChannel(discoveryChannel);
+    }
 
-    discoveryChannel = supabase.channel('lobby_discovery');
+    discoveryChannel = supabase.channel('lobby_discovery', {
+      config: { broadcast: { self: true } }
+    });
 
-    discoveryChannel.on('presence', { event: 'sync' }, () => {
-      const state = discoveryChannel!.presenceState();
+    const updateNearbyList = () => {
+      if (!discoveryChannel) return;
+      const state = discoveryChannel.presenceState();
       const rooms: { id: string; hostName: string }[] = [];
       
       Object.values(state).forEach((presences: any) => {
         presences.forEach((p: any) => {
-          // Only show rooms on the same IP and not too old (e.g. 1 hour)
-          if (p.ip === myIp && p.roomId && (Date.now() - p.createdAt < 3600000)) {
+          // IP matching or fallback to 'unknown' if both fail
+          const ipMatches = (p.ip === myIp && myIp !== 'unknown') || (p.ip === 'unknown' && myIp === 'unknown');
+          
+          if (p.isLobby && ipMatches && p.roomId && (Date.now() - (p.createdAt || 0) < 3600000)) {
             if (!rooms.find(r => r.id === p.roomId)) {
                rooms.push({ id: p.roomId, hostName: p.hostName });
             }
@@ -318,9 +342,13 @@ export const multiplayerService = {
       });
       
       _onNearbyRoomsChange?.(rooms);
-    });
+    };
 
-    discoveryChannel.subscribe();
+    discoveryChannel
+      .on('presence', { event: 'sync' }, updateNearbyList)
+      .on('presence', { event: 'join' }, updateNearbyList)
+      .on('presence', { event: 'leave' }, updateNearbyList)
+      .subscribe();
   },
 
   stopDiscoveryListener() {
