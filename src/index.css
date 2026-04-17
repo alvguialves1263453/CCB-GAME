@@ -3,26 +3,28 @@
 
 @theme {
   --font-sans: "Fredoka", ui-sans-serif, system-ui, sans-serif;
-  --color-game-bg: #87CEEB;
+  --color-game-bg: #EAE6FF;
   --color-game-card: #FFFFFF;
-  --color-game-primary: #5865F2;
+  --color-game-primary: #8A4FFF;
   --color-game-secondary: #FFD700;
-  --color-game-accent: #FF6B6B;
+  --color-game-accent: #FF5A95;
   --color-game-success: #4ECB71;
   --color-game-danger: #FF4757;
-  --color-game-border: #1A1A1A;
-  --shadow-game: 4px 4px 0px 0px #1A1A1A;
-  --shadow-game-h: 6px 6px 0px 0px #1A1A1A;
+  --color-game-border: #4A148C;
+  --shadow-game: 4px 4px 0px 0px #4A148C;
+  --shadow-game-h: 6px 6px 0px 0px #4A148C;
 }
 
 body {
   font-family: "Fredoka", sans-serif;
-  background-color: var(--color-game-bg);
-  color: var(--color-game-border);
-  background-image: 
-    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 20%),
-    radial-gradient(circle at 90% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 20%);
   min-height: 100vh;
+  /* Enhanced Gartic Phone-style gradient */
+  background-color: #6420AA; /* Fallback */
+  background-image:
+    linear-gradient(135deg, #6420AA 0%, #FF5A95 100%),
+    radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.15) 2px, transparent 0);
+  background-size: 100% 100%, 30px 30px;
+  color: var(--color-game-border);
 }
 
 .game-shadow {
@@ -123,6 +125,16 @@ body {
   .text-fluid-medium {
     font-size: clamp(1.25rem, 8vw, 2.5rem);
   }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+.animate-shake {
+  animation: shake 0.2s ease-in-out 0s 2;
 }
 
 /* Fix for mobile tap highlight */

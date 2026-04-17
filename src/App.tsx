@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker } from "lucide-react";
+import confetti from "canvas-confetti";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
@@ -138,10 +139,10 @@ export default function App() {
         setPlayers(prev => {
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
-            // Preserve local answered status if the round matches, to avoid flickering
+            // Trust the DB hasAnswered if the round is at least the current one
             const hasAnswered = dbp.id === localPlayerId 
-              ? (existing?.hasAnswered || (dbp.hasAnswered && dbp.round === currentRoundRef.current)) 
-              : (dbp.hasAnswered && dbp.round === currentRoundRef.current);
+              ? (existing?.hasAnswered || (dbp.hasAnswered && dbp.round >= currentRoundRef.current)) 
+              : (dbp.hasAnswered && dbp.round >= currentRoundRef.current);
 
             return {
               id: dbp.id,
@@ -212,8 +213,10 @@ export default function App() {
       if (allAnswered) {
         // Debounce slightly to allow UI to show final answer states
         const timer = setTimeout(() => {
-          handleRoundEnd();
-        }, 1000);
+          if (isGameActiveRef.current && !showResultRef.current) {
+            handleRoundEnd();
+          }
+        }, 1500); 
         return () => clearTimeout(timer);
       }
     }
@@ -603,20 +606,55 @@ export default function App() {
       finalIsCorrect = feedbackRef.current.correct;
     }
 
-    // Play result sound
+    // Play result sound and show effects
     if (finalIsCorrect) {
       soundService.playCorrect();
+      triggerConfetti();
     } else {
       soundService.playWrong();
+      // Add a screen shake or similar indicator for wrong answer
+      const gameContainer = document.getElementById('game-container');
+      if (gameContainer) {
+        gameContainer.classList.add('animate-shake');
+        setTimeout(() => gameContainer.classList.remove('animate-shake'), 500);
+      }
     }
 
-    // Auto-advance to next round after 4 seconds
+    // Auto-advance to next round after a delay
     const isHost = isSolo || players.find(p => p.id === localPlayerId)?.isHost;
     if (isHost) {
       setTimeout(() => {
-        nextRoundLocal();
-      }, 4000);
+        // Only advance if we are still looking at the results of the SAME round
+        if (viewRef.current === "game" && showResultRef.current) {
+          nextRoundLocal();
+        }
+      }, 4000); 
     }
+  };
+
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
+
+  const triggerConfetti = () => {
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    function randomInRange(min: number, max: number) {
+      return Math.random() * (max - min) + min;
+    }
+
+    const interval: any = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
   };
 
   const nextRoundLocal = () => {
@@ -759,82 +797,98 @@ export default function App() {
           {view === "home" && (
             <motion.div
               key="home"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex-grow flex flex-col items-center justify-center text-center gap-8"
+              exit={{ opacity: 0, y: -30 }}
+              className="flex-grow flex flex-col items-center justify-center p-4 max-w-4xl mx-auto w-full"
             >
-              <div className="relative">
-                <div className="absolute -inset-4 bg-white/30 blur-3xl rounded-full"></div>
-                <motion.h1 
-                  animate={{ 
-                    rotate: [0, -1, 1, -1, 1, 0],
-                    scale: [1, 1.02, 1, 1.02, 1]
-                  }}
-                  transition={{ 
-                    duration: 5, 
-                    repeat: Infinity, 
-                    ease: "easeInOut" 
-                  }}
-                  className="text-fluid-large font-black tracking-tighter text-game-primary uppercase relative drop-shadow-[4px_4px_0px_#1A1A1A] md:drop-shadow-[6px_6px_0px_#1A1A1A]"
-                >
-                  CCB QUIZ<br/>GAME
-                </motion.h1>
-              </div>
-              
-              <p className="text-lg md:text-2xl text-game-border font-bold max-w-lg bg-white/80 p-4 md:p-6 rounded-2xl game-border">
-                O desafio definitivo para testar seus conhecimentos sobre os hinos da CCB.
-              </p>
+              <motion.div
+                initial={{ scale: 0.8, rotate: -5 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 200, damping: 12 }}
+                className="relative mb-8 md:mb-16"
+              >
+                <div className="absolute -inset-8 bg-game-primary rounded-full blur-3xl opacity-20 animate-pulse" />
+                <div className="relative flex flex-col items-center">
+                  {/* Animated Music Notes */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    {[...Array(6)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ y: 0, opacity: 0 }}
+                        animate={{ 
+                          y: [-20, -150], 
+                          x: [0, (i % 2 === 0 ? 50 : -50)],
+                          opacity: [0, 1, 0],
+                          rotate: [0, (i % 2 === 0 ? 45 : -45)]
+                        }}
+                        transition={{ 
+                          duration: 3, 
+                          repeat: Infinity, 
+                          delay: i * 0.5,
+                          ease: "easeInOut"
+                        }}
+                        className="absolute text-game-secondary"
+                      >
+                        <Music className="w-8 h-8" />
+                      </motion.div>
+                    ))}
+                  </div>
 
-              <div className="flex flex-col sm:flex-row gap-6 w-full max-w-md">
+                  <div className="flex items-center justify-center w-24 h-24 md:w-32 md:h-32 bg-white border-8 border-game-border rounded-[2.5rem] md:rounded-[3rem] game-shadow mb-6 rotate-3">
+                    <Music className="w-12 h-12 md:w-16 md:h-16 text-game-primary" />
+                  </div>
+                  <h1 className="text-5xl md:text-7xl font-black text-white italic tracking-tighter uppercase leading-none drop-shadow-[5px_5px_0px_#1A1A1A] text-center select-none">
+                    Hino <span className="text-game-secondary">Rápido</span>
+                  </h1>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full">
                 <motion.button
                   whileHover={{ scale: 1.05, rotate: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     soundService.playClick();
                     setIsSolo(true);
-                    setRoomId(null);
                     setView("multiplayer_setup");
                   }}
-                  className="flex-1 p-6 bg-game-primary text-white font-black rounded-3xl game-border game-shadow-hover uppercase tracking-wider text-xl"
+                  className="group relative h-40 md:h-56 bg-game-primary border-4 border-game-border rounded-[2.5rem] game-shadow-hover flex flex-col items-center justify-center gap-4 transition-all"
                 >
-                  Jogar Solo
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-game-border rounded-xl md:rounded-2xl flex items-center justify-center text-game-primary group-hover:rotate-12 transition-transform">
+                    <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />
+                  </div>
+                  <span className="text-xl md:text-3xl font-black text-white italic uppercase tracking-tighter">TREINO</span>
                 </motion.button>
+
                 <motion.button
                   whileHover={{ scale: 1.05, rotate: 2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     soundService.playClick();
                     setIsSolo(false);
-                    setRoomId(null);
-                    setJoinRoomCode("");
                     setView("multiplayer_menu");
                   }}
-                  className="flex-1 p-6 bg-game-secondary text-game-border font-black rounded-3xl game-border game-shadow-hover uppercase tracking-wider text-xl"
+                  className="group relative h-40 md:h-56 bg-game-secondary border-4 border-game-border rounded-[2.5rem] game-shadow-hover flex flex-col items-center justify-center gap-4 transition-all"
                 >
-                  Multiplayer
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-game-border rounded-xl md:rounded-2xl flex items-center justify-center text-game-secondary group-hover:-rotate-12 transition-transform">
+                    <Users className="w-6 h-6 md:w-8 md:h-8" />
+                  </div>
+                  <span className="text-xl md:text-3xl font-black text-game-border italic uppercase tracking-tighter">CONJUNTO</span>
                 </motion.button>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  soundService.playClick();
-                  setView("hymn_list");
-                }}
-                className="w-full max-w-md p-4 bg-white text-game-border game-border rounded-2xl hover:bg-gray-50 transition-all game-shadow-hover uppercase tracking-widest text-sm font-black flex items-center justify-center gap-2"
-              >
-                <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-                Lista de Hinos
-              </motion.button>
-              
-              {isLoading && (
-                <div className="flex items-center gap-2 text-game-primary animate-pulse">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm font-black uppercase tracking-widest">Carregando Hinos...</span>
-                </div>
-              )}
+              <div className="mt-12 flex gap-4">
+                 <button 
+                  onClick={() => setView("hymn_list")}
+                  className="w-12 h-12 bg-white border-4 border-game-border rounded-2xl flex items-center justify-center game-shadow-hover transition-all"
+                >
+                   <Music className="w-6 h-6" />
+                 </button>
+                 <button className="w-12 h-12 bg-white border-4 border-game-border rounded-2xl flex items-center justify-center game-shadow-hover transition-all">
+                   <Settings className="w-6 h-6" />
+                 </button>
+              </div>
             </motion.div>
           )}
 
@@ -910,48 +964,118 @@ export default function App() {
 
           {view === "multiplayer_menu" && (
             <motion.div
-              key="menu"
-              initial={{ opacity: 0, x: 20 }}
+              key="multiplayer_menu"
+              initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="flex-grow flex flex-col items-center justify-center gap-8"
+              exit={{ opacity: 0, x: -50 }}
+              className="flex-grow flex flex-col items-center justify-center p-4 max-w-5xl mx-auto w-full"
             >
-              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow text-center">
-                <button onClick={() => {
-                  soundService.playClick();
-                  setView("home");
-                }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
-                </button>
+              <div className="w-full flex items-center justify-between mb-8 md:mb-16">
+                 <motion.button
+                  whileHover={{ scale: 1.1, x: -5 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setView("home")}
+                  className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-game-border rounded-2xl flex items-center justify-center game-shadow-hover"
+                >
+                  <ArrowLeft className="w-6 h-6 md:w-10 md:h-10" />
+                </motion.button>
+                <h2 className="text-4xl md:text-6xl font-black text-white italic uppercase tracking-tighter drop-shadow-[4px_4px_0px_#1A1A1A]">MULTIJOGADOR</h2>
+                <div className="w-12 h-12 md:w-16 md:h-16 opacity-0" />
+              </div>
 
-                <h2 className="text-4xl font-black text-game-primary mb-8 uppercase drop-shadow-md">
-                  Multiplayer
-                </h2>
-
-                <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 w-full">
+                <div className="space-y-6 md:space-y-10">
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.02, rotate: -0.5 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       soundService.playClick();
-                      setRoomId(null);
                       setView("multiplayer_setup");
                     }}
-                    className="w-full p-6 bg-game-primary text-white font-black rounded-2xl game-border game-shadow-hover uppercase tracking-widest text-xl"
+                    className="w-full p-8 md:p-14 bg-game-primary border-4 md:border-8 border-game-border rounded-[2.5rem] md:rounded-[3.5rem] game-shadow-hover flex flex-col items-center justify-center gap-6"
                   >
-                    Criar Sala
+                    <div className="w-16 h-16 md:w-20 md:h-20 bg-white border-4 border-game-border rounded-2xl flex items-center justify-center text-game-primary">
+                      <Plus className="w-10 h-10 md:w-12 md:h-12" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl md:text-4xl font-black text-white italic uppercase tracking-tighter">CRIAR SALA</p>
+                      <p className="text-[10px] md:text-sm text-white/50 font-black uppercase tracking-widest mt-2">Seja o mestre do jogo</p>
+                    </div>
                   </motion.button>
+
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.02, rotate: 0.5 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       soundService.playClick();
                       setView("multiplayer_join");
                     }}
-                    className="w-full p-6 bg-game-secondary text-game-border font-black rounded-2xl game-border game-shadow-hover uppercase tracking-widest text-xl"
-                  >
-                    Entrar em Sala
+                    className="w-full p-8 md:p-14 bg-game-secondary border-4 md:border-8 border-game-border rounded-[2.5rem] md:rounded-[3.5rem] game-shadow-hover flex flex-col items-center justify-center gap-6"
+                   >
+                    <div className="w-16 h-16 md:w-20 md:h-20 bg-white border-4 border-game-border rounded-2xl flex items-center justify-center text-game-secondary">
+                      <Key className="w-10 h-10 md:w-12 md:h-12" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl md:text-4xl font-black text-game-border italic uppercase tracking-tighter">ENTRAR POR CÓDIGO</p>
+                      <p className="text-[10px] md:text-sm text-game-border/30 font-black uppercase tracking-widest mt-2">Dê o código e bora</p>
+                    </div>
                   </motion.button>
+                </div>
+
+                <div className="bg-white border-4 md:border-8 border-game-border rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-10 game-shadow flex flex-col">
+                  <div className="flex items-center gap-4 mb-8">
+                     <div className="w-12 h-12 bg-game-success border-4 border-game-border rounded-xl flex items-center justify-center text-white">
+                        <Wifi className="w-6 h-6" />
+                     </div>
+                     <h3 className="text-2xl md:text-3xl font-black text-game-border italic uppercase">SALAS AMIGAS</h3>
+                  </div>
+
+                  <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-4 min-h-[300px] max-h-[500px]">
+                    {nearbyRooms.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center opacity-30 gap-6 mt-12">
+                        <motion.div
+                           animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                           transition={{ duration: 3, repeat: Infinity }}
+                        >
+                          <MonitorSpeaker className="w-20 h-20 md:w-32 md:h-32 mb-4" />
+                        </motion.div>
+                        <p className="text-sm md:text-lg font-black uppercase tracking-widest max-w-[200px]">Procurando salas na sua rede...</p>
+                        <div className="flex gap-2">
+                           {[0,1,2].map(i => (
+                             <motion.div key={i} animate={{ opacity: [0.2, 1, 0.2] }} transition={{ delay: i*0.2, repeat: Infinity }} className="w-2 h-2 bg-game-border rounded-full" />
+                           ))}
+                        </div>
+                      </div>
+                    ) : (
+                      nearbyRooms.map((game, idx) => (
+                        <motion.button
+                          key={idx}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          whileHover={{ scale: 1.02, x: 5 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            soundService.playClick();
+                            handleJoinGame(game.id);
+                          }}
+                          className="w-full p-4 md:p-6 bg-gray-50 border-4 border-game-border rounded-2xl flex items-center justify-between group game-shadow-hover transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white border-3 border-game-border rounded-xl flex items-center justify-center text-game-border font-black text-xs">
+                              ?/?
+                            </div>
+                            <div className="text-left">
+                              <p className="font-black text-lg md:text-xl text-game-border leading-none">{game.hostName || "Sala Musical"}</p>
+                              <p className="text-[10px] md:text-xs text-game-primary font-black uppercase tracking-widest mt-1 opacity-60">ID: {game.id}</p>
+                            </div>
+                          </div>
+                          <div className="w-10 h-10 bg-game-primary border-3 border-game-border rounded-xl flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ArrowRight className="w-5 h-5" />
+                          </div>
+                        </motion.button>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -960,33 +1084,36 @@ export default function App() {
           {view === "multiplayer_join" && (
             <motion.div
               key="join"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="flex-grow flex flex-col items-center justify-center gap-8"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex-grow flex flex-col items-center justify-center p-4 gap-8 min-h-[500px]"
             >
-              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow">
-                <button onClick={() => {
-                  soundService.playClick();
-                  setView("multiplayer_menu");
-                }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
+              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-10 rounded-[3rem] game-shadow">
+                <button 
+                  onClick={() => {
+                    soundService.playClick();
+                    setView("multiplayer_menu");
+                  }} 
+                  className="mb-8 flex items-center text-game-border/40 hover:text-game-primary transition-colors text-xs font-black uppercase tracking-widest"
+                >
                   <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
                 </button>
 
-                <h2 className="text-3xl font-black text-game-primary mb-6 uppercase text-center">
+                <h2 className="text-4xl font-black text-game-primary mb-10 uppercase italic italic-none text-center drop-shadow-sm">
                   Entrar na Sala
                 </h2>
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2 text-center">Código da Sala (5 Letras)</label>
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <label className="block text-xs uppercase text-game-border/50 font-black tracking-widest text-center">Código Secreto</label>
                     <input
                       type="text"
                       value={joinRoomCode}
                       onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5))}
-                      placeholder="EX: ABCDE"
+                      placeholder="XXXXX"
                       maxLength={5}
-                      className="w-full p-6 bg-gray-50 border-3 border-game-border rounded-2xl text-game-border outline-none focus:bg-white transition-colors text-3xl font-black text-center tracking-[0.5em]"
+                      className="w-full p-6 bg-gray-50 border-4 border-game-border rounded-3xl text-game-border outline-none focus:bg-white transition-all text-4xl font-black text-center tracking-[0.4em] game-shadow"
                       autoFocus
                     />
                   </div>
@@ -1002,25 +1129,24 @@ export default function App() {
                       }
                     }}
                     disabled={joinRoomCode.length !== 5}
-                    className="w-full p-5 bg-game-primary text-white font-black rounded-2xl hover:bg-game-primary/90 transition-colors uppercase tracking-widest disabled:opacity-50 game-border game-shadow-hover text-xl mt-4"
+                    className="w-full p-6 bg-game-primary text-white font-black rounded-3xl game-border game-shadow-hover uppercase tracking-widest text-xl disabled:opacity-30 disabled:grayscale transition-all"
                   >
-                    Avançar <ArrowRight className="w-5 h-5 ml-2 inline-block" />
+                    Bora Entrar!
                   </motion.button>
                 </div>
 
-                {/* Jogos na mesma rede section */}
-                <div className="mt-10 pt-8 border-t-4 border-game-border/10">
-                  <div className="flex items-center justify-center gap-2 mb-4 text-game-border/60">
-                    <Wifi className="w-4 h-4" />
-                    <span className="text-xs font-black uppercase tracking-widest">Jogos na mesma rede</span>
-                  </div>
+                {nearbyRooms.length > 0 && (
+                  <div className="mt-12 pt-8 border-t-4 border-game-border/5">
+                    <div className="flex items-center justify-center gap-2 mb-6 opacity-30">
+                      <Wifi className="w-4 h-4" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Salas Amigas</span>
+                    </div>
 
-                  <div className="space-y-3">
-                    {nearbyRooms.length > 0 ? (
-                      nearbyRooms.map(room => (
+                    <div className="space-y-4">
+                      {nearbyRooms.map(room => (
                         <motion.button
                           key={room.id}
-                          whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,1)" }}
+                          whileHover={{ scale: 1.02, x: 5 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => {
                             soundService.playClick();
@@ -1028,30 +1154,24 @@ export default function App() {
                             setRoomId(room.id);
                             setView("multiplayer_setup");
                           }}
-                          className="w-full p-4 bg-gray-50 border-2 border-game-border rounded-2xl flex items-center justify-between group hover:border-game-primary transition-all"
+                          className="w-full p-5 bg-white border-4 border-game-border rounded-2xl flex items-center justify-between group hover:border-game-primary transition-all game-shadow"
                         >
                           <div className="flex flex-col items-start px-2">
-                            <span className="text-xs uppercase text-game-border/50 font-black tracking-tighter mb-0.5">Sala de</span>
-                            <span className="text-game-border font-black text-lg group-hover:text-game-primary transition-colors">
-                              {room.hostName || "Anônimo"}
+                             <span className="text-game-border font-black text-lg group-hover:text-game-primary transition-colors">
+                              {room.hostName || "Dono da Sala"}
                             </span>
+                            <span className="text-[9px] uppercase text-game-border/30 font-black tracking-widest">Está esperando!</span>
                           </div>
                           <div className="flex items-center gap-3">
-                             <div className="px-3 py-1 bg-game-secondary border-2 border-game-border rounded-full text-[10px] font-black uppercase text-game-border group-hover:bg-game-primary group-hover:text-white transition-colors">
+                             <div className="px-4 py-2 bg-game-secondary border-2 border-game-border rounded-xl text-xs font-black uppercase text-game-border group-hover:bg-game-primary group-hover:text-white transition-colors">
                                {room.id}
                              </div>
-                             <ChevronRight className="w-5 h-5 text-game-border/30 group-hover:text-game-primary" />
                           </div>
                         </motion.button>
-                      ))
-                    ) : (
-                      <div className="py-8 text-center bg-gray-50/50 rounded-2xl border-2 border-dashed border-game-border/20 flex flex-col items-center gap-2">
-                        <Loader2 className="w-5 h-5 text-game-border/20 animate-spin" />
-                        <p className="text-[10px] uppercase font-black tracking-widest text-game-border/40">Procurando partidas...</p>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -1059,53 +1179,43 @@ export default function App() {
           {view === "multiplayer_setup" && (
             <motion.div
               key="setup"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="flex-grow flex flex-col items-center justify-center gap-8"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex-grow flex flex-col items-center justify-center p-4 gap-8 min-h-[600px]"
             >
-              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow">
+              <div className="w-full max-w-xl bg-game-card border-4 border-game-border p-10 rounded-[3rem] game-shadow">
                 <button onClick={() => {
                   soundService.playClick();
-                  if (isSolo) {
-                    setView("home");
-                  } else if (roomId) {
-                    setView("multiplayer_join");
-                  } else {
-                    setView("multiplayer_menu");
-                  }
-                }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
+                  if (isSolo) setView("home");
+                  else if (roomId) setView("multiplayer_join");
+                  else setView("multiplayer_menu");
+                }} className="mb-8 flex items-center text-game-border/40 hover:text-game-primary transition-colors text-xs font-black uppercase tracking-widest">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
                 </button>
                 
-                <h2 className="text-3xl font-black text-game-primary mb-6 uppercase">
-                  {isSolo ? "Quem está jogando?" : (roomId ? `Entrar na Sala ${roomId}` : "Criar Nova Sala")}
+                <h2 className="text-4xl font-black text-game-primary mb-10 uppercase italic text-center drop-shadow-sm">
+                  {isSolo ? "Solo" : (roomId ? "Entrar" : "Nova Sala")}
                 </h2>
                 
-                <div className="space-y-6">
-                  {!isSolo && !roomId && (
-                    <div className="p-4 bg-game-primary/10 border-2 border-game-primary rounded-2xl">
-                      <p className="text-xs text-game-primary uppercase font-black tracking-widest text-center">Você será o Host desta sala</p>
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Seu Nickname</label>
+                <div className="space-y-10">
+                  <div className="space-y-4">
+                    <label className="block text-xs uppercase text-game-border/50 font-black tracking-widest text-center">Como quer ser chamado?</label>
                     <input
                       type="text"
                       value={nickname}
                       onChange={(e) => setNickname(e.target.value)}
                       placeholder="Ex: Irmão Lucas"
-                      className="w-full p-4 bg-gray-50 border-3 border-game-border rounded-2xl text-game-border outline-none focus:bg-white transition-colors text-lg font-bold"
+                      className="w-full p-6 bg-gray-50 border-4 border-game-border rounded-3xl text-game-border text-2xl font-black text-center outline-none focus:bg-white transition-all game-shadow"
                       autoFocus
                     />
                   </div>
 
-                  {/* Round Selection */}
                   {(isSolo || (!roomId && !localPlayerId)) && (
-                    <div className="space-y-6">
-                      <div className="space-y-3">
-                        <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Quantidade de Rodadas</label>
-                        <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div className="space-y-4">
+                        <label className="block text-xs uppercase text-game-border/50 font-black tracking-widest text-center">Rodadas</label>
+                        <div className="grid grid-cols-2 gap-3">
                           {[5, 10, 15, 20].map((num) => (
                             <button
                               key={num}
@@ -1114,10 +1224,10 @@ export default function App() {
                                 setRoundCount(num);
                               }}
                               className={cn(
-                                "p-3 rounded-2xl text-sm font-black transition-all border-3",
+                                "p-4 rounded-2xl text-lg font-black transition-all border-4",
                                 roundCount === num 
-                                  ? "bg-game-secondary text-game-border border-game-border shadow-[2px_2px_0px_#1A1A1A]" 
-                                  : "bg-white border-game-border text-game-border opacity-50 hover:opacity-100"
+                                  ? "bg-game-secondary text-game-border border-game-border game-shadow" 
+                                  : "bg-white border-game-border/20 text-game-border/30"
                               )}
                             >
                               {num}
@@ -1126,14 +1236,13 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Difficulty Selection */}
-                      <div className="space-y-3">
-                        <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2">Dificuldade</label>
-                        <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-4">
+                        <label className="block text-xs uppercase text-game-border/50 font-black tracking-widest text-center">Nível</label>
+                        <div className="flex flex-col gap-3">
                           {[
-                            { id: 'facil', label: 'Fácil', colorClass: 'bg-game-success text-white' },
-                            { id: 'medio', label: 'Médio', colorClass: 'bg-yellow-500 text-white' },
-                            { id: 'dificil', label: 'Difícil', colorClass: 'bg-game-danger text-white' }
+                            { id: 'facil', label: 'Lento', colorClass: 'bg-game-success' },
+                            { id: 'medio', label: 'Médio', colorClass: 'bg-yellow-400' },
+                            { id: 'dificil', label: 'Rápido', colorClass: 'bg-game-danger' }
                           ].map((diff) => (
                             <button
                               key={diff.id}
@@ -1142,45 +1251,24 @@ export default function App() {
                                 setDifficulty(diff.id as Difficulty);
                               }}
                               className={cn(
-                                "p-3 rounded-2xl text-sm font-black transition-all border-3 uppercase tracking-widest",
+                                "w-full p-4 rounded-2xl text-sm font-black transition-all border-4 uppercase tracking-[0.2em]",
                                 difficulty === diff.id 
-                                  ? `${diff.colorClass} border-game-border shadow-[2px_2px_0px_#1A1A1A]` 
-                                  : "bg-white border-game-border text-game-border opacity-50 hover:opacity-100 shadow-none"
+                                  ? `${diff.colorClass} text-white border-game-border game-shadow` 
+                                  : "bg-white border-game-border/20 text-game-border/30"
                               )}
                             >
                               {diff.label}
                             </button>
                           ))}
                         </div>
-                        <p className="text-[10px] text-game-border mt-3 uppercase font-bold leading-tight bg-game-primary/10 p-3 rounded-xl border-2 border-game-primary/20">
-                          {difficulty === 'facil' && "Sem tempo limite. Pontos baseados em quem acerta e em quem é o mais rápido."}
-                          {difficulty === 'medio' && "20 segundos para responder. Menos tempo = menos pontos. Fique atento!"}
-                          {difficulty === 'dificil' && "Apenas 10 segundos! Um verdadeiro desafio para quem conhece o hinário."}
-                        </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Pre-lobby players list if joining via link */}
-                  {roomId && !localPlayerId && players.length > 0 && (
-                    <div className="p-4 bg-game-primary/5 rounded-2xl border-2 border-game-primary/20">
-                      <p className="text-[10px] text-game-primary mb-3 flex items-center gap-2 uppercase tracking-widest font-black">
-                        <Users className="w-3 h-3" /> Já na sala:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {players.map(p => (
-                          <span key={p.id} className="px-3 py-1 bg-white border-2 border-game-border rounded-full text-[10px] font-black text-game-border uppercase tracking-tight">
-                            {p.nickname}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
                   {isSolo && (
-                    <div className="pt-4 border-t-4 border-game-border">
-                      <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-4">Adicionar Bots (Opcional)</label>
-                      <div className="flex items-center justify-between gap-2">
+                    <div className="pt-8 border-t-4 border-game-border/5 space-y-4">
+                      <label className="block text-xs uppercase text-game-border/50 font-black tracking-widest text-center">Rivais Simulados</label>
+                      <div className="flex justify-between gap-3">
                         {[0, 1, 2, 3, 4, 5].map((num) => (
                           <button
                             key={num}
@@ -1189,19 +1277,16 @@ export default function App() {
                               setBotCount(num);
                             }}
                             className={cn(
-                              "w-12 h-12 rounded-xl font-black transition-all border-3",
+                              "w-14 h-14 rounded-2xl font-black transition-all border-4 text-xl",
                               botCount === num 
-                                ? "bg-game-primary text-white border-game-border shadow-[2px_2px_0px_#1A1A1A]" 
-                                : "bg-white text-game-border border-game-border opacity-50 hover:opacity-100"
+                                ? "bg-game-primary text-white border-game-border game-shadow" 
+                                : "bg-white border-game-border/20 text-game-border/30"
                             )}
                           >
-                            {num === 0 ? "Off" : num}
+                            {num}
                           </button>
                         ))}
                       </div>
-                      <p className="text-[10px] text-game-border mt-3 uppercase tracking-wider font-bold">
-                        {botCount === 0 ? "Você jogará sozinho." : `Você jogará contra ${botCount} bots.`}
-                      </p>
                     </div>
                   )}
                   
@@ -1213,86 +1298,95 @@ export default function App() {
                       handleJoinGame();
                     }}
                     disabled={isLoading || !nickname.trim()}
-                    className="w-full p-5 bg-game-primary text-white font-black rounded-2xl hover:bg-game-primary/90 transition-colors uppercase tracking-widest disabled:opacity-50 game-border game-shadow-hover text-xl"
+                    className="w-full p-8 bg-game-primary text-white font-black rounded-[2.5rem] game-border game-shadow-hover uppercase tracking-[0.2em] text-2xl disabled:opacity-30 disabled:grayscale transition-all"
                   >
-                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : (isSolo ? "Bora jogar!" : (roomId ? "Entrar na Sala" : "Criar Sala"))}
+                    {isLoading ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : "VAI!"}
                   </motion.button>
                 </div>
               </div>
             </motion.div>
           )}
 
-           {view === "lobby" && (
+          {view === "lobby" && (
             <motion.div
               key="lobby"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="flex-grow flex flex-col lg:grid lg:grid-cols-[1fr_400px] gap-6 md:gap-8"
+              className="flex-grow flex flex-col lg:grid lg:grid-cols-[1fr_350px] gap-8 min-h-[600px]"
             >
-              <div className="flex flex-col gap-6">
-                <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex-grow relative overflow-hidden game-shadow">
-                  <div className="absolute top-0 right-0 p-8 opacity-5">
-                    <Users className="w-48 h-48" />
-                  </div>
-                  
-                  <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-5xl font-black text-game-primary uppercase drop-shadow-md">Lobby</h2>
+              <div className="flex flex-col gap-8">
+                <div className="bg-game-card border-4 border-game-border p-10 rounded-[3rem] flex-grow relative overflow-hidden game-shadow">
+                  <div className="flex items-center justify-between mb-10">
+                    <h2 className="text-6xl font-black text-game-primary uppercase italic tracking-tighter drop-shadow-sm">SALA</h2>
                     {!isSolo && roomId && (
-                      <div className="text-right bg-game-secondary p-3 rounded-2xl border-2 border-game-border shadow-[3px_3px_0px_#1A1A1A]">
-                        <p className="text-[10px] text-game-border uppercase font-black tracking-widest">Código</p>
-                        <p className="text-3xl font-black text-game-border tracking-widest leading-none">{roomId}</p>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] uppercase font-black tracking-widest opacity-30 leading-none mb-1">Código</span>
+                        <div className="bg-game-secondary px-6 py-2 rounded-2xl border-4 border-game-border game-shadow">
+                          <span className="text-4xl font-black tracking-[0.2em] text-game-border leading-none">{roomId}</span>
+                        </div>
                       </div>
                     )}
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {players.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between p-4 bg-gray-50 border-3 border-game-border rounded-[1.5rem]">
+                      <motion.div 
+                        key={p.id} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "flex items-center justify-between p-6 border-4 rounded-[2rem] transition-all",
+                          p.isReady ? "bg-game-success/10 border-game-success" : "bg-white border-game-border"
+                        )}
+                      >
                         <div className="flex items-center gap-4">
                           <div className={cn(
-                            "w-12 h-12 rounded-full border-2 border-game-border flex items-center justify-center transition-colors shadow-[2px_2px_0px_#1A1A1A]",
-                            p.isReady ? "bg-game-success text-white" : "bg-white text-game-border"
+                            "w-14 h-14 rounded-2xl border-4 flex items-center justify-center transition-all game-shadow",
+                            p.isReady ? "bg-game-success border-game-border text-white" : "bg-white border-game-border text-game-border"
                           )}>
-                            <User className="w-6 h-6" />
+                            <User className="w-8 h-8" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <p className="font-black text-xl">{p.nickname}</p>
-                              {p.isHost && <Trophy className="w-5 h-5 text-game-secondary drop-shadow-sm" />}
+                              <p className="font-black text-2xl text-game-border leading-none">{p.nickname}</p>
+                              {p.isHost && <Trophy className="w-5 h-5 text-game-secondary" />}
                             </div>
-                            <div className="flex items-center gap-2">
-                              {!p.isHost && (p.isReady ? (
-                                <span className="text-xs text-game-success font-black uppercase tracking-widest">Pronto!</span>
-                              ) : (
-                                <span className="text-xs text-game-border/30 font-black uppercase tracking-widest">Aguardando...</span>
-                              ))}
-                            </div>
+                            {p.isHost && <span className="text-[10px] font-black uppercase text-game-primary tracking-widest mt-1 block">O Regente</span>}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          {p.id === localPlayerId && !isSolo && !p.isHost && (
-                            <button 
-                              onClick={() => {
-                                soundService.playClick();
-                                toggleReady();
-                              }}
-                              className={cn(
-                                "px-4 py-2 rounded-xl text-xs font-black uppercase transition-all border-2 border-game-border game-shadow-hover",
-                                p.isReady ? "bg-game-success text-white" : "bg-white text-game-border"
-                              )}
-                            >
-                              {p.isReady ? "Tô Pronto!" : "Tô Pronto?"}
-                            </button>
-                          )}
-                          {p.isHost && <span className="px-3 py-1 bg-game-primary text-white text-xs font-black rounded-full uppercase border-2 border-game-border shadow-[2px_2px_0px_#1A1A1A]">Host</span>}
-                        </div>
-                      </div>
+                        
+                        {p.id === localPlayerId && !isSolo && !p.isHost && (
+                          <motion.button 
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => {
+                              soundService.playClick();
+                              toggleReady();
+                            }}
+                            className={cn(
+                              "w-12 h-12 rounded-xl border-4 flex items-center justify-center game-shadow transition-all",
+                              p.isReady ? "bg-game-success text-white border-game-border" : "bg-white text-game-border border-game-border"
+                            )}
+                          >
+                             {p.isReady ? <Trophy className="w-6 h-6" /> : "?"}
+                          </motion.button>
+                        )}
+                        
+                        {!p.isHost && p.id !== localPlayerId && (
+                           <div className={cn(
+                             "w-10 h-10 rounded-xl border-4 border-game-border game-shadow flex items-center justify-center",
+                             p.isReady ? "bg-game-success" : "bg-gray-100"
+                           )}>
+                             {p.isReady && <Trophy className="w-4 h-4 text-white" />}
+                           </div>
+                        )}
+                      </motion.div>
                     ))}
                   </div>
                 </div>
                 
-                <div className="flex gap-4">
+                <div className="flex gap-6 h-24">
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -1302,89 +1396,83 @@ export default function App() {
                       setView("home");
                       setRoomId(null);
                     }} 
-                    className="p-5 bg-white text-game-border font-black rounded-[1.5rem] border-3 border-game-border hover:bg-gray-50 transition-colors uppercase tracking-widest flex-1 game-shadow-hover"
+                    className="flex-1 bg-white text-game-border font-black rounded-[2rem] border-4 border-game-border game-shadow hover:bg-gray-50 transition-colors uppercase tracking-[0.2em] italic"
                   >
                     Sair
                   </motion.button>
-                  {(!isSolo && players.find(p => p.id === localPlayerId)?.isHost) || isSolo ? (
+                  {((!isSolo && players.find(p => p.id === localPlayerId)?.isHost) || isSolo) ? (
                     <motion.button
-                      whileHover={{ scale: 1.05, rotate: 2 }}
+                      whileHover={{ scale: 1.05, rotate: 1 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
                         soundService.playClick();
                         handleStartGameClick(false);
                       }}
                       disabled={isLoading}
-                      className="p-5 bg-game-primary text-white font-black rounded-[1.5rem] transition-transform flex-1 uppercase tracking-widest game-shadow-hover game-border disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl"
+                      className="flex-[2] bg-game-primary text-white font-black rounded-[2rem] game-border game-shadow transition-colors uppercase tracking-[0.2em] text-3xl italic italic-none flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale"
                     >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Carregando...
-                        </>
-                      ) : (
-                        "Bora Começar!"
-                      )}
+                      {isLoading ? <Loader2 className="w-8 h-8 animate-spin" /> : "VAI!"}
                     </motion.button>
                   ) : (
-                    <div className="flex-1 p-5 bg-white border-3 border-game-border rounded-[1.5rem] flex items-center justify-center text-game-border/50 font-black uppercase tracking-widest text-sm">
-                      Esperando o Host...
+                    <div className="flex-[2] bg-white border-4 border-game-border rounded-[2rem] flex items-center justify-center text-game-border/30 font-black uppercase tracking-[0.2em] text-sm text-center px-4 italic">
+                      Lá vem o host...
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="bg-game-card border-4 border-game-border p-8 rounded-[2rem] flex flex-col gap-6 game-shadow">
-                <h3 className="text-2xl font-black text-game-primary uppercase tracking-widest">Sala Permanente</h3>
-                
-                {!isSolo && roomId && (
-                  <button
-                    onClick={() => {
-                      soundService.playClick();
-                      copyRoomLink();
-                    }}
-                    className="w-full p-6 bg-game-secondary/10 border-3 border-game-border rounded-[1.5rem] flex flex-col items-center gap-2 group hover:bg-game-secondary/20 transition-all relative overflow-hidden"
-                  >
-                    <AnimatePresence mode="wait">
-                      {copied ? (
-                        <motion.div
-                          key="copied"
-                          initial={{ y: 20, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: -20, opacity: 0 }}
-                          className="flex flex-col items-center gap-2"
-                        >
-                          <Trophy className="w-10 h-10 text-game-success mb-2" />
-                          <span className="font-black text-game-success uppercase tracking-widest text-sm">Copiado!</span>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="invite"
-                          initial={{ y: 20, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: -20, opacity: 0 }}
-                          className="flex flex-col items-center gap-2"
-                        >
-                          <Users className="w-10 h-10 text-game-primary mb-2 group-hover:scale-110 transition-transform" />
-                          <span className="font-black text-game-border uppercase tracking-widest text-sm text-center leading-tight">Mandar pra Galera</span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </button>
-                )}
+              <div className="bg-game-card border-4 border-game-border p-10 rounded-[3rem] flex flex-col gap-10 game-shadow h-fit">
+                <div className="space-y-4">
+                   <h3 className="text-2xl font-black text-game-primary uppercase italic tracking-tighter">Convite</h3>
+                   {!isSolo && roomId && (
+                    <button
+                      onClick={() => {
+                        soundService.playClick();
+                        copyRoomLink();
+                      }}
+                      className="w-full p-8 bg-gray-50 border-4 border-game-border rounded-[2rem] flex flex-col items-center gap-2 group hover:scale-[1.02] transition-all relative overflow-hidden game-shadow"
+                    >
+                      <AnimatePresence mode="wait">
+                        {copied ? (
+                          <motion.div
+                            key="copied"
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -20, opacity: 0 }}
+                            className="flex flex-col items-center gap-2"
+                          >
+                            <Trophy className="w-10 h-10 text-game-success" />
+                            <span className="font-black text-game-success uppercase tracking-widest text-xs">Copiado!</span>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="invite"
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -20, opacity: 0 }}
+                            className="flex flex-col items-center gap-2"
+                          >
+                            <Users className="w-10 h-10 text-game-primary group-hover:scale-110 transition-transform" />
+                            <span className="font-black text-game-border uppercase tracking-widest text-[10px] text-center italic">Chamar a Família</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  )}
+                </div>
 
-                <div className="p-6 bg-gray-50 border-3 border-game-border rounded-[1.5rem]">
-                  <h4 className="font-black text-game-primary uppercase tracking-widest text-sm mb-4">Regras do Multiplayer</h4>
-                  <ul className="space-y-4 text-sm text-game-border font-bold">
-                    <li className="flex gap-3">
-                      <div className="w-4 h-4 rounded-full bg-game-secondary border-2 border-game-border shrink-0 mt-0.5"></div>
-                      Todos os jogadores devem marcar <strong className="text-game-primary">Estou Pronto</strong> para o Host iniciar.
-                    </li>
-                    <li className="flex gap-3">
-                      <div className="w-4 h-4 rounded-full bg-game-primary border-2 border-game-border shrink-0 mt-0.5"></div>
-                      A pontuação é real e atualizada para todos ao final de cada rodada.
-                    </li>
-                  </ul>
+                <div className="space-y-4 pt-10 border-t-4 border-game-border/5">
+                   <h4 className="font-black text-game-border/30 uppercase tracking-widest text-[10px] text-center italic">Como Jogar</h4>
+                   <ul className="space-y-4">
+                     <li className="flex gap-4 items-start">
+                       <div className="w-6 h-6 rounded-full bg-game-secondary border-2 border-game-border shrink-0 mt-1 game-shadow animate-bounce"></div>
+                       <p className="text-xs text-game-border font-bold leading-tight">Cuidado com o relógio! Rápido = Mais pontos.</p>
+                     </li>
+                     <li className="flex gap-4 items-start">
+                       <div className="w-6 h-6 rounded-full bg-game-primary border-2 border-game-border shrink-0 mt-1 game-shadow"></div>
+                       <p className="text-xs text-game-border font-bold leading-tight">Só um hino está certo. Concentre-se!</p>
+                     </li>
+                   </ul>
                 </div>
               </div>
             </motion.div>
@@ -1393,6 +1481,7 @@ export default function App() {
           {view === "game" && questions.length > 0 && (
             <motion.div
               key="game"
+              id="game-container"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -1409,47 +1498,49 @@ export default function App() {
                   >
                     <motion.div
                       key={gameCountdown}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 1.5, opacity: 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                      className="text-[180px] md:text-[300px] font-black text-white italic drop-shadow-[10px_10px_0px_#1A1A1A]"
+                      initial={{ scale: 0, rotate: -20, opacity: 0 }}
+                      animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                      exit={{ scale: 2, rotate: 20, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                      className="text-[180px] md:text-[400px] font-black text-white italic drop-shadow-[15px_15px_0px_#1A1A1A] leading-none"
                     >
                       {gameCountdown === 0 ? "BORA!" : gameCountdown}
                     </motion.div>
-                    <p className="text-white/60 font-black uppercase text-xl md:text-3xl tracking-[0.5em] mt-[-40px]">Prepare-se!</p>
+                    <motion.p 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 0.6 }}
+                      className="text-white font-black uppercase text-xl md:text-3xl tracking-[0.5em] mt-8"
+                    >
+                      Prepare-se!
+                    </motion.p>
                   </motion.div>
                 )}
               </AnimatePresence>
               <div className="flex flex-col gap-6 md:gap-8">
                 {/* Round Header */}
-                <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-3 md:p-6 rounded-[1.5rem] md:rounded-[2rem] game-shadow">
-                  <div className="flex items-center gap-3 md:gap-4 shrink-0 z-10 relative">
-                    <div className="w-8 h-8 md:w-14 md:h-14 bg-game-secondary border-2 border-game-border rounded-xl md:rounded-2xl flex items-center justify-center text-game-border font-black text-sm md:text-2xl shadow-[2px_2px_0px_#1A1A1A]">
+                <div className="flex items-center justify-between bg-game-card border-4 border-game-border p-4 md:p-6 rounded-[2rem] md:rounded-[3rem] game-shadow">
+                  <div className="flex items-center gap-3 md:gap-6 shrink-0 z-10 relative">
+                    <div className="w-10 h-10 md:w-16 md:h-16 bg-game-secondary border-4 border-game-border rounded-2xl md:rounded-[1.5rem] flex items-center justify-center text-game-border font-black text-lg md:text-3xl game-shadow">
                       {currentRound + 1}
                     </div>
                     <div>
-                      <p className="text-[8px] md:text-xs text-game-border font-black uppercase tracking-widest">Rodada</p>
-                      <p className="font-black text-xs md:text-xl text-game-primary leading-none">de {roundCount}</p>
+                      <p className="text-[10px] md:text-xs text-game-border/40 font-black uppercase tracking-widest">Rodada</p>
+                      <p className="font-black text-sm md:text-2xl text-game-primary leading-none uppercase italic">de {roundCount}</p>
                     </div>
                   </div>
 
                   {difficulty !== 'facil' && timeLeft !== null && (
-                    <div className="flex flex-col flex-1 mx-4 lg:mx-8 z-10 relative">
-                      <div className="w-full bg-white/50 backdrop-blur-sm rounded-full h-3 md:h-5 overflow-hidden border-2 border-game-border shadow-[inset_0px_2px_4px_rgba(0,0,0,0.1)]">
-                        <div 
+                    <div className="flex flex-col flex-1 mx-6 lg:mx-12 z-10 relative">
+                      <div className="w-full bg-gray-100 rounded-full h-4 md:h-8 overflow-hidden border-4 border-game-border game-shadow relative">
+                        <motion.div 
+                          initial={false}
+                          animate={{ width: `${Math.max(0, (timeLeft / timeLimitMap[difficulty]) * 100)}%` }}
+                          transition={{ duration: 0.1, ease: "linear" }}
                           className={cn(
                             "h-full linear", 
                             timeLeft <= 3 ? "bg-game-danger" : "bg-game-primary"
                           )} 
-                          style={{ width: `${Math.max(0, (timeLeft / timeLimitMap[difficulty]) * 100)}%` }}
                         />
-                      </div>
-                      <div className={cn(
-                          "text-right font-black uppercase text-xl md:text-2xl mt-1 tracking-tighter tabular-nums",
-                          timeLeft <= 3 ? "text-game-danger animate-pulse" : "text-game-border"
-                      )}>
-                        {timeLeft.toFixed(2)}s
                       </div>
                     </div>
                   )}
@@ -1575,19 +1666,58 @@ export default function App() {
                         exit={{ opacity: 0, scale: 0.5 }}
                         className={cn(
                           "absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md rounded-[2.5rem]",
-                          feedback?.correct ? "bg-game-success/20" : "bg-game-danger/20"
+                          feedback?.correct ? "bg-game-success/40" : "bg-game-danger/40"
                         )}
                       >
-                        <div className={cn(
-                          "text-center p-12 bg-white border-4 border-game-border rounded-[3rem] shadow-2xl scale-110 mb-8 game-shadow",
-                          feedback?.correct ? "text-game-success" : "text-game-danger"
-                        )}>
-                          <h2 className="text-4xl md:text-7xl font-black uppercase tracking-tighter mb-2 italic">
-                            {feedback?.correct ? "Boa!" : (selectedOption === "Tempo Esgotado" ? "Passou do tempo!" : (selectedOption ? "Putz!" : "Pulou!"))}
+                        <motion.div
+                          initial={{ y: -100, rotate: -10 }}
+                          animate={{ y: 0, rotate: 0 }}
+                          transition={{ type: "spring", bounce: 0.5 }}
+                          className={cn(
+                            "text-center p-14 bg-white border-8 border-game-border rounded-[4rem] shadow-2xl scale-125 mb-8 game-shadow relative",
+                            feedback?.correct ? "text-game-success" : "text-game-danger"
+                          )}
+                        >
+                          {feedback?.correct && (
+                            <motion.div
+                              animate={{ 
+                                scale: [1, 1.2, 1],
+                                rotate: [0, 10, -10, 0]
+                              }}
+                              transition={{ duration: 0.5, repeat: Infinity }}
+                              className="absolute -top-12 -right-12 w-24 h-24 bg-yellow-400 rounded-full border-4 border-game-border flex items-center justify-center game-shadow z-10"
+                            >
+                              <Star className="w-12 h-12 text-white fill-white" />
+                            </motion.div>
+                          )}
+                          {!feedback?.correct && (
+                            <motion.div
+                                animate={{ 
+                                  x: [-10, 10, -10, 10, 0]
+                                }}
+                                transition={{ duration: 0.3 }}
+                                className="absolute -top-12 -left-12 w-24 h-24 bg-red-400 rounded-full border-4 border-game-border flex items-center justify-center game-shadow z-10"
+                              >
+                                <AlertCircle className="w-12 h-12 text-white fill-white" />
+                              </motion.div>
+                          )}
+
+                          <h2 className="text-6xl md:text-9xl font-black uppercase tracking-tighter mb-4 italic drop-shadow-[4px_4px_0px_#1A1A1A]">
+                            {feedback?.correct ? "BOOOA!" : (selectedOption === "Tempo Esgotado" ? "TEMPO!" : (selectedOption ? "ERROU!" : "PULOU!"))}
                           </h2>
-                          <p className="text-base md:text-xl text-game-border font-black uppercase tracking-widest">
-                            {feedback?.correct ? "+ pontos na conta!" : "Quase lá, hein?"}
+                          <p className="text-xl md:text-3xl text-game-border font-black uppercase tracking-[0.2em]">
+                            {feedback?.correct ? "+ PONTOS!" : "ESSA FOI DIFÍCIL!"}
                           </p>
+                        </motion.div>
+                        
+                        {/* Auto-advance progress indicator */}
+                        <div className="absolute bottom-20 w-64 h-4 bg-white border-4 border-game-border rounded-full overflow-hidden game-shadow outline-none">
+                          <motion.div 
+                            initial={{ width: "100%" }}
+                            animate={{ width: "0%" }}
+                            transition={{ duration: 5, ease: "linear" }}
+                            className="h-full bg-yellow-400"
+                          />
                         </div>
                         
                         {/* Removed manual Next Round button - now automatic */}
