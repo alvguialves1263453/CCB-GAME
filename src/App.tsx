@@ -7,7 +7,7 @@ import { fetchHymns, generateQuestions, type Hymn, type Question } from "./servi
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
 import { soundService } from "./lib/soundService";
 
-type ViewState = "home" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list";
+type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list";
 
 interface Player {
   id: string;
@@ -76,7 +76,8 @@ export default function App() {
   const [platform, setPlatform] = useState<"ios" | "android" | "other">("other");
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showUnreadyConfirm, setShowUnreadyConfirm] = useState(false);
-  
+  const [joinRoomCode, setJoinRoomCode] = useState("");
+
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
 
@@ -751,7 +752,8 @@ export default function App() {
                     soundService.playClick();
                     setIsSolo(false);
                     setRoomId(null);
-                    setView("multiplayer_setup");
+                    setJoinRoomCode("");
+                    setView("multiplayer_menu");
                   }}
                   className="flex-1 p-6 bg-game-secondary text-game-border font-black rounded-3xl game-border game-shadow-hover uppercase tracking-wider text-xl"
                 >
@@ -851,6 +853,109 @@ export default function App() {
             </motion.div>
           )}
 
+          {view === "multiplayer_menu" && (
+            <motion.div
+              key="menu"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex-grow flex flex-col items-center justify-center gap-8"
+            >
+              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow text-center">
+                <button onClick={() => {
+                  soundService.playClick();
+                  setView("home");
+                }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+                </button>
+
+                <h2 className="text-4xl font-black text-game-primary mb-8 uppercase drop-shadow-md">
+                  Multiplayer
+                </h2>
+
+                <div className="flex flex-col gap-4">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      soundService.playClick();
+                      setRoomId(null);
+                      setView("multiplayer_setup");
+                    }}
+                    className="w-full p-6 bg-game-primary text-white font-black rounded-2xl game-border game-shadow-hover uppercase tracking-widest text-xl"
+                  >
+                    Criar Sala
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      soundService.playClick();
+                      setView("multiplayer_join");
+                    }}
+                    className="w-full p-6 bg-game-secondary text-game-border font-black rounded-2xl game-border game-shadow-hover uppercase tracking-widest text-xl"
+                  >
+                    Entrar em Sala
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {view === "multiplayer_join" && (
+            <motion.div
+              key="join"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex-grow flex flex-col items-center justify-center gap-8"
+            >
+              <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow">
+                <button onClick={() => {
+                  soundService.playClick();
+                  setView("multiplayer_menu");
+                }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+                </button>
+
+                <h2 className="text-3xl font-black text-game-primary mb-6 uppercase text-center">
+                  Entrar na Sala
+                </h2>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs uppercase text-game-border font-black tracking-widest mb-2 text-center">Código da Sala (5 Letras)</label>
+                    <input
+                      type="text"
+                      value={joinRoomCode}
+                      onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5))}
+                      placeholder="EX: ABCDE"
+                      maxLength={5}
+                      className="w-full p-6 bg-gray-50 border-3 border-game-border rounded-2xl text-game-border outline-none focus:bg-white transition-colors text-3xl font-black text-center tracking-[0.5em]"
+                      autoFocus
+                    />
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      soundService.playClick();
+                      if (joinRoomCode.length === 5) {
+                        setRoomId(joinRoomCode);
+                        setView("multiplayer_setup");
+                      }
+                    }}
+                    disabled={joinRoomCode.length !== 5}
+                    className="w-full p-5 bg-game-primary text-white font-black rounded-2xl hover:bg-game-primary/90 transition-colors uppercase tracking-widest disabled:opacity-50 game-border game-shadow-hover text-xl mt-4"
+                  >
+                    Avançar <ArrowRight className="w-5 h-5 ml-2 inline-block" />
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {view === "multiplayer_setup" && (
             <motion.div
               key="setup"
@@ -862,7 +967,13 @@ export default function App() {
               <div className="w-full max-w-md bg-game-card border-4 border-game-border p-8 rounded-[2rem] shadow-2xl game-shadow">
                 <button onClick={() => {
                   soundService.playClick();
-                  setView("home");
+                  if (isSolo) {
+                    setView("home");
+                  } else if (roomId) {
+                    setView("multiplayer_join");
+                  } else {
+                    setView("multiplayer_menu");
+                  }
                 }} className="mb-6 flex items-center text-game-border hover:text-game-primary transition-colors text-sm font-black uppercase tracking-widest">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
                 </button>

@@ -67,7 +67,12 @@ const triggerSync = () => {
 
 export const multiplayerService = {
   async createRoom(nickname: string): Promise<{ room: Room; player: Player } | null> {
-    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let roomId = '';
+    for (let i = 0; i < 5; i++) {
+        roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
     const player: Player = {
       id: Math.random().toString(36).substring(2, 10),
       nickname,
@@ -128,6 +133,7 @@ export const multiplayerService = {
         presence: {
           key: player.id,
         },
+        broadcast: { self: true },
       },
     });
 
