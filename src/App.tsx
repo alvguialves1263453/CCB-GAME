@@ -7,12 +7,14 @@ import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
 import { soundService } from "./lib/soundService";
-
+import { ProfileCreator, AvatarConfig, Avatar } from "./components/ProfileCreator";
+import { Edit2 } from "lucide-react";
 type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list";
 
 interface Player {
   id: string;
   nickname: string;
+  avatar?: AvatarConfig;
   isHost: boolean;
   score: number;
   hasAnswered: boolean;
@@ -170,7 +172,8 @@ export default function App() {
   const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string }[]>([]);
   const [gameCountdown, setGameCountdown] = useState<number | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [nickname, setNickname] = useState("");
+  const [profile, setProfile] = useState<{ nickname: string; config: AvatarConfig } | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [hymns, setHymns] = useState<Hymn[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
@@ -279,6 +282,7 @@ export default function App() {
             return {
               id: dbp.id,
               nickname: dbp.nickname,
+              avatar: dbp.avatar,
               isHost: dbp.isHost,
               isReady: dbp.isReady,
               score: dbp.score || 0,
@@ -428,13 +432,18 @@ export default function App() {
   }, []);
 
   const handleJoinGame = async () => {
-    if (!nickname.trim()) return;
+    if (!profile) {
+      setIsEditingProfile(true);
+      return;
+    }
     setIsLoading(true);
+    soundService.playClick();
 
     if (isSolo) {
       const newPlayer: Player = {
         id: crypto.randomUUID(),
-        nickname: nickname.trim(),
+        nickname: profile.nickname,
+        avatar: profile.config,
         isHost: true,
         score: 0,
         hasAnswered: false,
@@ -446,6 +455,7 @@ export default function App() {
       const activeBots = Array.from({ length: botCount }, (_, i) => ({
         id: `bot_${i + 1}`,
         nickname: botNames[i % botNames.length],
+        avatar: { skinColor: "#FFC0CB", hairStyle: "short", hairColor: "#4a3018", clothing: "casual", clothingColor: "#4287f5", gender: "M" as 'M', instrument: "none" },
         isHost: false,
         score: 0,
         hasAnswered: false,
@@ -462,15 +472,15 @@ export default function App() {
       try {
         if (roomId) {
           // Join existing
-          const player = await multiplayerService.joinRoom(roomId, nickname.trim());
+          const player = await multiplayerService.joinRoom(roomId, profile.nickname, profile.config);
           if (player) {
             setLocalPlayerId(player.id);
-            // Add immediately to local state for faster Lobby transition
             setPlayers(prev => {
               if (prev.some(p => p.id === player.id)) return prev;
               return [...prev, {
                 id: player.id,
                 nickname: player.nickname,
+                avatar: player.avatar,
                 isHost: player.isHost,
                 isReady: player.isReady,
                 score: player.score || 0,
@@ -484,14 +494,14 @@ export default function App() {
           }
         } else {
           // Create new
-          const result = await multiplayerService.createRoom(nickname.trim());
+          const result = await multiplayerService.createRoom(profile.nickname, profile.config);
           if (result) {
             setRoomId(result.room.id);
             setLocalPlayerId(result.player.id);
-            // Add immediately
             setPlayers([{
               id: result.player.id,
               nickname: result.player.nickname,
+              avatar: result.player.avatar,
               isHost: result.player.isHost,
               isReady: result.player.isReady,
               score: 0,
@@ -987,37 +997,38 @@ export default function App() {
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
               className="w-full max-w-lg flex flex-col items-center justify-center gap-[2vh] px-4"
             >
-              {/* LOGO */}
-              <div className="flex flex-col items-center gap-[1vh]">
-                <motion.div
-                  animate={{ rotate: [0, 8, -8, 0], y: [0, -6, 0] }}
-                  transition={{ repeat: Infinity, duration: 3.5, ease: 'easeInOut' }}
-                  className="w-[12vh] h-[12vh] max-w-28 max-h-28 bg-white border-4 border-[#1a0533] rounded-[2rem] flex items-center justify-center game-shadow relative"
-                >
-                  <div className="absolute -top-3 -right-3 opacity-90">
-                    <TrumpetSVG size={24} />
+              {/* PROFILE DISPLAY */}
+              <div className="w-full flex flex-col items-center gap-4 bg-white/10 p-6 rounded-[2.5rem] border-4 border-[#1a0533]/20 relative group">
+                {profile ? (
+                  <div className="flex items-center gap-6 w-full">
+                    <div className="relative">
+                      <Avatar config={profile.config} size={80} />
+                      <button 
+                        onClick={() => setIsEditingProfile(true)}
+                        className="absolute -bottom-1 -right-1 bg-[#9B59F5] p-2 rounded-full border-2 border-[#1a0533] text-white shadow-md hover:scale-110 transition-transform"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">Seu Perfil</p>
+                      <h3 className="text-3xl font-black text-white italic truncate drop-shadow-sm">{profile.nickname}</h3>
+                      <div className="flex gap-2 mt-1">
+                        <span className="px-2 py-0.5 bg-[#4ECB71] rounded-full text-[8px] font-black uppercase text-white border border-white/20">Online</span>
+                      </div>
+                    </div>
                   </div>
-                  <Music className="w-[5vh] h-[5vh] max-w-14 max-h-14 text-[#9B59F5]" />
-                </motion.div>
-
-                <h1
-                  style={{
-                    fontSize: 'clamp(2rem, 9vw, 3.8rem)',
-                    WebkitTextStroke: '3px #1a0533',
-                    paintOrder: 'stroke fill',
-                    textShadow: '4px 4px 0px #1a0533',
-                    lineHeight: 1,
-                  }}
-                  className="font-black text-white italic tracking-tight uppercase text-center select-none"
-                >
-                  HINO{' '}
-                  <span style={{ color: '#FFD700', WebkitTextStroke: '3px #1a0533' }}>RÁPIDO</span>
-                </h1>
-
-                <div className="flex gap-2 items-center">
-                  <span className="badge-cartoon bg-white text-[#9B59F5] uppercase text-[10px]">♪ Quiz Musical</span>
-                  <span className="badge-cartoon bg-[#FFD700] text-[#1a0533] uppercase text-[10px]">CCB</span>
-                </div>
+                ) : (
+                  <button 
+                    onClick={() => setIsEditingProfile(true)}
+                    className="flex flex-col items-center gap-3 py-4 group"
+                  >
+                    <div className="w-16 h-16 rounded-3xl bg-white border-4 border-[#1a0533] flex items-center justify-center game-shadow group-hover:scale-110 transition-transform">
+                      <Plus className="w-8 h-8 text-[#9B59F5]" />
+                    </div>
+                    <span className="text-white font-black italic uppercase tracking-tighter text-xl drop-shadow-sm">Criar Avatar</span>
+                  </button>
+                )}
               </div>
 
               {/* MAIN BUTTONS */}
@@ -1260,18 +1271,7 @@ export default function App() {
                 </h2>
               </div>
 
-              {/* Nickname */}
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Como quer ser chamado?</label>
-                <input
-                  type="text"
-                  maxLength={15}
-                  placeholder="Ex: Irmão Lucas"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  className="input-cartoon !py-2.5 !text-base"
-                />
-              </div>
+              {/* Nickname removed, using Profile */}
 
               {/* Room code for join - only if manual */}
               {view === "multiplayer_join" && isManualJoin && (
@@ -1371,9 +1371,9 @@ export default function App() {
 
               {/* Go button */}
               <motion.button
-                whileHover={(!nickname.trim() || (view === "multiplayer_join" && isManualJoin && joinRoomCode.length < 4) || isLoading) ? {} : { scale: 1.03 }}
-                whileTap={(!nickname.trim() || (view === "multiplayer_join" && isManualJoin && joinRoomCode.length < 4) || isLoading) ? {} : { scale: 0.97 }}
-                disabled={!nickname.trim() || (view === "multiplayer_join" && isManualJoin && joinRoomCode.length < 4) || isLoading}
+                whileHover={(!profile || (view === "multiplayer_join" && isManualJoin && joinRoomCode.length < 4) || isLoading) ? {} : { scale: 1.03 }}
+                whileTap={(!profile || (view === "multiplayer_join" && isManualJoin && joinRoomCode.length < 4) || isLoading) ? {} : { scale: 0.97 }}
+                disabled={!profile || (view === "multiplayer_join" && isManualJoin && joinRoomCode.length < 4) || isLoading}
                 onClick={handleJoinGame}
                 className="btn-cartoon btn-green w-full p-3 text-xl tracking-widest gap-2 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
               >
@@ -1432,12 +1432,18 @@ export default function App() {
                           p.isReady ? "bg-[#d1fae5] shadow-[3px_3px_0px_#1a0533]" : "bg-gray-100 opacity-80"
                         )}>
                           {p.isHost && <div className="absolute -top-2 -right-2 w-6 h-6 bg-[#FFD700] border-2 border-[#1a0533] rounded-full flex items-center justify-center text-[8px] font-black z-10">👑</div>}
-                          <div className={cn(
-                            "w-10 h-10 rounded-lg border-4 border-[#1a0533] flex items-center justify-center text-xl font-black",
-                            p.isReady ? "bg-[#4ECB71] text-white" : "bg-white text-[#1a0533]"
-                          )}>
-                            {p.nickname.charAt(0).toUpperCase()}
-                          </div>
+                          {p.avatar ? (
+                            <div className="mb-1 pointer-events-none">
+                              <Avatar config={p.avatar} size={48} />
+                            </div>
+                          ) : (
+                            <div className={cn(
+                              "w-10 h-10 rounded-lg border-4 border-[#1a0533] flex items-center justify-center text-xl font-black",
+                              p.isReady ? "bg-[#4ECB71] text-white" : "bg-white text-[#1a0533]"
+                            )}>
+                              {p.nickname.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <p className="font-black text-[10px] truncate w-full text-center text-[#1a0533]">{p.nickname}</p>
                           <div className={cn(
                             "px-2 py-0.5 rounded-full border-2 border-[#1a0533] text-[7px] font-black uppercase tracking-wider",
@@ -1714,6 +1720,24 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+      
+      {/* Profile Creator Modal */}
+      <AnimatePresence>
+        {isEditingProfile && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <ProfileCreator 
+              initialNickname={profile?.nickname}
+              initialConfig={profile?.config}
+              onSave={(nick, config) => {
+                setProfile({ nickname: nick, config });
+                setIsEditingProfile(false);
+                soundService.playClick();
+              }}
+              onCancel={() => setIsEditingProfile(false)}
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

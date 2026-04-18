@@ -1,9 +1,11 @@
 import { supabase } from "../lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { AvatarConfig } from "../components/ProfileCreator";
 
 export interface Player {
   id: string;
   nickname: string;
+  avatar?: AvatarConfig;
   isHost: boolean;
   isReady: boolean;
   score: number;
@@ -91,7 +93,7 @@ const triggerSync = () => {
 };
 
 export const multiplayerService = {
-  async createRoom(nickname: string): Promise<{ room: Room; player: Player } | null> {
+  async createRoom(nickname: string, avatar?: AvatarConfig): Promise<{ room: Room; player: Player } | null> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let roomId = '';
     for (let i = 0; i < 5; i++) {
@@ -101,6 +103,7 @@ export const multiplayerService = {
     const player: Player = {
       id: Math.random().toString(36).substring(2, 10),
       nickname,
+      avatar,
       isHost: true,
       isReady: false,
       score: 0,
@@ -128,10 +131,11 @@ export const multiplayerService = {
     }
   },
 
-  async joinRoom(roomId: string, nickname: string): Promise<Player | null> {
+  async joinRoom(roomId: string, nickname: string, avatar?: AvatarConfig): Promise<Player | null> {
     const player: Player = {
       id: Math.random().toString(36).substring(2, 10),
       nickname,
+      avatar,
       isHost: false,
       isReady: false,
       score: 0,
