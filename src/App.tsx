@@ -412,12 +412,8 @@ export default function App() {
 
   // Check if all players answered (Unified for Solo and Multi)
   useEffect(() => {
-    // Only check if game is active, not showing results, and it's been at least 1s since the round started
-    // this prevents race conditions where old 'hasAnswered' states trigger an end before the new round reset
-    const now = Date.now();
-    const timeSinceStart = now - startTimeRef.current;
-
-    if (isGameActive && !showResult && players.length > 0 && timeSinceStart > 1000) {
+    // Only check if game is active, not showing results
+    if (isGameActive && !showResult && players.length > 0) {
       const allAnswered = players.every(p => p.hasAnswered);
       if (allAnswered) {
         // Debounce slightly to allow UI to show final answer states
@@ -774,11 +770,25 @@ export default function App() {
       if (p.id === localPlayerId) {
         return { ...p, hasAnswered: true, score: p.score + pointsToAdd };
       }
+      // Fast-forward bots if in solo mode so the user doesn't wait
+      if (isSolo && (p.id.startsWith("bot") || p.id.includes("bot")) && !p.hasAnswered) {
+        const isCorrect = Math.random() > 0.35;
+        let points = 0;
+        if (isCorrect) {
+          const timeSpentBot = timeSpent;
+          if (difficulty === 'facil') points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
+          else if (difficulty === 'medio') points = Math.max(100, Math.floor(((20 - timeSpentBot) / 20) * 1000));
+          else points = Math.max(100, Math.floor(((10 - timeSpentBot) / 10) * 1000));
+        }
+        return { ...p, hasAnswered: true, score: p.score + points };
+      }
       return p;
     }));
 
-    // In Solo mode, we can advance faster if no bots, or wait for bots
-    if (isSolo && botCount === 0) {
+    // In Solo mode, we immediately advance the round for a snappy experience
+    if (isSolo) {
+      botTimeoutsRef.current.forEach(clearTimeout);
+      botTimeoutsRef.current = [];
       setTimeout(() => {
         if (isGameActiveRef.current) handleRoundEnd();
       }, 800);
@@ -1096,6 +1106,16 @@ export default function App() {
                   >
                     <span className="text-xl sm:text-2xl md:text-3xl font-black italic uppercase text-white cartoon-text" style={{ WebkitTextStroke: '1px #1a0533' }}>QUIZ</span>
                   </motion.div>
+
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-white/70 italic mt-3 md:mt-4"
+                    style={{ filter: 'drop-shadow(1px 1px 0px rgba(26,5,51,0.5))' }}
+                  >
+                    Desenvolvido por Guilherme Alves
+                  </motion.p>
                 </div>
 
                 <div className="absolute -top-6 -right-10 animate-pulse">
