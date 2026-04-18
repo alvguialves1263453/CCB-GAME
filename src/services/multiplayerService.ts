@@ -162,7 +162,7 @@ export const multiplayerService = {
         presence: {
           key: player.id,
         },
-        broadcast: { self: true },
+        broadcast: { self: false },
       },
     });
 

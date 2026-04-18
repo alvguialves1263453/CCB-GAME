@@ -1,143 +1,322 @@
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:wght@400;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Fredoka", ui-sans-serif, system-ui, sans-serif;
-  --color-game-bg: #EAE6FF;
+  --color-game-bg: #1a0533;
   --color-game-card: #FFFFFF;
-  --color-game-primary: #8A4FFF;
+  --color-game-primary: #9B59F5;
   --color-game-secondary: #FFD700;
   --color-game-accent: #FF5A95;
   --color-game-success: #4ECB71;
   --color-game-danger: #FF4757;
-  --color-game-border: #4A148C;
-  --shadow-game: 4px 4px 0px 0px #4A148C;
-  --shadow-game-h: 6px 6px 0px 0px #4A148C;
+  --color-game-border: #1a0533;
+  --shadow-game: 5px 5px 0px 0px #1a0533;
+  --shadow-game-h: 7px 7px 0px 0px #1a0533;
 }
 
+/* ===========================
+   BASE BODY - Gartic Phone style gradient
+   =========================== */
 body {
   font-family: "Fredoka", sans-serif;
-  min-height: 100vh;
-  /* Enhanced Gartic Phone-style gradient */
-  background-color: #6420AA; /* Fallback */
-  background-image:
-    linear-gradient(135deg, #6420AA 0%, #FF5A95 100%),
-    radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.15) 2px, transparent 0);
-  background-size: 100% 100%, 30px 30px;
-  color: var(--color-game-border);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: linear-gradient(160deg, #3b0764 0%, #6d28d9 30%, #db2777 70%, #f97316 100%);
+  color: #1a0533;
+  user-select: none;
+  position: relative;
 }
 
+/* Polka dot overlay like Gartic */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.07) 2px, transparent 2px);
+  background-size: 38px 38px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===========================
+   CARTOON SHADOWS & BORDERS
+   =========================== */
 .game-shadow {
-  box-shadow: var(--shadow-game);
+  box-shadow: 5px 5px 0px 0px #1a0533;
+}
+
+.game-shadow-lg {
+  box-shadow: 7px 7px 0px 0px #1a0533;
+}
+
+.game-shadow-hover {
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
 }
 
 .game-shadow-hover:hover {
-  box-shadow: var(--shadow-game-h);
+  box-shadow: 7px 7px 0px 0px #1a0533;
   transform: translate(-2px, -2px);
 }
 
+.game-shadow-hover:active {
+  box-shadow: 2px 2px 0px 0px #1a0533;
+  transform: translate(3px, 3px);
+}
+
 .game-border {
-  border: 3px solid var(--color-game-border);
+  border: 4px solid #1a0533;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+/* ===========================
+   CARTOON TEXT STROKE
+   =========================== */
+.cartoon-text {
+  -webkit-text-stroke: 2px #1a0533;
+  paint-order: stroke fill;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.cartoon-text-white {
+  -webkit-text-stroke: 2.5px #1a0533;
+  paint-order: stroke fill;
+  color: #ffffff;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--color-game-border);
-  border-radius: 10px;
+/* ===========================
+   PANELS / CARDS
+   =========================== */
+.cartoon-panel {
+  background: rgba(255, 255, 255, 0.95);
+  border: 4px solid #1a0533;
+  border-radius: 2rem;
+  box-shadow: 6px 6px 0px 0px #1a0533;
 }
 
+.cartoon-panel-dark {
+  background: rgba(26, 5, 51, 0.85);
+  border: 4px solid rgba(255,255,255,0.3);
+  border-radius: 2rem;
+  box-shadow: 6px 6px 0px 0px rgba(0,0,0,0.5);
+  backdrop-filter: blur(12px);
+}
+
+/* ===========================
+   BUTTONS
+   =========================== */
+.btn-cartoon {
+  font-family: "Fredoka", sans-serif;
+  font-weight: 700;
+  border: 4px solid #1a0533;
+  border-radius: 1.5rem;
+  box-shadow: 5px 5px 0px 0px #1a0533;
+  transition: all 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  letter-spacing: 0.03em;
+}
+
+.btn-cartoon:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0px 0px #1a0533;
+}
+
+.btn-cartoon:active {
+  transform: translate(3px, 3px);
+  box-shadow: 2px 2px 0px 0px #1a0533;
+}
+
+.btn-purple {
+  background: #9B59F5;
+  color: white;
+}
+
+.btn-yellow {
+  background: #FFD700;
+  color: #1a0533;
+}
+
+.btn-green {
+  background: #4ECB71;
+  color: white;
+}
+
+.btn-pink {
+  background: #FF5A95;
+  color: white;
+}
+
+.btn-white {
+  background: white;
+  color: #1a0533;
+}
+
+/* ===========================
+   INPUT CARTOON
+   =========================== */
+.input-cartoon {
+  border: 4px solid #1a0533;
+  border-radius: 1rem;
+  padding: 0.8rem 1.2rem;
+  font-family: "Fredoka", sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: white;
+  box-shadow: 4px 4px 0px 0px #1a0533;
+  outline: none;
+  transition: box-shadow 0.1s, transform 0.1s;
+  width: 100%;
+  color: #1a0533;
+}
+
+.input-cartoon:focus {
+  box-shadow: 6px 6px 0px 0px #9B59F5;
+  transform: translate(-1px, -1px);
+}
+
+/* ===========================
+   MUSICAL NOTES PARTICLES
+   =========================== */
 @keyframes float-note {
-  0% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 0;
-  }
-  10% {
-    opacity: 0.3;
-  }
-  90% {
-    opacity: 0.3;
-  }
-  100% {
-    transform: translateY(-100vh) rotate(360deg);
-    opacity: 0;
-  }
+  0%   { transform: translateY(110vh) rotate(0deg) scale(0.8); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.8; }
+  100% { transform: translateY(-15vh) rotate(380deg) scale(1.1); opacity: 0; }
+}
+
+@keyframes float-instrument {
+  0%   { transform: translateY(0px) rotate(-5deg); }
+  50%  { transform: translateY(-18px) rotate(5deg); }
+  100% { transform: translateY(0px) rotate(-5deg); }
 }
 
 .animate-float-note {
   animation: float-note linear infinite;
 }
 
-.perspective-1000 {
-  perspective: 1000px;
+.animate-float-instrument {
+  animation: float-instrument ease-in-out infinite;
 }
 
-/* Mobile Responsiveness & Platform Specifics */
-:root {
-  --safe-area-top: env(safe-area-inset-top);
-  --safe-area-bottom: env(safe-area-inset-bottom);
+/* ===========================
+   BOUNCE & WIGGLE
+   =========================== */
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30%       { transform: translateY(-8px) rotate(-3deg); }
+  60%       { transform: translateY(-4px) rotate(2deg); }
 }
 
-.min-h-dynamic {
-  min-height: 100vh;
-  min-height: 100dvh;
+.animate-bounce-subtle {
+  animation: bounce-subtle 2.5s ease-in-out infinite;
 }
 
-.pb-safe {
-  padding-bottom: var(--safe-area-bottom);
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-4deg); }
+  50%       { transform: rotate(4deg); }
 }
 
-.pt-safe {
-  padding-top: var(--safe-area-top);
+.animate-wiggle {
+  animation: wiggle 1.5s ease-in-out infinite;
 }
 
-/* Platform detection classes (applied via root) */
-[data-os="ios"] .game-shadow {
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  border-width: 2px;
+@keyframes pop-in {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  70%  { transform: scale(1.15) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
-[data-os="ios"] .game-border {
-  border-width: 2px;
-  border-radius: 2.5rem;
+.animate-pop-in {
+  animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-[data-os="android"] .game-shadow {
-  box-shadow: 6px 6px 0px 0px #1A1A1A;
-  border-radius: 0.75rem;
+/* ===========================
+   PULSE GLOW
+   =========================== */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 5px 5px 0px 0px #1a0533, 0 0 0 0 rgba(155, 89, 245, 0); }
+  50%       { box-shadow: 5px 5px 0px 0px #1a0533, 0 0 20px 8px rgba(155, 89, 245, 0.5); }
 }
 
-[data-os="android"] .game-border {
-  border-radius: 0.75rem;
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Fluid Typography */
-@layer utilities {
-  .text-fluid-large {
-    font-size: clamp(2rem, 15vw, 6rem);
-  }
-  .text-fluid-medium {
-    font-size: clamp(1.25rem, 8vw, 2.5rem);
-  }
-}
-
+/* ===========================
+   SHAKE (wrong answer)
+   =========================== */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px); }
-  75% { transform: translateX(10px); }
+  20%  { transform: translateX(-10px) rotate(-2deg); }
+  40%  { transform: translateX(10px) rotate(2deg); }
+  60%  { transform: translateX(-7px) rotate(-1deg); }
+  80%  { transform: translateX(7px) rotate(1deg); }
 }
 
 .animate-shake {
-  animation: shake 0.2s ease-in-out 0s 2;
+  animation: shake 0.35s ease-in-out;
 }
 
-/* Fix for mobile tap highlight */
+/* ===========================
+   SCROLLBAR HIDE
+   =========================== */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ===========================
+   FLUID TEXT
+   =========================== */
+@layer utilities {
+  .text-fluid-large  { font-size: clamp(2.5rem, 12vw, 5rem); }
+  .text-fluid-medium { font-size: clamp(1.5rem, 6vw, 2.5rem); }
+}
+
+/* ===========================
+   CONFETTI LAYER
+   =========================== */
+canvas { pointer-events: none; }
+
+/* ===========================
+   GLASS PANEL
+   =========================== */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 2px solid rgba(255,255,255,0.35);
+}
+
+/* ===========================
+   HEADER BADGE
+   =========================== */
+.badge-cartoon {
+  border: 3px solid #1a0533;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.65rem;
+  box-shadow: 3px 3px 0px 0px #1a0533;
+}
+
+/* ===========================
+   TAP HIGHLIGHT
+   =========================== */
 * {
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
+
