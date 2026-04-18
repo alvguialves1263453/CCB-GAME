@@ -1531,13 +1531,13 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              <div className="flex items-center justify-between px-4 gap-3 h-14 shrink-0">
-                <div className="cartoon-panel bg-white px-5 py-2 flex items-center gap-2">
-                  <span className="text-[10px] font-black opacity-40 uppercase tracking-widest text-[#1a0533]">Round</span>
-                  <span className="text-2xl font-black italic text-[#9B59F5]">{currentRound + 1}<span className="text-lg opacity-50">/{roundCount}</span></span>
+              <div className="flex items-center justify-between px-2 md:px-4 gap-2 md:gap-3 h-14 shrink-0 pt-1">
+                <div className="cartoon-panel bg-white px-3 md:px-5 py-1 md:py-2 flex items-center gap-1 md:gap-2">
+                  <span className="hidden md:block text-[10px] font-black opacity-40 uppercase tracking-widest text-[#1a0533]">Round</span>
+                  <span className="text-lg md:text-2xl font-black italic text-[#9B59F5]">{currentRound + 1}<span className="text-sm md:text-lg opacity-50">/{roundCount}</span></span>
                 </div>
 
-                <div className="flex-grow max-w-md h-8 bg-white border-4 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[3px_3px_0px_#1a0533]">
+                <div className="flex-grow max-w-md h-7 md:h-8 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[3px_3px_0px_#1a0533]">
                   <motion.div
                     initial={false}
                     animate={{ width: `${Math.max(0, (timeLeft || 0) / (timeLimitMap[difficulty] || 1)) * 100}%` }}
@@ -1549,15 +1549,15 @@ export default function App() {
                     )}
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[11px] font-black text-[#1a0533] tracking-widest uppercase">
-                      TEMPO: {timeLeft === null || timeLeft === Infinity ? "∞" : `${timeLeft.toFixed(1)}s`}
+                    <span className="text-[10px] md:text-[11px] font-black text-[#1a0533] tracking-widest uppercase">
+                      <span className="hidden md:inline">TEMPO: </span>{timeLeft === null || timeLeft === Infinity ? "∞" : `${timeLeft.toFixed(1)}s`}
                     </span>
                   </div>
                 </div>
 
-                <div className="cartoon-panel bg-white px-5 py-2 flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-[#FFD700] drop-shadow-sm" />
-                  <span className="text-2xl font-black italic text-[#1a0533]">{players.find(p => p.id === localPlayerId)?.score || 0}</span>
+                <div className="cartoon-panel bg-white px-3 md:px-5 py-1 md:py-2 flex items-center gap-1 md:gap-2">
+                  <Trophy className="w-4 h-4 md:w-5 md:h-5 text-[#FFD700] drop-shadow-sm" />
+                  <span className="text-lg md:text-2xl font-black italic text-[#1a0533]">{players.find(p => p.id === localPlayerId)?.score || 0}</span>
                 </div>
               </div>
 
@@ -1605,23 +1605,23 @@ export default function App() {
                 </div>
 
                 {showResult && (
-                  <motion.div
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className={cn(
-                      "absolute inset-0 flex flex-col items-center justify-center z-50 p-10 text-center glass-panel",
-                      feedback?.correct ? "bg-[#4ECB71]/40" : "bg-[#FF4757]/40"
-                    )}
-                  >
-                    <div className="bg-white border-8 border-[#1a0533] p-10 rounded-[4rem] shadow-[12px_12px_0px_#1a0533] flex flex-col items-center gap-6 animate-pop-in">
-                      <h3 className={cn("text-7xl md:text-9xl font-black italic uppercase cartoon-text", feedback?.correct ? "text-[#4ECB71]" : "text-[#FF4757]")}>
-                        {feedback?.correct ? "BOA!" : "QUASE!"}
-                      </h3>
-                      <div className="bg-[#1a0533] text-white px-6 py-2 rounded-full font-black text-sm md:text-base uppercase tracking-[0.5em] animate-pulse">
-                        Próximo em {resultCountdown ?? 3}s...
+                    <motion.div
+                      initial={{ y: 50, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className={cn(
+                        "absolute inset-0 flex flex-col items-center justify-center z-50 p-4 md:p-10 text-center glass-panel",
+                        feedback?.correct ? "bg-[#4ECB71]/40" : "bg-[#FF4757]/40"
+                      )}
+                    >
+                      <div className="bg-white border-4 md:border-8 border-[#1a0533] p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-[8px_8px_0px_#1a0533] md:shadow-[12px_12px_0px_#1a0533] flex flex-col items-center gap-4 md:gap-6 animate-pop-in max-w-[90%]">
+                        <h3 className={cn("text-5xl md:text-9xl font-black italic uppercase cartoon-text", feedback?.correct ? "text-[#4ECB71]" : "text-[#FF4757]")}>
+                          {feedback?.correct ? "BOA!" : "QUASE!"}
+                        </h3>
+                        <div className="bg-[#1a0533] text-white px-5 py-2 rounded-full font-black text-xs md:text-base uppercase tracking-[0.3em] md:tracking-[0.5em] animate-pulse">
+                          Próximo em {resultCountdown ?? 3}s...
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
                 )}
               </div>
 
