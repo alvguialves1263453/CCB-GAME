@@ -286,7 +286,6 @@ export default function App() {
   const [showUnreadyConfirm, setShowUnreadyConfirm] = useState(false);
   const [joinRoomCode, setJoinRoomCode] = useState("");
   const [isManualJoin, setIsManualJoin] = useState(false);
-  const [resultCountdown, setResultCountdown] = useState<number | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
