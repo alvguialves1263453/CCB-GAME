@@ -489,18 +489,9 @@ export default function App() {
         }));
       },
       (room) => {
-        if (!room) {
-          // Room was deleted - host left
-          setHostLeft(true);
-          setRoomId(null);
-          setLocalPlayerId(null);
-          setPlayers([]);
-          setTimeout(() => {
-            setHostLeft(false);
-            setView("home");
-          }, 3000);
-          return;
-        }
+        // Only process room updates if we have a valid room
+        // Don't show "host left" automatically - only when host explicitly closes
+        if (!room) return;
         
         setRoundCount(room.roundCount);
         setDifficulty(room.difficulty as Difficulty);
