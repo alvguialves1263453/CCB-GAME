@@ -1162,7 +1162,7 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-game-border uppercase tracking-tight">Sair do Jogo?</h3>
-                <p className="text-game-border/60 font-medium">{isSolo ? "Seu progresso nesta partida será perdido." : "Você sairá da sala e a partida continuará para os demais."} Tem certeza?</p>
+                <p className="text-game-border/60 font-medium">{isSolo ? "Seu progresso nesta partida será perdido." : (!isSolo && roomId && playersRef.current.find(p => p.id === localPlayerId)?.isHost) ? "A sala será encerrada para todos os jogadores." : "Você sairá da sala e a partida continuará para os demais."} Tem certeza?</p>
               </div>
               <div className="flex gap-4">
                 <button
@@ -1191,7 +1191,7 @@ export default function App() {
                   }}
                   className="flex-1 p-4 bg-game-danger text-white font-black rounded-xl hover:bg-red-600 transition-colors shadow-[4px_4px_0px_#450a0a]"
                 >
-                  Sair
+                  {(!isSolo && roomId && playersRef.current.find(p => p.id === localPlayerId)?.isHost) ? "Encerrar Sala" : "Sair"}
                 </button>
               </div>
             </motion.div>
@@ -1775,9 +1775,15 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2 shrink-0">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setView("home")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
-                    <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
-                  </button>
+                  {isSolo ? (
+                    <button onClick={() => setView("home")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                      <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                    </button>
+                  ) : (
+                    <button onClick={() => { soundService.playClick(); setShowExitConfirm(true); }} className="w-11 h-11 bg-red-500 border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                      <X className="w-5 h-5 text-white" />
+                    </button>
+                  )}
                   <div className="bg-white border-4 border-[#1a0533] px-4 py-1.5 rounded-xl game-shadow">
                     <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#9B59F5]">{roomId || "SOLO"}</span></span>
                   </div>
