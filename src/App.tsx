@@ -598,9 +598,37 @@ export default function App() {
   };
 
   const handleCreateRoom = async () => {
+    if (!profile) {
+      setIsEditingProfile(true);
+      return;
+    }
     setIsLoading(true);
-    // ... logic for creation
-    setIsLoading(false);
+    soundService.playClick();
+    try {
+      const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl);
+      if (result) {
+        setRoomId(result.room.id);
+        setLocalPlayerId(result.player.id);
+        setPlayers([{
+          id: result.player.id,
+          nickname: result.player.nickname,
+          avatar: result.player.avatar,
+          isHost: result.player.isHost,
+          isReady: result.player.isReady,
+          score: 0,
+          hasAnswered: false,
+          lastAnswerTime: 0
+        }]);
+        setView("lobby");
+      } else {
+        alert("Erro ao criar sala. Verifique sua conexão.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro na conexão multiplayer.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleJoinGame = async () => {
@@ -1434,7 +1462,7 @@ export default function App() {
             >
               {/* Header */}
               <div className="flex items-center gap-3 shrink-0">
-                <button onClick={() => setView(view === "multiplayer_setup" && isSolo ? "home" : "multiplayer_menu")} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                <button onClick={() => setView("mode_selection")} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                 </button>
                 <h2 className="text-2xl font-black italic uppercase tracking-tighter cartoon-text text-white drop-shadow-[3px_3px_0px_#1a0533]">
@@ -1609,13 +1637,7 @@ export default function App() {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     soundService.playClick();
-                    if (isSolo) {
-                      setRoomId(null);
-                      setLocalPlayerId("p_" + Math.random().toString(36).substr(2, 9));
-                      setView("lobby");
-                    } else {
-                      handleCreateRoom();
-                    }
+                    setView("multiplayer_setup");
                   }}
                   className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
                 >

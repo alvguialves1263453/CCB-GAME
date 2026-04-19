@@ -273,6 +273,10 @@ export const multiplayerService = {
   // Discovery (Keeping it simple for nearby rooms, could use a 'lobbies' view)
   async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
     const fetchLobbies = async () => {
+      // Auto-cleanup: remove ghost rooms that have been stuck in lobby for over 15 minutes
+      const fifteenMinsAgo = new Date(Date.now() - 15 * 60000).toISOString();
+      await supabase.from('rooms').delete().eq('phase', 'lobby').lt('created_at', fifteenMinsAgo);
+
       const { data } = await supabase.from('rooms').select('id, players(nickname)').eq('phase', 'lobby');
       if (data) {
          const formatted = data.map((r: any) => ({ id: r.id, hostName: r.players?.[0]?.nickname || 'Host' }));
@@ -316,4 +320,20 @@ export const multiplayerService = {
       _onRoomUpdate = null;
     };
   },
+
+  deleteRoomWithKeepalive(roomId: string) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !apikey) return;
+
+    const headers = {
+      'apikey': apikey,
+      'Authorization': `Bearer ${apikey}`,
+      'Content-Type': 'application/json'
+    };
+
+    // Delete players first, then room. keepalive ensures requests fire even when tab is closing.
+    fetch(`${supabaseUrl}/rest/v1/players?room_id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+    fetch(`${supabaseUrl}/rest/v1/rooms?id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+  }
 };
