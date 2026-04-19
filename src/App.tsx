@@ -123,17 +123,17 @@ const INSTRUMENT_POSITIONS = [
   { top: '35%', left: '1%', rot: 5, dur: 3.9, delay: 1.8 },
 ];
 
-const MusicalNotesBackground = () => {
+const MusicalNotesBackground = ({ reducedMotion }: { reducedMotion?: boolean }) => {
   const notes = ["♪", "♫", "♬", "♩", "♭", "♮", "♯", "𝄞", "𝄢", "𝄪", "𝆓"];
   const noteColors = ["#FFD700", "#FF5A95", "#9B59F5", "#4ECB71", "#fff", "#f97316", "#38bdf8", "#fbbf24"];
+  const noteCount = reducedMotion ? 8 : 40;
+  
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-      {/* Floating musical notes - DYNAMIC FLYING */}
-      {[...Array(40)].map((_, i) => {
+      {/* Reduced notes for slow devices */}
+      {[...Array(noteCount)].map((_, i) => {
         const note = notes[i % notes.length];
         const color = noteColors[i % noteColors.length];
-
-        // Randomize spawn position and trajectory
         const spawnFromLeft = i % 2 === 0;
         const startX = spawnFromLeft ? -10 : 110;
         const startY = (i * 2.5) % 100;
@@ -172,8 +172,8 @@ const MusicalNotesBackground = () => {
         );
       })}
 
-      {/* Floating instruments */}
-      {INSTRUMENT_POSITIONS.map((pos, i) => {
+      {/* Floating instruments - hide on reduced motion */}
+      {!reducedMotion && INSTRUMENT_POSITIONS.map((pos, i) => {
         const { Component } = INSTRUMENTS[i % INSTRUMENTS.length];
         const style: React.CSSProperties = {
           position: 'absolute',
@@ -273,6 +273,8 @@ export default function App() {
     playersRef.current = players;
   });
 
+  const [reducedMotion, setReducedMotion] = useState(false);
+
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
@@ -285,6 +287,27 @@ export default function App() {
       setPlatform("other");
       document.documentElement.removeAttribute("data-os");
     }
+
+    // Detect low-end devices based on hardware
+    const isLowEndDevice = async () => {
+      try {
+        const memory = (navigator as any).deviceMemory;
+        const cores = navigator.hardwareConcurrency;
+        // Low memory (< 3GB) or very few cores (< 4) likely slow device
+        if (memory !== undefined && memory < 3) {
+          setReducedMotion(true);
+        } else if (cores !== undefined && cores < 4) {
+          setReducedMotion(true);
+        } else {
+          // Check if prefers-reduced-motion is set
+          const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          setReducedMotion(prefersReduced);
+        }
+      } catch {
+        setReducedMotion(false);
+      }
+    };
+    isLowEndDevice();
   }, []);
 
   // Persistence for user profile
@@ -1042,8 +1065,8 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] w-full text-game-border font-sans selection:bg-game-primary/30 overflow-hidden relative flex flex-col bg-transparent" style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}>
-      <MusicalNotesBackground />
+    <div className="h-screen h-[100dvh] w-full text-game-border font-sans selection:bg-game-primary/30 overflow-hidden relative flex flex-col bg-transparent" style={{ perspective: '1000px', transformStyle: 'preserve-3d', minHeight: '-webkit-fill-available' }}>
+      <MusicalNotesBackground reducedMotion={reducedMotion} />
 
       {/* Screen-wide Time Tension Overlay */}
       <div
@@ -1162,12 +1185,11 @@ export default function App() {
           {view === "home" && (
             <motion.div
               key="home"
-              initial={{ opacity: 0, scale: 0.8, y: 30, rotateX: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: -20, rotateX: -15 }}
+              initial={{ opacity: 0, scale: 0.8, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
               className="w-full flex-grow flex flex-col items-center justify-center gap-[1.5vh] px-4 py-2"
-              style={{ transformStyle: 'preserve-3d' }}
             >
               {/* GAME TITLE - CCB QUIZ */}
               <motion.div
@@ -1185,14 +1207,14 @@ export default function App() {
                       paintOrder: 'stroke fill',
                       filter: 'drop-shadow(6px 6px 0px #1a0533)',
                     }}
-                    animate={{ rotate: [-1.5, 1.5, -1.5], scale: [1, 1.03, 1] }}
+                    animate={reducedMotion ? {} : { rotate: [-1.5, 1.5, -1.5], scale: [1, 1.03, 1] }}
                     transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                   >
                     CCB
                   </motion.h1>
                   <motion.div
                     className="bg-[#9B59F5] border-2 md:border-4 border-[#1a0533] px-4 md:px-6 py-1.5 md:py-2.5 rounded-xl md:rounded-2xl shadow-[4px_4px_0px_#1a0533] mt-[-15px] md:mt-[-20px] relative z-20"
-                    animate={{ rotate: [2, -2, 2], y: [0, 4, 0] }}
+                    animate={reducedMotion ? {} : { rotate: [2, -2, 2], y: [0, 4, 0] }}
                     transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
                   >
                     <span className="text-xl sm:text-2xl md:text-3xl font-black italic uppercase text-white cartoon-text" style={{ WebkitTextStroke: '1px #1a0533' }}>QUIZ</span>
@@ -1218,7 +1240,7 @@ export default function App() {
 
                 {/* LEFT SIDE: AVATAR PANEL */}
                 <div className="flex flex-col items-center shrink-0">
-                  <div className="relative group p-6 md:p-10 bg-white/10 rounded-[4rem] border-4 border-[#1a0533]/20 shadow-2xl backdrop-blur-md relative transform transition-transform hover:scale-105" style={{ transformStyle: 'preserve-3d' }}>
+                  <div className="relative group p-6 md:p-10 bg-white/10 rounded-[4rem] border-4 border-[#1a0533]/20 shadow-2xl backdrop-blur-md relative transition-transform hover:scale-105">
 
                     {/* Floating Sparkles decoration */}
                     <div className="absolute -top-4 -left-4 animate-pulse">
@@ -1262,11 +1284,10 @@ export default function App() {
                 {/* RIGHT SIDE: MAIN BUTTONS PANEL */}
                 <div className="w-full md:w-[400px] flex flex-col gap-5 py-4">
                   <motion.button
-                    whileHover={{ scale: 1.05, rotateX: 6, rotateY: 3, y: -6, shadow: "10px 10px 0px 0px #1a0533" }}
-                    whileTap={{ scale: 0.95, y: 2 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={handlePlayClick}
                     className="btn-cartoon btn-purple w-full py-3 md:py-6 gap-2 md:gap-3"
-                    style={{ borderRadius: '2rem', fontSize: '1.2rem md:1.4rem', transformStyle: 'preserve-3d' }}
                   >
                     <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 border-2 border-white/40 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
                       <Play className="w-6 h-6 md:w-7 md:h-7 fill-white text-white translate-x-1" />
@@ -1275,11 +1296,10 @@ export default function App() {
                   </motion.button>
 
                   <motion.button
-                    whileHover={{ scale: 1.05, rotateX: -6, rotateY: -3, y: -6, shadow: "10px 10px 0px 0px #1a0533" }}
-                    whileTap={{ scale: 0.95, y: 2 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => { soundService.playClick(); setIsSolo(false); setView("multiplayer_menu"); }}
                     className="btn-cartoon btn-yellow w-full py-3 md:py-6 gap-2 md:gap-3"
-                    style={{ borderRadius: '2rem', fontSize: '1.2rem md:1.4rem', transformStyle: 'preserve-3d' }}
                   >
                     <div className="w-10 h-10 md:w-12 md:h-12 bg-black/10 border-2 border-[#1a0533]/30 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
                       <Users className="w-6 h-6 md:w-8 md:h-8 text-[#1a0533]" />
@@ -1291,7 +1311,7 @@ export default function App() {
                   <div className="flex justify-between items-center px-4 mt-2">
                     <div className="flex gap-4">
                       <motion.button
-                        whileHover={{ scale: 1.15, rotate: -8 }}
+                        whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setView("hymn_list"); }}
                         className="w-16 h-16 bg-white border-4 border-[#1a0533] rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
@@ -1299,7 +1319,7 @@ export default function App() {
                         <Music className="w-8 h-8 text-[#9B59F5]" />
                       </motion.button>
                       <motion.button
-                        whileHover={{ scale: 1.15, rotate: 8 }}
+                        whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setShowSettings(true); }}
                         className="w-16 h-16 bg-white border-4 border-[#1a0533] rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
