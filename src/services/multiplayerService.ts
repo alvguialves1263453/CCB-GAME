@@ -209,6 +209,11 @@ export const multiplayerService = {
     }).eq('id', roomId);
   },
 
+  async touchRoom(roomId: string) {
+    // Heartbeat: update updated_at so we know the room is alive
+    await supabase.from('rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId);
+  },
+
   async startRound(roomId: string, roundIndex: number, timeLimitSec: number) {
     // Reset all players has_answered for this room
     await supabase.from('players').update({ has_answered: false, round: roundIndex }).eq('room_id', roomId);
@@ -273,9 +278,13 @@ export const multiplayerService = {
   // Discovery (Keeping it simple for nearby rooms, could use a 'lobbies' view)
   async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
     const fetchLobbies = async () => {
-      // Auto-cleanup: remove ghost rooms that have been stuck in lobby for over 15 minutes
+      // Cleanup 1: Remove rooms stuck in lobby for 15+ min
       const fifteenMinsAgo = new Date(Date.now() - 15 * 60000).toISOString();
       await supabase.from('rooms').delete().eq('phase', 'lobby').lt('created_at', fifteenMinsAgo);
+
+      // Cleanup 2: Remove ANY room with no heartbeat for 3+ minutes (stale/ghost rooms)
+      const threeMinsAgo = new Date(Date.now() - 3 * 60000).toISOString();
+      await supabase.from('rooms').delete().lt('updated_at', threeMinsAgo).not('phase', 'eq', 'ranking');
 
       const { data } = await supabase.from('rooms').select('id, players(nickname)').eq('phase', 'lobby');
       if (data) {

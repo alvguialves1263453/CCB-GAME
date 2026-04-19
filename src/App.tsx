@@ -237,6 +237,7 @@ export default function App() {
   const [joinRoomCode, setJoinRoomCode] = useState("");
   const [isManualJoin, setIsManualJoin] = useState(false);
   const [resultCountdown, setResultCountdown] = useState<number | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [testStatus, setTestStatus] = useState({
     supabase: 'idle',
@@ -363,6 +364,7 @@ export default function App() {
         
         setRoundCount(room.roundCount);
         setDifficulty(room.difficulty as Difficulty);
+        difficultyRef.current = room.difficulty as Difficulty; // Update ref immediately, not waiting for next render
         if (room.questions) setQuestions(room.questions);
 
         // State Machine based on Phase
@@ -400,18 +402,22 @@ export default function App() {
           setShowResult(true);
           setResultCountdown(3);
           
-          // Host automatically schedules next round after a delay
+          // Host automatically schedules next round after 4s (matches endRound deadline)
           const me = playersRef.current.find(p => p.id === localPlayerId);
           if (me?.isHost && roomId) {
-            if (Date.now() < (room.deadlineAt || 0)) {
-               setTimeout(() => {
-                 if (room.currentRound + 1 < room.roundCount) {
-                   multiplayerService.startRound(roomId, room.currentRound + 1, TIME_LIMITS[room.difficulty as Difficulty] || 0);
-                 } else {
-                   multiplayerService.finishGame(roomId);
-                 }
-               }, Math.max(0, (room.deadlineAt || 0) - Date.now()));
-            }
+            setTimeout(() => {
+              if (room.currentRound + 1 < room.roundCount) {
+                const timeLimitSec = TIME_LIMITS[difficultyRef.current];
+                if (timeLimitSec !== Infinity && timeLimitSec > 0) {
+                  roomDeadlineRef.current = Date.now() + timeLimitSec * 1000;
+                } else {
+                  roomDeadlineRef.current = null;
+                }
+                multiplayerService.startRound(roomId, room.currentRound + 1, timeLimitSec);
+              } else {
+                multiplayerService.finishGame(roomId);
+              }
+            }, 4000);
           }
         } else if (room.phase === 'ranking') {
           if (viewRef.current !== 'ranking') setView('ranking');
@@ -425,12 +431,16 @@ export default function App() {
   // Cleanup room when host leaves or reloads
   useEffect(() => {
     if (!roomId || isSolo) return;
-    
+
     const handleUnload = () => {
       const me = playersRef.current.find(p => p.id === localPlayerId);
       if (me?.isHost) {
-        // Attempt to clean up the room
-        multiplayerService.deleteRoom(roomId);
+        multiplayerService.deleteRoomWithKeepalive(roomId);
+      } else if (localPlayerId) {
+        // Guest: just remove self via keepalive
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/players?id=eq.${localPlayerId}`;
+        const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (apikey) fetch(url, { method: 'DELETE', headers: { 'apikey': apikey, 'Authorization': `Bearer ${apikey}` }, keepalive: true }).catch(() => {});
       }
     };
 
@@ -438,6 +448,20 @@ export default function App() {
     return () => {
       window.removeEventListener('beforeunload', handleUnload);
     };
+  }, [roomId, isSolo, localPlayerId]);
+
+  // Host heartbeat - updates room every 30s so we know it's alive
+  useEffect(() => {
+    if (!roomId || isSolo) return;
+    const me = playersRef.current.find(p => p.id === localPlayerId);
+    if (!me?.isHost) return;
+
+    const interval = setInterval(async () => {
+      // Just a lightweight touch to keep the room alive
+      await multiplayerService.touchRoom(roomId);
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [roomId, isSolo, localPlayerId]);
 
   // Check if all players answered (Unified for Solo and Multi)
@@ -539,7 +563,14 @@ export default function App() {
       } else {
         const me = players.find(p => p.id === localPlayerId);
         if (me?.isHost && roomId) {
-           multiplayerService.startRound(roomId, 0, TIME_LIMITS[difficultyRef.current] || 0);
+          const timeLimitSec = TIME_LIMITS[difficultyRef.current];
+          // Set deadline locally on host immediately so timer starts right away
+          if (timeLimitSec !== Infinity && timeLimitSec > 0) {
+            roomDeadlineRef.current = Date.now() + timeLimitSec * 1000;
+          } else {
+            roomDeadlineRef.current = null;
+          }
+          multiplayerService.startRound(roomId, 0, timeLimitSec);
         }
       }
       setGameCountdown(null);
@@ -1104,6 +1135,14 @@ export default function App() {
                   onClick={() => {
                     soundService.playClick();
                     setShowExitConfirm(false);
+                    if (!isSolo && roomId) {
+                      const me = playersRef.current.find(p => p.id === localPlayerId);
+                      if (me?.isHost) {
+                        multiplayerService.deleteRoomWithKeepalive(roomId);
+                      } else {
+                        multiplayerService.leaveRoom();
+                      }
+                    }
                     setView("home");
                     setIsGameActive(false);
                   }}
@@ -1704,16 +1743,54 @@ export default function App() {
                   </div>
                 </div>
 
-                {!isSolo && (
+                {!isSolo && roomId && (
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={copyRoomLink}
+                    onClick={() => { soundService.playClick(); setShowQrModal(true); }}
                     className="btn-cartoon btn-yellow px-4 py-1.5 text-xs gap-2 whitespace-nowrap"
                   >
-                    {copied ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                    {copied ? "Link Copiado!" : "Convidar Amigos"}
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
+                    QR Code
                   </motion.button>
+                )}
+
+                {/* QR Code Modal */}
+                {showQrModal && roomId && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    onClick={() => setShowQrModal(false)}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.8, y: 30 }}
+                      animate={{ scale: 1, y: 0 }}
+                      exit={{ scale: 0.8, y: 30 }}
+                      onClick={e => e.stopPropagation()}
+                      className="bg-white border-4 border-[#1a0533] rounded-[2rem] p-6 flex flex-col items-center gap-4 shadow-[8px_8px_0px_#1a0533] max-w-xs w-full"
+                    >
+                      <h3 className="text-xl font-black uppercase italic text-[#1a0533] cartoon-text">Escaneie para Entrar</h3>
+                      <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-2 shadow-[4px_4px_0px_#1a0533]">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?room=' + roomId)}`}
+                          alt="QR Code da sala"
+                          className="w-44 h-44 rounded-xl"
+                        />
+                      </div>
+                      <div className="bg-[#9B59F5] text-white px-5 py-2 rounded-full border-2 border-[#1a0533] font-black uppercase tracking-widest text-base shadow-[3px_3px_0px_#1a0533]">
+                        SALA: {roomId}
+                      </div>
+                      <p className="text-xs text-[#1a0533]/60 font-bold text-center">Aponte a câmera para o código ou compartilhe o código da sala</p>
+                      <button
+                        onClick={() => setShowQrModal(false)}
+                        className="w-full py-2 bg-gray-100 border-4 border-[#1a0533] rounded-xl font-black uppercase text-sm hover:bg-gray-200 transition-colors cursor-pointer shadow-[3px_3px_0px_#1a0533]"
+                      >
+                        Fechar
+                      </button>
+                    </motion.div>
+                  </motion.div>
                 )}
               </div>
 
