@@ -25,22 +25,23 @@ const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
 
 const AnimatedPoints = ({ points }: { points: number }) => {
   const [display, setDisplay] = useState(0);
+  const [done, setDone] = useState(false);
   
   useEffect(() => {
     // Fast count up animation
-    if (display < points) {
+    if (display < points && !done) {
       const step = Math.max(1, Math.floor(points / 20));
       const timer = setTimeout(() => setDisplay(p => Math.min(p + step, points)), 20);
       return () => clearTimeout(timer);
+    } else if (display >= points && !done) {
+      setDone(true);
     }
-  }, [display, points]);
-  
-  if (display >= points) return null;
+  }, [display, points, done]);
   
   return (
     <motion.div
       initial={{ scale: 0.5, opacity: 0, y: 20 }}
-      animate={{ scale: [1, 1.3, 1.1], opacity: 1, y: 0 }}
+      animate={done ? { scale: 1 } : { scale: [1, 1.3, 1.1], opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="text-3xl md:text-5xl font-black italic text-[#FFD700] drop-shadow-[2px_2px_0px_#1a0533]"
     >
