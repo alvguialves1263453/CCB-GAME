@@ -432,8 +432,8 @@ export default function App() {
         const currentIds = new Set(dbPlayers.map(p => p.id));
         const prev = prevPlayersRef.current;
         
-        // Check for departures or empty room
-        if (dbPlayers.length === 0 && prev.length > 0) {
+        // Check for departures or empty room (but not if we're in ranking - game ended)
+        if (dbPlayers.length === 0 && prev.length > 0 && view !== 'ranking') {
           setHostLeft(true);
           setRoomId(null);
           setLocalPlayerId(null);
@@ -473,7 +473,8 @@ export default function App() {
       roomId,
       (dbPlayers) => {
         // If room is empty, host left - show message and go home
-        if (dbPlayers.length === 0 && prevPlayersRef.current.length > 0) {
+        // BUT don't trigger if we're in ranking phase (game ended normally)
+        if (dbPlayers.length === 0 && prevPlayersRef.current.length > 0 && view !== 'ranking') {
           setHostLeft(true);
           setRoomId(null);
           setLocalPlayerId(null);
@@ -1027,7 +1028,7 @@ export default function App() {
     setSelectedOption(null);
     setShowResult(false);
     setResultCountdown(null);
-    setTimeLeft(difficultyRef.current === 'facil' ? null : TIME_LIMITS[difficultyRef.current]);
+    setTimeLeft(difficulty === 'facil' ? null : TIME_LIMITS[difficulty]);
     startTimeRef.current = Date.now();
 
     // Reset players for the round
@@ -1089,11 +1090,10 @@ export default function App() {
   // Timer Tick
   useEffect(() => {
     const interval = setInterval(() => {
-      // 1. Logic for Answer Timer
-      const currentDifficulty = difficultyRef.current;
-      if (isGameActiveRef.current && !showResultRef.current && !isPreparing && currentDifficulty !== 'facil') {
+      // 1. Logic for Answer Timer - use state for reliability
+      if (isGameActive && !showResult && !isPreparing && difficulty !== 'facil') {
+        const timeLimit = TIME_LIMITS[difficulty];
         let remaining = 0;
-        const timeLimit = TIME_LIMITS[currentDifficulty];
         
         if (isSolo) {
           const timeSpent = (Date.now() - startTimeRef.current) / 1000;
