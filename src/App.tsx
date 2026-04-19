@@ -567,16 +567,10 @@ export default function App() {
                roomDeadlineRef.current = null;
              }
              setTimeLeft(diff === 'facil' ? null : TIME_LIMITS[diff]);
-          }
-        }
-              setTimeLeft(diff === 'facil' ? null : TIME_LIMITS[diff]);
-          } else {
-            // Update deadline if it changed
-            roomDeadlineRef.current = room.deadlineAt;
-          }
-        } else if (room.phase === 'result') {
-          setIsGameActive(false);
-          setShowResult(true);
+           }
+         } else if (room.phase === 'result') {
+           setIsGameActive(false);
+           setShowResult(true);
           setResultCountdown(3);
           
           // Host automatically schedules next round after 4s (matches endRound deadline)
