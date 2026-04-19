@@ -360,19 +360,23 @@ export const multiplayerService = {
     };
   },
 
-  deleteRoomWithKeepalive(roomId: string) {
+  async deleteRoomWithKeepalive(roomId: string) {
+    // Use SDK for normal operation
+    await supabase.from('players').delete().eq('room_id', roomId);
+    await supabase.from('rooms').delete().eq('id', roomId);
+    
+    // Fallback: also try fetch with keepalive in case SDK fails
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !apikey) return;
-
-    const headers = {
-      'apikey': apikey,
-      'Authorization': `Bearer ${apikey}`,
-      'Content-Type': 'application/json'
-    };
-
-    // Delete players first, then room. keepalive ensures requests fire even when tab is closing.
-    fetch(`${supabaseUrl}/rest/v1/players?room_id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
-    fetch(`${supabaseUrl}/rest/v1/rooms?id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+    if (supabaseUrl && apikey) {
+      const headers = {
+        'apikey': apikey,
+        'Authorization': `Bearer ${apikey}`,
+        'Content-Type': 'application/json'
+      };
+      // This fires even if tab closes
+      fetch(`${supabaseUrl}/rest/v1/players?room_id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+      fetch(`${supabaseUrl}/rest/v1/rooms?id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+    }
   }
 };

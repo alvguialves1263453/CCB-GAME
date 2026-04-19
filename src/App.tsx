@@ -388,6 +388,21 @@ export default function App() {
     }
   }, []);
 
+  // Delete room when host closes tab
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isSolo && roomId && localPlayerId) {
+        const me = playersRef.current.find(p => p.id === localPlayerId);
+        if (me?.isHost) {
+          multiplayerService.deleteRoomWithKeepalive(roomId);
+        }
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isSolo, roomId, localPlayerId]);
+
   // Sync prevPlayersRef whenever players changes
   useEffect(() => {
     prevPlayersRef.current = players;
