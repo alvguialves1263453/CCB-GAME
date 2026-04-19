@@ -394,20 +394,28 @@ export default function App() {
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
       (dbPlayers) => {
-        // Check if a player left
-        const prevPlayerIds = new Set((playersRef.current || []).map(p => p.id));
-        const currentPlayerIds = new Set(dbPlayers.map(p => p.id));
-        
-        // Find which player left
-        for (const pid of prevPlayerIds) {
-          if (!currentPlayerIds.has(pid) && pid !== localPlayerId) {
-            const leftName = playersRef.current.find(p => p.id === pid)?.nickname || 'Jogador';
-            setLeftPlayerName(leftName);
-            setTimeout(() => setLeftPlayerName(null), 4000);
-          }
+        // Check if a player left (for other players, not me)
+        if (localPlayerId && dbPlayers.every(p => p.id !== localPlayerId)) {
+          // I was removed from the room
+          setHostLeft(true);
+          setTimeout(() => {
+            setHostLeft(false);
+            setView("home");
+          }, 3000);
+          return;
         }
 
         setPlayers(prev => {
+          // Find players that left (only show notification for others leaving, not me)
+          const currentIds = new Set(dbPlayers.map(p => p.id));
+          for (const p of prev) {
+            if (!currentIds.has(p.id) && p.id !== localPlayerId) {
+              setLeftPlayerName(p.nickname);
+              setTimeout(() => setLeftPlayerName(null), 4000);
+              break; // Only show once
+            }
+          }
+          
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
             return {
