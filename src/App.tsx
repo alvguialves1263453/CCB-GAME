@@ -592,6 +592,8 @@ export default function App() {
                 multiplayerService.startRound(roomId, room.currentRound + 1, timeLimitSec);
               } else {
                 multiplayerService.finishGame(roomId);
+                // Host also needs to update local view immediately
+                setView('ranking');
               }
             }, 4000);
           }
