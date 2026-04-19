@@ -2440,19 +2440,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 ))}
               </div>
 
-              {/* Timer countdown in ranking - auto close after 60 seconds */}
+              {/* Timer countdown in ranking - just visual, no auto-delete */}
               {view === 'ranking' && !isSolo && (
                 <RankingCountdown onComplete={() => {
-                  if (roomId && localPlayerId) {
-                    const me = players.find(p => p.id === localPlayerId);
-                    if (me?.isHost) {
-                      multiplayerService.deleteRoomWithKeepalive(roomId);
-                    } else {
-                      multiplayerService.leaveRoom();
-                    }
-                  }
-                  setView("home");
-                  setIsGameActive(false);
+                  // Just show a message, don't auto-delete
+                  // Players and host must manually close
                 }} />
               )}
 
