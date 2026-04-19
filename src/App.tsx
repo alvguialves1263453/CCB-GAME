@@ -394,7 +394,7 @@ export default function App() {
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
       (dbPlayers) => {
-        // Get current player IDs from the server
+        // Get current player IDs from the server response
         const currentPlayerIds = new Set(dbPlayers.map(p => p.id));
         
         // Check if I was removed from the room
@@ -407,24 +407,26 @@ export default function App() {
           return;
         }
 
-        // Get previous player IDs from the ref (more reliable than state)
-        const prevPlayerIds = new Set((playersRef.current || []).map(p => p.id));
+        // Get previous player IDs from state (last committed)
+        const prev = playersRef.current || [];
+        const prevPlayerIds = new Set(prev.map(p => p.id));
         
-        // Find players that actually left (in prev but not in current)
+        // Find players that left - only if they're NOT coming back (not in current list)
+        // This prevents false notifications when player reconnects with new ID
         for (const oldId of prevPlayerIds) {
           if (!currentPlayerIds.has(oldId) && oldId !== localPlayerId) {
-            // Only notify if we had this player (was in room before)
-            const oldPlayer = playersRef.current?.find(p => p.id === oldId);
-            if (oldPlayer) {
+            const oldPlayer = prev.find(p => p.id === oldId);
+            if (oldPlayer && dbPlayers.every(p => p.nickname !== oldPlayer.nickname)) {
+              // Double-check: is this nickname really gone?
               setLeftPlayerName(oldPlayer.nickname);
               setTimeout(() => setLeftPlayerName(null), 4000);
             }
-            break; // Only one notification per update
+            break;
           }
         }
 
         setPlayers(dbPlayers.map(dbp => {
-          const existing = (playersRef.current || []).find(p => p.id === dbp.id);
+          const existing = prev.find(p => p.id === dbp.id);
           return {
             ...dbp,
             lastAnswerTime: existing?.lastAnswerTime || 0

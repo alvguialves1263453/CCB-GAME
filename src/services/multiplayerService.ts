@@ -61,6 +61,8 @@ const mapPlayer = (row: any): Player => ({
 const refreshPlayers = async (roomId: string) => {
   const { data } = await supabase.from('players').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
   if (data) {
+    // Update snapshot with current player IDs
+    _lastPlayerSnapshot = new Set(data.map(p => p.id));
     _onPlayersChange?.(data.map(mapPlayer));
   }
 };
@@ -160,23 +162,22 @@ export const multiplayerService = {
 
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
-        if (payload.new) {
-          _onRoomUpdate?.(mapRoom(payload.new));
+        // Handle room deletion (when room no longer exists)
+        if (!payload.new) {
+          _onRoomUpdate?.(null as any);
+          return;
         }
+        _onRoomUpdate?.(mapRoom(payload.new));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, (payload) => {
-        // Handle DELETE - player was removed from room
-        if (payload.old?.id) {
-          _lastPlayerSnapshot.delete(payload.old.id);
-          refreshPlayers(roomId);
-        }
+        // Handle DELETE - refresh will get the actual current list
+        // We can't access payload.old.id reliably, so just refresh
+        refreshPlayers(roomId);
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
-        // Handle INSERT - new player joined
         refreshPlayers(roomId);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
-        // Handle UPDATE - player state changed
         refreshPlayers(roomId);
       });
 
