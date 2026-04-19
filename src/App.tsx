@@ -1073,17 +1073,16 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
     setFeedback({ correct: isUserCorrect, option: option || "Tempo Esgotado" });
 
-    if (isSolo) {
-      setPlayers(current => current.map(p => {
-        if (p.id === localPlayerId) {
-          return { ...p, hasAnswered: true, score: p.score + pointsToAdd };
-        }
-        return p;
-      }));
-    } else {
-      if (localPlayerId && roomId) {
-         multiplayerService.submitAnswer(roomId, isUserCorrect, pointsToAdd, currentRound);
+    // Update local state immediately for instant feedback
+    setPlayers(current => current.map(p => {
+      if (p.id === localPlayerId) {
+        return { ...p, hasAnswered: true, score: p.score + pointsToAdd };
       }
+      return p;
+    }));
+
+    if (!isSolo && localPlayerId && roomId) {
+      multiplayerService.submitAnswer(roomId, isUserCorrect, pointsToAdd, currentRound);
     }
   };
 
