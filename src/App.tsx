@@ -199,6 +199,12 @@ const MusicalNotesBackground = () => {
 
 type Difficulty = 'facil' | 'medio' | 'dificil';
 
+const TIME_LIMITS = {
+  facil: Infinity,
+  medio: 20,
+  dificil: 10
+};
+
 export default function App() {
   const [view, setView] = useState<ViewState>("home");
   const viewRef = useRef(view);
@@ -231,27 +237,39 @@ export default function App() {
   const [joinRoomCode, setJoinRoomCode] = useState("");
   const [isManualJoin, setIsManualJoin] = useState(false);
   const [resultCountdown, setResultCountdown] = useState<number | null>(null);
-
+  const [showSettings, setShowSettings] = useState(false);
+  const [testStatus, setTestStatus] = useState({
+    supabase: 'idle',
+    hymns: 'idle',
+    multiplayer: 'idle'
+  });
+  
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
   const lastHandledRoundRef = useRef<number>(-1);
   const botTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const lastBotRoundRef = useRef<number>(-1);
 
   // Refs for reliable socket callbacks
   const isGameActiveRef = useRef(isGameActive);
   const showResultRef = useRef(showResult);
   const currentRoundRef = useRef(currentRound);
+  const difficultyRef = useRef(difficulty);
+  const roomDeadlineRef = useRef<number | null>(null);
   const questionsRef = useRef(questions);
   const feedbackRef = useRef(feedback);
   const selectedOptionRef = useRef(selectedOption);
+  const playersRef = useRef(players);
 
   useEffect(() => {
     isGameActiveRef.current = isGameActive;
     showResultRef.current = showResult;
     currentRoundRef.current = currentRound;
+    difficultyRef.current = difficulty;
     questionsRef.current = questions;
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
+    playersRef.current = players;
   });
 
   useEffect(() => {
@@ -305,6 +323,9 @@ export default function App() {
       setCurrentRound(0);
       setIsGameActive(false);
       setShowResult(false);
+      lastBotRoundRef.current = -1;
+      botTimeoutsRef.current.forEach(clearTimeout);
+      botTimeoutsRef.current = [];
     }
   }, [view]);
 
@@ -330,85 +351,94 @@ export default function App() {
         setPlayers(prev => {
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
-            const isLocal = dbp.id === localPlayerId;
-
-            // Only count as answered if the DB says they are on the current (or future) round
-            // OR if it's the local player and we have it marked as answered locally for the current round index
-            const dbHasAnswered = dbp.hasAnswered && dbp.round >= currentRoundRef.current;
-            const localHasAnswered = isLocal && existing?.hasAnswered && currentRoundRef.current === dbp.round;
-            const hasAnswered = dbHasAnswered || localHasAnswered;
-
             return {
-              id: dbp.id,
-              nickname: dbp.nickname,
-              avatar: dbp.avatar,
-              isHost: dbp.isHost,
-              isReady: dbp.isReady,
-              score: dbp.score || 0,
-              hasAnswered: !!hasAnswered,
-              round: dbp.round,
+              ...dbp,
               lastAnswerTime: existing?.lastAnswerTime || 0
             };
           });
         });
-
-        // Fallback sync: If we are a guest and we see the host is on a newer round, jump to it
-        const hostPlayer = dbPlayers.find(p => p.isHost);
-        if (hostPlayer && hostPlayer.id !== localPlayerId) {
-          if (hostPlayer.round > currentRoundRef.current && hostPlayer.round < roundCountRef.current) {
-            startRound(hostPlayer.round);
-          } else if (hostPlayer.round >= roundCountRef.current && viewRef.current === "game") {
-            setView("ranking");
-          }
-        }
       },
       (room) => {
-        if (room.gameStarted && viewRef.current !== "game" && room.questions) {
-          setQuestions(room.questions);
-        } else if (!room.gameStarted && (viewRef.current === "game" || viewRef.current === "ranking")) {
-          setView("lobby");
-          setIsPreparing(false);
-          setGameCountdown(null);
-        }
-      },
-      () => {
-        // onRoundEnd - we handle this via useEffect now
-      },
-      (roundIndex) => {
-        // onNextRound
-        if (roundIndex < roundCountRef.current) {
-          startRound(roundIndex);
-        } else {
-          setView("ranking");
-        }
-      },
-      () => {
-        // onGameReset
-        setView("lobby");
-        setIsPreparing(false);
-        setGameCountdown(null);
-      },
-      (data) => {
-        // onGameStarted
-        setQuestions(data.questions);
-        setRoundCount(data.roundCount);
-        if (data.difficulty) {
-          setDifficulty(data.difficulty as Difficulty);
-        }
+        if (!room) return;
+        
+        setRoundCount(room.roundCount);
+        setDifficulty(room.difficulty as Difficulty);
+        if (room.questions) setQuestions(room.questions);
 
-        // Start Countdown
-        setIsPreparing(true);
-        setView("game");
-        setGameCountdown(3);
-      },
-      (data) => {
-        // onPlayerAnswered
-        setPlayers(prev => prev.map(p => (p.id === data.playerId && data.round === currentRoundRef.current) ? { ...p, hasAnswered: true } : p));
+        // State Machine based on Phase
+        if (room.phase === 'lobby') {
+          if (viewRef.current !== 'lobby') setView('lobby');
+          setIsPreparing(false);
+          setIsGameActive(false);
+          setShowResult(false);
+        } else if (room.phase === 'preparing') {
+          if (viewRef.current !== 'game') setView('game');
+          setIsPreparing(true);
+          setIsGameActive(false);
+          setShowResult(false);
+          
+          if (gameCountdown === null && room.deadlineAt) {
+            setGameCountdown(Math.ceil(Math.max(0, (room.deadlineAt - Date.now()) / 1000)));
+          }
+        } else if (room.phase === 'answering') {
+          if (viewRef.current !== 'game') setView('game');
+          
+          // Reset UI if entering a new round from the DB
+          if (!isGameActiveRef.current || currentRoundRef.current !== room.currentRound) {
+             setIsPreparing(false);
+             setIsGameActive(true);
+             setShowResult(false);
+             setCurrentRound(room.currentRound);
+             setSelectedOption(null);
+             setFeedback(null);
+             setResultCountdown(null);
+             setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
+          }
+
+          roomDeadlineRef.current = room.deadlineAt;
+        } else if (room.phase === 'result') {
+          setIsGameActive(false);
+          setShowResult(true);
+          
+          // Host automatically schedules next round after a delay
+          const me = playersRef.current.find(p => p.id === localPlayerId);
+          if (me?.isHost && roomId) {
+            if (Date.now() < (room.deadlineAt || 0)) {
+               setTimeout(() => {
+                 if (room.currentRound + 1 < room.roundCount) {
+                   multiplayerService.startRound(roomId, room.currentRound + 1, TIME_LIMITS[room.difficulty as Difficulty] || 0);
+                 } else {
+                   multiplayerService.finishGame(roomId);
+                 }
+               }, Math.max(0, (room.deadlineAt || 0) - Date.now()));
+            }
+          }
+        } else if (room.phase === 'ranking') {
+          if (viewRef.current !== 'ranking') setView('ranking');
+        }
       }
     );
 
     return () => unsubscribe();
-  }, [roomId, isSolo, view]);
+  }, [roomId, isSolo]);
+
+  // Cleanup room when host leaves or reloads
+  useEffect(() => {
+    if (!roomId || isSolo) return;
+    
+    const handleUnload = () => {
+      const me = playersRef.current.find(p => p.id === localPlayerId);
+      if (me?.isHost) {
+        // Attempt to clean up the room
+        multiplayerService.deleteRoom(roomId);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [roomId, isSolo, localPlayerId]);
 
   // Check if all players answered (Unified for Solo and Multi)
   useEffect(() => {
@@ -426,6 +456,50 @@ export default function App() {
       }
     }
   }, [players, isGameActive, showResult]);
+ 
+  // Bot logic for Solo mode
+  useEffect(() => {
+    // Only trigger if we are in game, not preparing, and haven't triggered for THIS round yet
+    if (isSolo && isGameActive && !showResult && !isPreparing && currentRound !== lastBotRoundRef.current && players.length > 1) {
+      const bots = players.filter(p => p.id.includes("bot"));
+      if (bots.length === 0) return;
+
+      lastBotRoundRef.current = currentRound;
+      
+      // Clear any old timeouts just in case
+      botTimeoutsRef.current.forEach(clearTimeout);
+      botTimeoutsRef.current = [];
+
+      bots.forEach(bot => {
+        const isHard = difficultyRef.current === 'dificil';
+        // Random delay: Hard (1.5s - 5s), Others (3s - 10s)
+        const delay = isHard 
+          ? Math.random() * 3500 + 1500 
+          : Math.random() * 7000 + 3000;
+        
+        const timeoutId = setTimeout(() => {
+          // Use the latest refs to check if round is still active
+          if (!isGameActiveRef.current || showResultRef.current || currentRoundRef.current !== currentRound) return;
+          
+          setPlayers(current => current.map(p => {
+            if (p.id === bot.id) {
+              const isCorrect = Math.random() > 0.4;
+              let points = 0;
+              if (isCorrect) {
+                const timeSpentBot = delay / 1000;
+                const limit = TIME_LIMITS[difficultyRef.current] || 999;
+                if (difficultyRef.current === 'facil') points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
+                else points = Math.max(100, Math.floor(((limit - timeSpentBot) / limit) * 1000));
+              }
+              return { ...p, hasAnswered: true, score: p.score + points };
+            }
+            return p;
+          }));
+        }, delay);
+        botTimeoutsRef.current.push(timeoutId);
+      });
+    }
+  }, [isSolo, isGameActive, showResult, isPreparing, currentRound, players.length]);
 
   // Discovery listener
   useEffect(() => {
@@ -448,11 +522,17 @@ export default function App() {
       }, 1000);
       return () => clearTimeout(timer);
     } else if (gameCountdown === 0) {
-      setIsPreparing(false);
+      if (isSolo) {
+        startRound(0);
+      } else {
+        const me = players.find(p => p.id === localPlayerId);
+        if (me?.isHost && roomId) {
+           multiplayerService.startRound(roomId, 0, TIME_LIMITS[difficultyRef.current] || 0);
+        }
+      }
       setGameCountdown(null);
-      startRound(0);
     }
-  }, [gameCountdown]);
+  }, [gameCountdown, isSolo]);
 
   // Load all hymns
   const loadHymns = async () => {
@@ -609,10 +689,16 @@ export default function App() {
       if (q) {
         setQuestions(q);
         setCurrentRound(0);
+        lastHandledRoundRef.current = -1;
+        lastBotRoundRef.current = -1;
+        botTimeoutsRef.current.forEach(clearTimeout);
+        botTimeoutsRef.current = [];
+        setSelectedOption(null);
+        setFeedback(null);
         setIsPreparing(true);
         setGameCountdown(3);
         setView("game");
-        setIsGameActive(true);
+        setIsGameActive(false);
       }
     } else {
       const me = players.find(p => p.id === localPlayerId);
@@ -627,16 +713,8 @@ export default function App() {
       const q = await prepareQuestions();
       if (q && roomId) {
         setIsLoading(true);
-        multiplayerService.startGameWithQuestions(roomId, q, roundCount, difficulty);
-
-        // Local start for host (since self-broadcast is now disabled)
-        setQuestions(q);
-        setRoundCount(roundCount);
-        setDifficulty(difficulty);
-        setIsPreparing(true);
-        setView("game");
-        setGameCountdown(3);
-
+        // Start game in DB
+        await multiplayerService.startGame(roomId, q, roundCount, difficulty);
         setIsLoading(false);
       }
     }
@@ -667,13 +745,6 @@ export default function App() {
     // This is now handled by handleStartGameClick or real-time room updates
   };
 
-  // Time limits mapping
-  const timeLimitMap = {
-    facil: Infinity,
-    medio: 20,
-    dificil: 10
-  };
-
   const startRound = (roundIndex: number) => {
     // Avoid double-starting the same round (can happen with both broadcast and fallback presence)
     if (currentRoundRef.current === roundIndex && isGameActiveRef.current && !showResultRef.current) {
@@ -681,56 +752,22 @@ export default function App() {
     }
 
     setCurrentRound(roundIndex);
+    if (roundIndex === 0) {
+      setIsPreparing(false);
+    }
     setIsGameActive(true);
     setSelectedOption(null);
-    setFeedback(null);
     setShowResult(false);
     setResultCountdown(null);
-    setTimeLeft(difficulty === 'facil' ? null : timeLimitMap[difficulty]);
+    setTimeLeft(difficultyRef.current === 'facil' ? null : TIME_LIMITS[difficultyRef.current]);
     startTimeRef.current = Date.now();
 
     // Reset players for the round
     setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
 
-    if (!isSolo && roomId) {
-      multiplayerService.resetPlayerRoundState(roundIndex);
-    }
-
     // Clear any pending bot timeouts
     botTimeoutsRef.current.forEach(clearTimeout);
     botTimeoutsRef.current = [];
-
-    // Simulate bots answering after some time (adjust for difficulty)
-    // We use a small delay before spawning timeouts to ensure players list is stable
-    setTimeout(() => {
-      const currentPlayers = players; // Capture current players at the time of start
-      const bots = currentPlayers.filter(p => p.id.startsWith("bot") || p.id.includes("bot"));
-      
-      bots.forEach(bot => {
-        const isHard = difficulty === 'dificil';
-        const delay = isHard ? Math.random() * 3000 + 1000 : Math.random() * 6000 + 1500;
-        
-        const timeoutId = setTimeout(() => {
-          if (!isGameActiveRef.current || showResultRef.current) return;
-          
-          setPlayers(current => current.map(p => {
-            if (p.id === bot.id) {
-              const isCorrect = Math.random() > 0.35;
-              let points = 0;
-              if (isCorrect) {
-                const timeSpentBot = delay / 1000;
-                if (difficulty === 'facil') points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
-                else if (difficulty === 'medio') points = Math.max(100, Math.floor(((20 - timeSpentBot) / 20) * 1000));
-                else points = Math.max(100, Math.floor(((10 - timeSpentBot) / 10) * 1000));
-              }
-              return { ...p, hasAnswered: true, score: p.score + points };
-            }
-            return p;
-          }));
-        }, delay);
-        botTimeoutsRef.current.push(timeoutId);
-      });
-    }, 100);
   };
 
   const handleAnswer = (option: string | null) => {
@@ -751,9 +788,9 @@ export default function App() {
 
     let pointsToAdd = 0;
     if (isUserCorrect) {
-      if (difficulty === 'facil') {
+      if (difficultyRef.current === 'facil') {
         pointsToAdd = Math.max(100, Math.floor(1000 - (timeSpent * 20)));
-      } else if (difficulty === 'medio') {
+      } else if (difficultyRef.current === 'medio') {
         pointsToAdd = Math.max(100, Math.floor(((20 - timeSpent) / 20) * 1000));
       } else {
         pointsToAdd = Math.max(100, Math.floor(((10 - timeSpent) / 10) * 1000));
@@ -762,36 +799,17 @@ export default function App() {
 
     setFeedback({ correct: isUserCorrect, option: option || "Tempo Esgotado" });
 
-    if (!isSolo && localPlayerId && roomId) {
-      multiplayerService.updateScore(roomId, isUserCorrect, pointsToAdd, currentRound);
-    }
-
-    setPlayers(prev => prev.map(p => {
-      if (p.id === localPlayerId) {
-        return { ...p, hasAnswered: true, score: p.score + pointsToAdd };
-      }
-      // Fast-forward bots if in solo mode so the user doesn't wait
-      if (isSolo && (p.id.startsWith("bot") || p.id.includes("bot")) && !p.hasAnswered) {
-        const isCorrect = Math.random() > 0.35;
-        let points = 0;
-        if (isCorrect) {
-          const timeSpentBot = timeSpent;
-          if (difficulty === 'facil') points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
-          else if (difficulty === 'medio') points = Math.max(100, Math.floor(((20 - timeSpentBot) / 20) * 1000));
-          else points = Math.max(100, Math.floor(((10 - timeSpentBot) / 10) * 1000));
-        }
-        return { ...p, hasAnswered: true, score: p.score + points };
-      }
-      return p;
-    }));
-
-    // In Solo mode, we immediately advance the round for a snappy experience
     if (isSolo) {
-      botTimeoutsRef.current.forEach(clearTimeout);
-      botTimeoutsRef.current = [];
-      setTimeout(() => {
-        if (isGameActiveRef.current) handleRoundEnd();
-      }, 800);
+      setPlayers(current => current.map(p => {
+        if (p.id === localPlayerId) {
+          return { ...p, hasAnswered: true, score: p.score + pointsToAdd };
+        }
+        return p;
+      }));
+    } else {
+      if (localPlayerId && roomId) {
+         multiplayerService.submitAnswer(roomId, isUserCorrect, pointsToAdd, currentRound);
+      }
     }
   };
 
@@ -802,107 +820,87 @@ export default function App() {
 
   // Timer Tick
   useEffect(() => {
-    if (!isGameActive || difficulty === 'facil' || showResult) return;
-
-    hasRungBellRef.current = false;
-    lastTickTimeRef.current = 0;
-
+    // Only check if active game phase or if checking multiplayer deadlines
     const interval = setInterval(() => {
-      const timeSpent = (Date.now() - startTimeRef.current) / 1000;
-      const limit = timeLimitMap[difficulty];
-      const remaining = Math.max(0, limit - timeSpent);
+      // 1. Logic for Answer Timer
+      if (isGameActiveRef.current && !showResultRef.current && !isPreparing && difficultyRef.current !== 'facil') {
+        let remaining = 0;
+        if (isSolo) {
+          const timeSpent = (Date.now() - startTimeRef.current) / 1000;
+          const limit = TIME_LIMITS[difficultyRef.current];
+          remaining = Math.max(0, limit - timeSpent);
+        } else {
+          if (roomDeadlineRef.current) {
+            remaining = Math.max(0, (roomDeadlineRef.current - Date.now()) / 1000);
+          } else {
+            remaining = Infinity;
+          }
+        }
 
-      setTimeLeft(remaining);
+        setTimeLeft(remaining);
 
-      // Tension tick sound
-      if (remaining <= 3 && remaining > 0) {
-        const now = Date.now();
-        if (now - lastTickTimeRef.current > 200) {
-          soundService.playTick();
-          lastTickTimeRef.current = now;
+        // Tension tick sound
+        if (remaining <= 3 && remaining > 0) {
+          const now = Date.now();
+          if (now - lastTickTimeRef.current > 200) {
+            soundService.playTick();
+            lastTickTimeRef.current = now;
+          }
+        }
+
+        if (remaining <= 0) {
+          if (!hasRungBellRef.current) {
+            hasRungBellRef.current = true;
+            soundService.playBell();
+          }
+
+          if (!selectedOptionRef.current) {
+            handleAnswer(null); 
+          }
+
+          if (isSolo) {
+            handleRoundEnd();
+          } else {
+            const me = playersRef.current.find(p => p.id === localPlayerId);
+            if (me?.isHost && roomId) {
+               showResultRef.current = true; // Impede spam
+               multiplayerService.endRound(roomId);
+            }
+          }
         }
       }
-
-      if (remaining <= 0) {
-        if (!hasRungBellRef.current) {
-          hasRungBellRef.current = true;
-          soundService.playBell();
-        }
-
-        // Prevent stale closure from overwriting if the user already answered
-        if (!selectedOptionRef.current) {
-          handleAnswer(null); // Mark this local player as timed out
-        }
-
-        // Force the round to end immediately for this client!
-        if (isGameActiveRef.current && !showResultRef.current) {
-          handleRoundEnd();
-        }
+      
+      // 2. Host transition handler for when everyone has answered
+      if (!isSolo && isGameActiveRef.current && !showResultRef.current && playersRef.current.length > 0) {
+         const allAnswered = playersRef.current.every(p => p.hasAnswered);
+         if (allAnswered) {
+             const me = playersRef.current.find(p => p.id === localPlayerId);
+             if (me?.isHost && roomId) {
+                 showResultRef.current = true; // Impede spam no banco de dados
+                 multiplayerService.endRound(roomId);
+             }
+         }
       }
     }, 50);
 
     return () => clearInterval(interval);
-  }, [isGameActive, difficulty, showResult]);
+  }, [isSolo]);
 
   const handleRoundEnd = () => {
     if (!isGameActiveRef.current || lastHandledRoundRef.current === currentRoundRef.current) return;
     lastHandledRoundRef.current = currentRoundRef.current;
 
-    setIsGameActive(false);
-    setShowResult(true);
+    if (isSolo) {
+      setIsGameActive(false);
+      setShowResult(true);
 
-    // Stop and clear the timer immediately
-    setTimeLeft(null);
-
-    let finalIsCorrect = false;
-
-    // Ensure feedback is set even if user didn't answer
-    if (!feedbackRef.current) {
-      const currentQuestion = questionsRef.current[currentRoundRef.current];
-      const currentSelected = selectedOptionRef.current;
-      const isUserCorrect = currentSelected
-        ? currentSelected.trim().toLowerCase() === currentQuestion.options[currentQuestion.correct].trim().toLowerCase()
-        : false;
-
-      finalIsCorrect = isUserCorrect;
-      setFeedback({
-        correct: isUserCorrect,
-        option: currentSelected || "Não Respondido"
-      });
-    } else {
-      finalIsCorrect = feedbackRef.current.correct;
-    }
-
-    // Play result sound and show effects
-    if (finalIsCorrect) {
-      soundService.playCorrect();
-      triggerConfetti();
-    } else {
-      soundService.playWrong();
-      // Add a screen shake or similar indicator for wrong answer
-      const gameContainer = document.getElementById('game-container');
-      if (gameContainer) {
-        gameContainer.classList.add('animate-shake');
-        setTimeout(() => gameContainer.classList.remove('animate-shake'), 500);
-      }
-    }
-
-    // Auto-advance to next round after a delay
-    const isHost = isSolo || players.find(p => p.id === localPlayerId)?.isHost;
-    if (isHost) {
-      setResultCountdown(3);
-      const countdownInterval = setInterval(() => {
-        setResultCountdown(prev => (prev !== null && prev > 1) ? prev - 1 : 0);
-      }, 1000);
-
-      setTimeout(() => {
-        clearInterval(countdownInterval);
-        setResultCountdown(null);
-        // Only advance if we are still looking at the results of the SAME round
-        if (viewRef.current === "game" && showResultRef.current) {
-          nextRoundLocal();
-        }
+      const timer = setTimeout(() => {
+        nextRoundLocal();
       }, 3000);
+      setResultCountdown(timer as any);
+    } else {
+      // For multiplayer, the Timer Tick interval already calls endRound when time is up or everyone answered.
+      // So here we do nothing. The DB phase change will trigger UI update.
     }
   };
 
@@ -945,15 +943,18 @@ export default function App() {
   const resetGame = async () => {
     if (isSolo) {
       setPlayers(prev => prev.map(p => ({ ...p, score: 0, hasAnswered: false, isReady: true })));
+      setSelectedOption(null);
+      setFeedback(null);
+      setShowResult(false);
+      lastHandledRoundRef.current = -1;
+      lastBotRoundRef.current = -1;
+      botTimeoutsRef.current.forEach(clearTimeout);
+      botTimeoutsRef.current = [];
       setView("lobby");
     } else if (roomId) {
       const me = players.find(p => p.id === localPlayerId);
       if (me?.isHost) {
         multiplayerService.resetRoom(roomId);
-        // Local reset for host
-        setView("lobby");
-        setIsPreparing(false);
-        setGameCountdown(null);
       }
     }
   };
@@ -1036,7 +1037,7 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-game-border uppercase tracking-tight">Sair do Jogo?</h3>
-                <p className="text-game-border/60 font-medium">Seu progresso nesta partida solo será perdido. Tem certeza?</p>
+                <p className="text-game-border/60 font-medium">{isSolo ? "Seu progresso nesta partida será perdido." : "Você sairá da sala e a partida continuará para os demais."} Tem certeza?</p>
               </div>
               <div className="flex gap-4">
                 <button
@@ -1210,7 +1211,7 @@ export default function App() {
                       <motion.button
                         whileHover={{ scale: 1.15, rotate: 8 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => soundService.playClick()}
+                        onClick={() => { soundService.playClick(); setShowSettings(true); }}
                         className="w-16 h-16 bg-white border-4 border-[#1a0533] rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
                       >
                         <Settings className="w-8 h-8 text-[#9B59F5]" />
@@ -1465,7 +1466,7 @@ export default function App() {
               </div>
 
               {/* Setup options (only for creating games) */}
-              {view === "multiplayer_setup" && (
+              {(view === "setup" || view === "multiplayer_setup") && (
                 <div className="space-y-3">
                   {/* Rounds + Difficulty row */}
                   <div className="grid grid-cols-2 gap-3">
@@ -1710,6 +1711,15 @@ export default function App() {
               </AnimatePresence>
 
               <div className="flex items-center justify-between px-2 md:px-4 gap-2 md:gap-3 h-14 shrink-0 pt-1">
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => { soundService.playClick(); setShowExitConfirm(true); }}
+                  className="w-10 h-10 md:w-11 md:h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:bg-red-50 transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5 md:w-6 md:h-6 text-[#1a0533]" />
+                </motion.button>
+
                 <div className="cartoon-panel bg-white px-3 md:px-5 py-1 md:py-2 flex items-center gap-1 md:gap-2">
                   <span className="hidden md:block text-[10px] font-black opacity-40 uppercase tracking-widest text-[#1a0533]">Round</span>
                   <span className="text-lg md:text-2xl font-black italic text-[#9B59F5]">{currentRound + 1}<span className="text-sm md:text-lg opacity-50">/{roundCount}</span></span>
@@ -1718,7 +1728,7 @@ export default function App() {
                 <div className="flex-grow max-w-md h-7 md:h-8 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[3px_3px_0px_#1a0533]">
                   <motion.div
                     initial={false}
-                    animate={{ width: `${Math.max(0, (timeLeft || 0) / (timeLimitMap[difficulty] || 1)) * 100}%` }}
+                    animate={{ width: `${Math.max(0, (timeLeft || 0) / (TIME_LIMITS[difficulty] || 1)) * 100}%` }}
                     className={cn(
                       "h-full transition-colors duration-300",
                       (timeLeft === null || timeLeft === Infinity) ? "bg-[#4ECB71]" :
@@ -1782,6 +1792,19 @@ export default function App() {
                   ))}
                 </div>
 
+                {!showResult && selectedOption && players.some(p => !p.hasAnswered) && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                  >
+                    <div className="bg-[#9B59F5] border-4 border-[#1a0533] px-8 py-4 rounded-[2rem] shadow-[8px_8px_0px_#1a0533] flex flex-col items-center gap-4 animate-pulse backdrop-blur-sm">
+                      <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className="text-white font-black uppercase italic tracking-widest text-base md:text-xl cartoon-text-white">Aguardando jogadores...</span>
+                    </div>
+                  </motion.div>
+                )}
+
                 {showResult && (
                   <motion.div
                     initial={{ y: 50, opacity: 0 }}
@@ -1803,8 +1826,8 @@ export default function App() {
                 )}
               </div>
 
-              {/* Mini Placar fixo no rodapé para mobile, lateral para desktop */}
-              <div className="w-full h-16 shrink-0 bg-white border-4 border-[#1a0533] rounded-[2rem] p-3 flex items-center justify-center gap-4 overflow-x-auto no-scrollbar shadow-[0px_4px_0px_rgba(26,5,51,0.2)]">
+              {/* Mini Placar fixo no rodapé para desktop, escondido no mobile */}
+              <div className="hidden md:flex w-full h-16 shrink-0 bg-white border-4 border-[#1a0533] rounded-[2rem] p-3 items-center justify-center gap-4 overflow-x-auto no-scrollbar shadow-[0px_4px_0px_rgba(26,5,51,0.2)]">
                 {players.sort((a, b) => b.score - a.score).map((p, i) => (
                   <div key={p.id} className="flex items-center gap-2 shrink-0 bg-gray-100 px-4 py-2 rounded-2xl border-2 border-[#1a0533]">
                     <div className={cn("w-3 h-3 rounded-full border-2 border-[#1a0533]", p.hasAnswered ? "bg-[#4ECB71]" : "bg-white")} />
@@ -1903,6 +1926,56 @@ export default function App() {
               onSave={saveProfile}
               onCancel={() => setIsEditingProfile(false)}
             />
+          </div>
+        )}
+
+        {showSettings && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+             <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white border-4 border-[#1a0533] p-6 rounded-3xl w-full max-w-md flex flex-col gap-4 relative shadow-[8px_8px_0px_#1a0533]"
+             >
+                <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 w-10 h-10 bg-gray-100 border-2 border-[#1a0533] rounded-xl flex items-center justify-center hover:bg-gray-200">
+                   <X className="w-6 h-6 text-[#1a0533]" />
+                </button>
+                <h2 className="text-2xl font-black italic uppercase text-[#1a0533] tracking-tighter">Testar Conexões</h2>
+                <div className="flex flex-col gap-3 mt-4">
+                   <button onClick={async () => {
+                     setTestStatus(prev => ({ ...prev, supabase: 'testing' }));
+                     try {
+                        const { error } = await supabase.from('hymn_snippets').select('count').single();
+                        setTestStatus(prev => ({ ...prev, supabase: !error ? 'ok' : 'error' }));
+                     } catch(e) { setTestStatus(prev => ({ ...prev, supabase: 'error' })); }
+                   }} className="btn-cartoon btn-blue py-3 font-bold flex items-center justify-between px-6">
+                      <span>Testar Banco (Supabase)</span>
+                      <div className={cn("w-4 h-4 rounded-full border-2 border-black/20", testStatus.supabase === 'idle' ? 'bg-white/40' : testStatus.supabase === 'testing' ? 'bg-yellow-400 animate-pulse' : testStatus.supabase === 'ok' ? 'bg-green-400' : 'bg-red-500')} />
+                   </button>
+                   <button onClick={async () => {
+                      setTestStatus(prev => ({ ...prev, hymns: 'testing' }));
+                      if (hymns.length > 0) {
+                         setTestStatus(prev => ({ ...prev, hymns: 'ok' }));
+                      } else {
+                         setIsLoading(true);
+                         await loadHymns();
+                         setTestStatus(prev => ({ ...prev, hymns: hymns.length > 0 ? 'ok' : 'error' }));
+                         setIsLoading(false);
+                      }
+                   }} className="btn-cartoon btn-yellow py-3 font-bold flex items-center justify-between px-6">
+                      <span>Testar Hinos</span>
+                      <div className={cn("w-4 h-4 rounded-full border-2 border-black/20", testStatus.hymns === 'idle' ? 'bg-white/40' : testStatus.hymns === 'testing' ? 'bg-yellow-400 animate-pulse' : testStatus.hymns === 'ok' ? 'bg-green-400' : 'bg-red-500')} />
+                   </button>
+                   <button onClick={() => {
+                      setTestStatus(prev => ({ ...prev, multiplayer: 'testing' }));
+                      // Postgres realtime check implies DB is online
+                      setTimeout(() => setTestStatus(prev => ({ ...prev, multiplayer: testStatus.supabase === 'error' ? 'error' : 'ok' })), 1000);
+                   }} className="btn-cartoon btn-purple py-3 font-bold text-white flex items-center justify-between px-6">
+                      <span>Testar Multiplayer</span>
+                      <div className={cn("w-4 h-4 rounded-full border-2 border-white/20", testStatus.multiplayer === 'idle' ? 'bg-white/30' : testStatus.multiplayer === 'testing' ? 'bg-yellow-400 animate-pulse' : testStatus.multiplayer === 'ok' ? 'bg-[#4ECB71]' : 'bg-[#FF4757]')} />
+                   </button>
+                </div>
+             </motion.div>
           </div>
         )}
       </AnimatePresence>

@@ -1,7 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 
-
 export interface Player {
   id: string;
   nickname: string;
@@ -17,79 +16,56 @@ export interface Player {
 export interface Room {
   id: string;
   hostId: string;
-  gameStarted: boolean;
-  players: Player[];
-  questions?: any[];
+  phase: 'lobby' | 'preparing' | 'answering' | 'result' | 'ranking';
+  currentRound: number;
   roundCount: number;
+  difficulty: string;
+  deadlineAt: number | null;
+  questions?: any[];
 }
 
 let channel: RealtimeChannel | null = null;
 let currentRoomId: string | null = null;
-let localPlayer: Player | null = null;
-let isGameStarted = false;
-let discoveryChannel: RealtimeChannel | null = null;
-let clientIp: string | null = null;
+let localPlayerId: string | null = null;
 
-// Global callbacks to be assigned when React component mounts
 let _onPlayersChange: ((players: Player[]) => void) | null = null;
 let _onRoomUpdate: ((room: Room) => void) | null = null;
-let _onRoundEnd: (() => void) | null = null;
-let _onNextRound: ((round: number) => void) | null = null;
-let _onGameReset: (() => void) | null = null;
-let _onGameStarted: ((data: { questions: any[]; roundCount: number; difficulty: string }) => void) | null = null;
-let _onPlayerAnswered: ((data: { playerId: string; correct: boolean; round: number }) => void) | null = null;
-let _onNearbyRoomsChange: ((rooms: { id: string; hostName: string }[]) => void) | null = null;
 
-const getClientIp = async () => {
-  if (clientIp) return clientIp;
-  const services = [
-    'https://api64.ipify.org?format=json',
-    'https://api.ipify.org?format=json',
-    'https://ipapi.co/json/'
-  ];
+const mapRoom = (row: any): Room => ({
+  id: row.id,
+  hostId: row.host_id,
+  phase: row.phase,
+  currentRound: row.current_round,
+  roundCount: row.round_count,
+  difficulty: row.difficulty,
+  deadlineAt: row.deadline_at ? Number(row.deadline_at) : null,
+  questions: row.questions,
+});
 
-  for (const url of services) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      const data = await res.json();
-      clientIp = data.ip || data.query;
-      if (clientIp) return clientIp;
-    } catch (e) {
-      continue;
-    }
+const mapPlayer = (row: any): Player => ({
+  id: row.id,
+  nickname: row.nickname,
+  avatar: row.avatar,
+  isHost: row.is_host,
+  isReady: row.is_ready,
+  score: row.score,
+  hasAnswered: row.has_answered,
+  round: row.round,
+  joinedAt: row.joined_at ? Number(row.joined_at) : 0,
+});
+
+const refreshPlayers = async (roomId: string) => {
+  const { data } = await supabase.from('players').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
+  if (data) {
+    _onPlayersChange?.(data.map(mapPlayer));
   }
-  return 'unknown';
 };
 
-const triggerSync = () => {
-  if (!channel || !currentRoomId) return;
-  const state = channel.presenceState();
-  const uniquePlayers = new Map<string, Player>();
-  
-  Object.values(state).forEach((presences: any) => {
-    presences.forEach((p: Player) => {
-      uniquePlayers.set(p.id, p);
-    });
-  });
-
-  const playersList = Array.from(uniquePlayers.values());
-  const sortedPlayers = playersList.sort((a, b) => a.joinedAt - b.joinedAt);
-  const host = sortedPlayers.find(p => p.isHost) || sortedPlayers[0];
-  
-  _onPlayersChange?.(sortedPlayers);
-  
-  const room: Room = {
-    id: currentRoomId,
-    hostId: host?.id || '',
-    gameStarted: isGameStarted, 
-    players: sortedPlayers,
-    roundCount: 5
-  };
-  
-  _onRoomUpdate?.(room);
+const refreshRoom = async (roomId: string) => {
+  const { data } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+  if (data) {
+    _onRoomUpdate?.(mapRoom(data));
+  }
 };
 
 export const multiplayerService = {
@@ -100,299 +76,244 @@ export const multiplayerService = {
         roomId += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     
-    const player: Player = {
-      id: Math.random().toString(36).substring(2, 10),
-      nickname,
-      avatar,
-      isHost: true,
-      isReady: false,
-      score: 0,
-      hasAnswered: false,
-      round: 0,
-      joinedAt: Date.now(),
-    };
+    const playerId = Math.random().toString(36).substring(2, 10);
+    const joinedAt = Date.now();
 
-    const room: Room = {
+    // Insert Room
+    const { data: roomData, error: roomError } = await supabase.from('rooms').insert({
       id: roomId,
-      hostId: player.id,
-      gameStarted: false,
-      players: [player],
-      roundCount: 5,
-    };
+      host_id: playerId,
+      phase: 'lobby',
+      current_round: 0,
+      round_count: 5,
+      difficulty: 'facil'
+    }).select().single();
 
-    try {
-      await this.initChannel(roomId, player);
-      // Start broadcasting for discovery
-      this.startDiscoveryBroadcast(roomId, player.nickname);
-      return { room, player };
-    } catch (error) {
-      console.error("Error creating room:", error);
+    if (roomError) {
+      console.error("Error creating room DB:", roomError);
       return null;
     }
+
+    // Insert Player
+    const { data: playerData, error: playerError } = await supabase.from('players').insert({
+      id: playerId,
+      room_id: roomId,
+      nickname,
+      avatar,
+      is_host: true,
+      is_ready: false,
+      score: 0,
+      has_answered: false,
+      round: 0,
+      joined_at: joinedAt
+    }).select().single();
+
+    if (playerError) {
+      console.error("Error creating player DB:", playerError);
+      return null;
+    }
+
+    await this.initChannel(roomId, playerId);
+    return { room: mapRoom(roomData), player: mapPlayer(playerData) };
   },
 
   async joinRoom(roomId: string, nickname: string, avatar?: string): Promise<Player | null> {
-    const player: Player = {
-      id: Math.random().toString(36).substring(2, 10),
+    roomId = roomId.toUpperCase();
+    const playerId = Math.random().toString(36).substring(2, 10);
+    
+    const { data, error } = await supabase.from('players').insert({
+      id: playerId,
+      room_id: roomId,
       nickname,
       avatar,
-      isHost: false,
-      isReady: false,
+      is_host: false,
+      is_ready: false,
       score: 0,
-      hasAnswered: false,
+      has_answered: false,
       round: 0,
-      joinedAt: Date.now(),
-    };
+      joined_at: Date.now()
+    }).select().single();
 
-    try {
-      await this.initChannel(roomId.toUpperCase(), player);
-      return player;
-    } catch (error) {
-      console.error("Error joining room:", error);
+    if (error) {
+      console.error("Error joining room DB:", error);
       return null;
     }
+
+    await this.initChannel(roomId, playerId);
+    return mapPlayer(data);
   },
 
-  async initChannel(roomId: string, player: Player) {
+  async initChannel(roomId: string, playerId: string) {
     if (channel) {
       await supabase.removeChannel(channel);
     }
 
     currentRoomId = roomId;
-    localPlayer = player;
+    localPlayerId = playerId;
     
-    channel = supabase.channel(`room:${roomId}`, {
-      config: {
-        presence: {
-          key: player.id,
-        },
-        broadcast: { self: false },
-      },
-    });
+    channel = supabase.channel(`room_db:${roomId}`);
 
-    // ATTACH LISTENERS BEFORE SUBSCRIBING
     channel
-      .on('presence', { event: 'sync' }, triggerSync)
-      .on('presence', { event: 'join' }, triggerSync)
-      .on('presence', { event: 'leave' }, triggerSync)
-      .on('broadcast', { event: 'game:start' }, ({ payload }) => {
-        isGameStarted = true;
-        _onGameStarted?.(payload);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
+        if (payload.new) {
+          _onRoomUpdate?.(mapRoom(payload.new));
+        }
       })
-      .on('broadcast', { event: 'game:next_round' }, ({ payload }) => {
-        _onNextRound?.(payload?.round ?? 0);
-      })
-      .on('broadcast', { event: 'game:reset' }, () => {
-        isGameStarted = false;
-        _onGameReset?.();
-      })
-      .on('broadcast', { event: 'player:answered' }, ({ payload }) => {
-        _onPlayerAnswered?.(payload);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+        refreshPlayers(roomId);
       });
 
-    return new Promise((resolve, reject) => {
-      channel!
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await channel!.track(player);
-            resolve(true);
-          }
-          if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-            reject(new Error("Supabase signal timeout"));
-          }
-        });
+    await new Promise((resolve) => {
+      channel!.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          resolve(true);
+        }
+      });
     });
+
+    // Initial fetch
+    refreshRoom(roomId);
+    refreshPlayers(roomId);
   },
 
-  toggleReady(roomId: string, isReady: boolean) {
-    if (channel && localPlayer) {
-      localPlayer.isReady = isReady;
-      channel.track(localPlayer);
+  async toggleReady(roomId: string, isReady: boolean) {
+    if (localPlayerId) {
+      await supabase.from('players').update({ is_ready: isReady }).eq('id', localPlayerId);
     }
   },
 
-  updateScore(roomId: string, correct: boolean, score: number, round: number) {
-    if (channel && localPlayer) {
-      localPlayer.score += score;
-      localPlayer.hasAnswered = true;
-      localPlayer.round = round;
-      channel.track(localPlayer);
-      
-      // If correct, broadcast answer event if needed (optional)
-      channel.send({
-        type: 'broadcast',
-        event: 'player:answered',
-        payload: { playerId: localPlayer.id, correct, round }
-      });
+  async submitAnswer(roomId: string, correct: boolean, score: number, round: number) {
+    if (localPlayerId) {
+      // We must fetch the current score first, or do an RPC. For simplicity, since it's a quiz, 
+      // we can read it from the local state array if needed, but it's safer to read from DB.
+      const { data } = await supabase.from('players').select('score').eq('id', localPlayerId).single();
+      const currentScore = data?.score || 0;
+
+      await supabase.from('players').update({
+        has_answered: true,
+        score: currentScore + score,
+        round: round
+      }).eq('id', localPlayerId);
     }
   },
 
-  startGameWithQuestions(roomId: string, questions: any[], roundCount: number, difficulty: string) {
-    if (channel) {
-      isGameStarted = true;
-      // Stop broadcasting for discovery when game starts
-      this.stopDiscoveryBroadcast();
-      channel.send({
-        type: 'broadcast',
-        event: 'game:start',
-        payload: { questions, roundCount, difficulty }
-      });
-    }
+  // Host Actions
+  async startGame(roomId: string, questions: any[], roundCount: number, difficulty: string) {
+    await supabase.from('rooms').update({
+      phase: 'preparing',
+      questions: questions,
+      round_count: roundCount,
+      difficulty: difficulty,
+      current_round: 0,
+      deadline_at: Date.now() + 3000 // 3 seconds preparing
+    }).eq('id', roomId);
   },
 
-  resetRoom(roomId: string) {
-    if (channel && localPlayer) {
-      isGameStarted = false;
-      // Reset local player first
-      localPlayer.score = 0;
-      localPlayer.hasAnswered = false;
-      localPlayer.isReady = false;
-      channel.track(localPlayer);
-      
-      channel.send({
-        type: 'broadcast',
-        event: 'game:reset',
-        payload: {}
-      });
-    }
+  async startRound(roomId: string, roundIndex: number, timeLimitSec: number) {
+    // Reset all players has_answered for this room
+    await supabase.from('players').update({ has_answered: false, round: roundIndex }).eq('room_id', roomId);
+
+    await supabase.from('rooms').update({
+      phase: 'answering',
+      current_round: roundIndex,
+      deadline_at: timeLimitSec === Infinity ? null : Date.now() + (timeLimitSec * 1000)
+    }).eq('id', roomId);
   },
 
-  nextRound(roomId: string, nextRoundIndex: number) {
-    if (channel && localPlayer) {
-      this.resetPlayerRoundState(nextRoundIndex);
-
-      channel.send({
-        type: 'broadcast',
-        event: 'game:next_round',
-        payload: { round: nextRoundIndex }
-      });
-    }
+  async endRound(roomId: string) {
+    await supabase.from('rooms').update({
+      phase: 'result',
+      deadline_at: Date.now() + 4000 // 4 seconds showing results
+    }).eq('id', roomId);
   },
 
-  resetPlayerRoundState(round: number) {
-    if (channel && localPlayer) {
-      localPlayer.hasAnswered = false;
-      localPlayer.round = round;
-      channel.track(localPlayer);
-    }
+  async finishGame(roomId: string) {
+    await supabase.from('rooms').update({
+      phase: 'ranking',
+      deadline_at: null
+    }).eq('id', roomId);
   },
 
-  leaveRoom() {
+  async resetRoom(roomId: string) {
+    // Reset players
+    await supabase.from('players').update({
+      score: 0,
+      has_answered: false,
+      is_ready: false,
+      round: 0
+    }).eq('room_id', roomId);
+
+    // Reset room
+    await supabase.from('rooms').update({
+      phase: 'lobby',
+      current_round: 0,
+      deadline_at: null
+    }).eq('id', roomId);
+  },
+
+  async deleteRoom(roomId: string) {
+    // Note: If you have foreign keys set to CASCADE on 'players', deleting the room is enough.
+    // Otherwise, we delete players first.
+    await supabase.from('players').delete().eq('room_id', roomId);
+    await supabase.from('rooms').delete().eq('id', roomId);
+  },
+
+  async leaveRoom() {
+    if (localPlayerId && currentRoomId) {
+      await supabase.from('players').delete().eq('id', localPlayerId);
+    }
     if (channel) {
       supabase.removeChannel(channel);
       channel = null;
     }
-    isGameStarted = false;
     currentRoomId = null;
-    localPlayer = null;
-    this.stopDiscoveryBroadcast();
+    localPlayerId = null;
   },
 
-  async startDiscoveryBroadcast(roomId: string, hostName: string) {
-    const ip = await getClientIp();
-    if (discoveryChannel) {
-       await supabase.removeChannel(discoveryChannel);
-    }
-
-    discoveryChannel = supabase.channel('lobby_discovery', {
-      config: { 
-        presence: { key: roomId },
-        broadcast: { self: true }
-      }
-    });
-
-    discoveryChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await discoveryChannel!.track({ roomId, hostName, ip, createdAt: Date.now(), isLobby: true });
-      }
-    });
-  },
-
-  stopDiscoveryBroadcast() {
-    if (discoveryChannel) {
-      supabase.removeChannel(discoveryChannel);
-      discoveryChannel = null;
-    }
-  },
-
+  // Discovery (Keeping it simple for nearby rooms, could use a 'lobbies' view)
   async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
-    _onNearbyRoomsChange = onNearbyRoomsChange;
-    const myIp = await getClientIp();
-
-    if (discoveryChannel) {
-      await supabase.removeChannel(discoveryChannel);
-    }
-
-    discoveryChannel = supabase.channel('lobby_discovery', {
-      config: { broadcast: { self: true } }
-    });
-
-    const updateNearbyList = () => {
-      if (!discoveryChannel) return;
-      const state = discoveryChannel.presenceState();
-      const rooms: { id: string; hostName: string }[] = [];
-      
-      Object.values(state).forEach((presences: any) => {
-        presences.forEach((p: any) => {
-          // IP matching or fallback to 'unknown' if both fail
-          const ipMatches = (p.ip === myIp && myIp !== 'unknown') || (p.ip === 'unknown' && myIp === 'unknown');
-          
-          if (p.isLobby && ipMatches && p.roomId && (Date.now() - (p.createdAt || 0) < 3600000)) {
-            if (!rooms.find(r => r.id === p.roomId)) {
-               rooms.push({ id: p.roomId, hostName: p.hostName });
-            }
-          }
-        });
-      });
-      
-      _onNearbyRoomsChange?.(rooms);
+    const fetchLobbies = async () => {
+      const { data } = await supabase.from('rooms').select('id, players(nickname)').eq('phase', 'lobby');
+      if (data) {
+         const formatted = data.map((r: any) => ({ id: r.id, hostName: r.players?.[0]?.nickname || 'Host' }));
+         onNearbyRoomsChange(formatted);
+      }
     };
-
-    discoveryChannel
-      .on('presence', { event: 'sync' }, updateNearbyList)
-      .on('presence', { event: 'join' }, updateNearbyList)
-      .on('presence', { event: 'leave' }, updateNearbyList)
+    
+    fetchLobbies();
+    
+    const channel = supabase.channel('lobby_discovery_db')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+         fetchLobbies();
+      })
       .subscribe();
+      
+    (this as any)._discoveryChannel = channel;
   },
 
   stopDiscoveryListener() {
-    this.stopDiscoveryBroadcast();
-    _onNearbyRoomsChange = null;
+    if ((this as any)._discoveryChannel) {
+      supabase.removeChannel((this as any)._discoveryChannel);
+      (this as any)._discoveryChannel = null;
+    }
   },
 
   subscribeToRoom(
     roomId: string,
     onPlayersChange: (players: Player[]) => void,
-    onRoomUpdate: (room: Room) => void,
-    onRoundEnd?: () => void,
-    onNextRound?: (round: number) => void,
-    onGameReset?: () => void,
-    onGameStarted?: (data: { questions: any[]; roundCount: number; difficulty: string }) => void,
-    onPlayerAnswered?: (data: { playerId: string; correct: boolean; round: number }) => void
+    onRoomUpdate: (room: Room) => void
   ) {
-    // Assign the callbacks provided by the React hook to our global variables
     _onPlayersChange = onPlayersChange;
     _onRoomUpdate = onRoomUpdate;
-    _onRoundEnd = onRoundEnd || null;
-    _onNextRound = onNextRound || null;
-    _onGameReset = onGameReset || null;
-    _onGameStarted = onGameStarted || null;
-    _onPlayerAnswered = onPlayerAnswered || null;
 
-    // If channel is already present (e.g. view changed), trigger sync immediately
-    // to populate UI with the current presence state.
     if (channel && currentRoomId === roomId) {
-       triggerSync();
+      refreshRoom(roomId);
+      refreshPlayers(roomId);
     }
 
     return () => {
-      // Clear the callbacks when the component unmounts
       _onPlayersChange = null;
       _onRoomUpdate = null;
-      _onRoundEnd = null;
-      _onNextRound = null;
-      _onGameReset = null;
-      _onGameStarted = null;
     };
   },
 };
