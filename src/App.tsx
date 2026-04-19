@@ -393,6 +393,51 @@ export default function App() {
     prevPlayersRef.current = players;
   }, [players]);
 
+  // Fallback: Poll players every 3 seconds to ensure sync
+  useEffect(() => {
+    if (!roomId || isSolo) return;
+    
+    const pollInterval = setInterval(async () => {
+      if (!roomId) return;
+      const { data } = await supabase.from('players').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
+      if (data) {
+        const dbPlayers = data.map((row: any) => ({
+          id: row.id,
+          nickname: row.nickname,
+          avatar: row.avatar,
+          isHost: row.is_host,
+          isReady: row.is_ready,
+          score: row.score || 0,
+          hasAnswered: row.has_answered || false,
+          lastAnswerTime: 0,
+          joinedAt: row.joined_at ? Number(row.joined_at) : 0
+        }));
+        
+        // Force update with server data
+        const currentIds = new Set(dbPlayers.map(p => p.id));
+        const prev = prevPlayersRef.current;
+        
+        // Check for departures
+        for (const p of prev) {
+          if (!currentIds.has(p.id) && p.id !== localPlayerId) {
+            setLeftPlayerName(p.nickname);
+            setTimeout(() => setLeftPlayerName(null), 4000);
+            break;
+          }
+        }
+        
+        prevPlayersRef.current = dbPlayers;
+        
+        setPlayers(prev => dbPlayers.map(dbp => {
+          const existing = prev.find(player => player.id === dbp.id);
+          return { ...dbp, lastAnswerTime: existing?.lastAnswerTime || 0 };
+        }));
+      }
+    }, 3000);
+    
+    return () => clearInterval(pollInterval);
+  }, [roomId, isSolo]);
+
   // Handle Multiplayer Subscriptions
   useEffect(() => {
     if (!roomId || isSolo) return;
