@@ -780,6 +780,7 @@ export default function App() {
           const player = await multiplayerService.joinRoom(roomId, profile.nickname, profile.avatarUrl);
           if (player) {
             setLocalPlayerId(player.id);
+            setIsSolo(false);
             setPlayers(prev => {
               if (prev.some(p => p.id === player.id)) return prev;
               return [...prev, {
@@ -795,10 +796,15 @@ export default function App() {
             });
             setView("lobby");
           } else {
+            setIsSolo(true);
+            setRoomId(null);
+            setLocalPlayerId(null);
             alert("Sala não encontrada ou erro ao entrar. Verifique o código.");
+            setView("home");
           }
         } else {
           // Create new
+          setIsSolo(false);
           const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl);
           if (result) {
             setRoomId(result.room.id);
