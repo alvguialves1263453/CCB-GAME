@@ -449,13 +449,25 @@ export default function App() {
         // Debounce slightly to allow UI to show final answer states
         const timer = setTimeout(() => {
           if (isGameActiveRef.current && !showResultRef.current) {
-            handleRoundEnd();
+            if (isSolo) {
+              handleRoundEnd();
+            } else {
+              // Show results immediately to avoid DB latency freeze
+              showResultRef.current = true;
+              setIsGameActive(false);
+              setShowResult(true);
+              
+              const me = playersRef.current.find(p => p.id === localPlayerId);
+              if (me?.isHost && roomId) {
+                 multiplayerService.endRound(roomId);
+              }
+            }
           }
         }, 500);
         return () => clearTimeout(timer);
       }
     }
-  }, [players, isGameActive, showResult]);
+  }, [players, isGameActive, showResult, isSolo, localPlayerId, roomId]);
  
   // Bot logic for Solo mode
   useEffect(() => {
@@ -861,25 +873,16 @@ export default function App() {
           if (isSolo) {
             handleRoundEnd();
           } else {
+            showResultRef.current = true;
+            setIsGameActive(false);
+            setShowResult(true);
+            
             const me = playersRef.current.find(p => p.id === localPlayerId);
             if (me?.isHost && roomId) {
-               showResultRef.current = true; // Impede spam
                multiplayerService.endRound(roomId);
             }
           }
         }
-      }
-      
-      // 2. Host transition handler for when everyone has answered
-      if (!isSolo && isGameActiveRef.current && !showResultRef.current && playersRef.current.length > 0) {
-         const allAnswered = playersRef.current.every(p => p.hasAnswered);
-         if (allAnswered) {
-             const me = playersRef.current.find(p => p.id === localPlayerId);
-             if (me?.isHost && roomId) {
-                 showResultRef.current = true; // Impede spam no banco de dados
-                 multiplayerService.endRound(roomId);
-             }
-         }
       }
     }, 50);
 
