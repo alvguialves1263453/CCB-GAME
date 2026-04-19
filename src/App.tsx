@@ -1770,12 +1770,12 @@ export default function App() {
                     onClick={() => { soundService.playClick(); setShowQrModal(true); }}
                     className="btn-cartoon btn-yellow px-4 py-1.5 text-xs gap-2 whitespace-nowrap"
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
-                    QR Code
+                    <Users className="w-4 h-4" />
+                    Convidar
                   </motion.button>
                 )}
 
-                {/* QR Code Modal */}
+                {/* Invite Modal */}
                 {showQrModal && roomId && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -1789,20 +1789,44 @@ export default function App() {
                       animate={{ scale: 1, y: 0 }}
                       exit={{ scale: 0.8, y: 30 }}
                       onClick={e => e.stopPropagation()}
-                      className="bg-white border-4 border-[#1a0533] rounded-[2rem] p-6 flex flex-col items-center gap-4 shadow-[8px_8px_0px_#1a0533] max-w-xs w-full"
+                      className="bg-white border-4 border-[#1a0533] rounded-[2rem] p-6 flex flex-col items-center gap-4 shadow-[8px_8px_0px_#1a0533] max-w-sm w-full"
                     >
-                      <h3 className="text-xl font-black uppercase italic text-[#1a0533] cartoon-text">Escaneie para Entrar</h3>
-                      <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-2 shadow-[4px_4px_0px_#1a0533]">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?room=' + roomId)}`}
-                          alt="QR Code da sala"
-                          className="w-44 h-44 rounded-xl"
-                        />
+                      <h3 className="text-xl font-black uppercase italic text-[#1a0533] cartoon-text">Convidar Amigos</h3>
+                      
+                      {/* QR Code Button */}
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowQrModal(true)}
+                        className="w-full btn-cartoon btn-purple p-4 flex items-center justify-center gap-3"
+                      >
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
+                        <span className="font-black uppercase">QR Code</span>
+                      </motion.button>
+
+                      {/* Copy Link Button */}
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          soundService.playClick();
+                          const link = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+                          navigator.clipboard.writeText(link);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="w-full btn-cartoon btn-green p-4 flex items-center justify-center gap-3"
+                      >
+                        <Globe className="w-6 h-6" />
+                        <span className="font-black uppercase">{copied ? "Link Copiado!" : "Copiar Link"}</span>
+                      </motion.button>
+
+                      {/* Room Code Display */}
+                      <div className="w-full bg-[#FFD700] border-4 border-[#1a0533] rounded-xl p-4 flex flex-col items-center gap-2 shadow-[4px_4px_0px_#1a0533]">
+                        <span className="text-xs font-black uppercase text-[#1a0533]/70">Código da Sala</span>
+                        <div className="text-3xl font-black italic tracking-widest text-[#1a0533]">{roomId}</div>
                       </div>
-                      <div className="bg-[#9B59F5] text-white px-5 py-2 rounded-full border-2 border-[#1a0533] font-black uppercase tracking-widest text-base shadow-[3px_3px_0px_#1a0533]">
-                        SALA: {roomId}
-                      </div>
-                      <p className="text-xs text-[#1a0533]/60 font-bold text-center">Aponte a câmera para o código ou compartilhe o código da sala</p>
+
                       <button
                         onClick={() => setShowQrModal(false)}
                         className="w-full py-2 bg-gray-100 border-4 border-[#1a0533] rounded-xl font-black uppercase text-sm hover:bg-gray-200 transition-colors cursor-pointer shadow-[3px_3px_0px_#1a0533]"
