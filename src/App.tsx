@@ -554,17 +554,26 @@ export default function App() {
              setSelectedOption(null);
              setFeedback(null);
              setResultCountdown(null);
-             setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
-             
-             // Start timer - use deadline from DB or calculate from current time
-             if (room.deadlineAt) {
-               roomDeadlineRef.current = room.deadlineAt;
-             } else if (difficultyRef.current !== 'facil') {
-               roomDeadlineRef.current = Date.now() + TIME_LIMITS[difficultyRef.current] * 1000;
-             } else {
-               roomDeadlineRef.current = null;
-             }
-             startTimeRef.current = Date.now();
+setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
+              
+              // Calculate deadline with network latency compensation
+              const diff = difficultyRef.current;
+              if (diff !== 'facil') {
+                const timeLimitMs = TIME_LIMITS[diff] * 1000;
+                
+                if (room.deadlineAt) {
+                  // Use deadline from DB, but subtract estimated network latency (500ms for safety)
+                  const networkLatencyCompensation = 500;
+                  const adjustedDeadline = room.deadlineAt - networkLatencyCompensation;
+                  roomDeadlineRef.current = Math.max(Date.now(), adjustedDeadline);
+                } else {
+                  // Fallback: calculate from current time
+                  roomDeadlineRef.current = Date.now() + timeLimitMs;
+                }
+              } else {
+                roomDeadlineRef.current = null;
+              }
+              startTimeRef.current = Date.now();
           } else {
             // Update deadline if it changed
             roomDeadlineRef.current = room.deadlineAt;
@@ -739,6 +748,7 @@ export default function App() {
           // Set deadline locally on host immediately so timer starts right away
           if (timeLimitSec !== Infinity && timeLimitSec > 0) {
             roomDeadlineRef.current = Date.now() + timeLimitSec * 1000;
+            startTimeRef.current = Date.now();
           } else {
             roomDeadlineRef.current = null;
           }
@@ -1097,25 +1107,25 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
       if (currentDifficulty === 'facil') return;
       
       const timeLimit = TIME_LIMITS[currentDifficulty];
+      const startTime = startTimeRef.current;
       let remaining = 0;
       
-      // For solo, use start time
+      // For solo, always use start time
       if (isSolo) {
-        const timeSpent = (Date.now() - startTimeRef.current) / 1000;
+        const timeSpent = (Date.now() - startTime) / 1000;
         remaining = Math.max(0, timeLimit - timeSpent);
-      } else if (roomDeadlineRef.current) {
-        // Use deadline from host
-        remaining = Math.max(0, (roomDeadlineRef.current - Date.now()) / 1000);
-        
-        // If deadline expired but we're still here, use start time as fallback
-        if (remaining <= 0) {
-          const elapsed = (Date.now() - startTimeRef.current) / 1000;
-          remaining = Math.max(0, timeLimit - elapsed);
-        }
       } else {
-        // No deadline - use start time fallback
-        const elapsed = (Date.now() - startTimeRef.current) / 1000;
-        remaining = Math.max(0, timeLimit - elapsed);
+        // For multiplayer: prefer roomDeadline, but also calculate from startTime as fallback
+        const deadline = roomDeadlineRef.current;
+        
+        if (deadline && deadline > Date.now()) {
+          // Deadline is valid
+          remaining = (deadline - Date.now()) / 1000;
+        } else {
+          // Fallback: calculate from start time (handles network latency)
+          const timeSpent = (Date.now() - startTime) / 1000;
+          remaining = Math.max(0, timeLimit - timeSpent);
+        }
       }
 
       setTimeLeft(remaining);
