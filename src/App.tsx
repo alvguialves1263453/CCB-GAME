@@ -238,6 +238,7 @@ export default function App() {
   const [isManualJoin, setIsManualJoin] = useState(false);
   const [resultCountdown, setResultCountdown] = useState<number | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [testStatus, setTestStatus] = useState({
     supabase: 'idle',
@@ -1793,16 +1794,33 @@ export default function App() {
                     >
                       <h3 className="text-xl font-black uppercase italic text-[#1a0533] cartoon-text">Convidar Amigos</h3>
                       
-                      {/* QR Code Button */}
+                      {showQrCode ? (
+                        <div className="w-full flex flex-col items-center gap-3">
+                          <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-2 shadow-[4px_4px_0px_#1a0533]">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?room=' + roomId)}`}
+                              alt="QR Code da sala"
+                              className="w-36 h-36 rounded-xl"
+                            />
+                          </div>
+                          <button
+                            onClick={() => setShowQrCode(false)}
+                            className="text-xs text-[#9B59F5] font-black uppercase hover:underline"
+                          >
+                            Voltar
+                          </button>
+                        </div>
+                      ) : (
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setShowQrModal(true)}
+                        onClick={() => setShowQrCode(true)}
                         className="w-full btn-cartoon btn-purple p-4 flex items-center justify-center gap-3"
                       >
                         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
                         <span className="font-black uppercase">QR Code</span>
                       </motion.button>
+                      )}
 
                       {/* Copy Link Button */}
                       <motion.button
