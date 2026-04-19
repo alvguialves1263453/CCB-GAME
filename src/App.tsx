@@ -240,6 +240,8 @@ export default function App() {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [leftPlayerName, setLeftPlayerName] = useState<string | null>(null);
+  const [hostLeft, setHostLeft] = useState(false);
   const [testStatus, setTestStatus] = useState({
     supabase: 'idle',
     hymns: 'idle',
@@ -392,6 +394,29 @@ export default function App() {
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
       (dbPlayers) => {
+        // Check if a player left
+        const prevPlayerIds = new Set((playersRef.current || []).map(p => p.id));
+        const currentPlayerIds = new Set(dbPlayers.map(p => p.id));
+        
+        // Find which player left
+        for (const pid of prevPlayerIds) {
+          if (!currentPlayerIds.has(pid) && pid !== localPlayerId) {
+            const leftName = playersRef.current.find(p => p.id === pid)?.nickname || 'Jogador';
+            setLeftPlayerName(leftName);
+            setTimeout(() => setLeftPlayerName(null), 4000);
+          }
+        }
+
+        // Check if room was deleted (host left)
+        if (!room) {
+          setHostLeft(true);
+          setTimeout(() => {
+            setHostLeft(false);
+            setView("home");
+          }, 3000);
+          return;
+        }
+
         setPlayers(prev => {
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
@@ -1097,6 +1122,46 @@ export default function App() {
             : "bg-transparent"
         )}
       />
+
+      {/* Player Left Notification */}
+      <AnimatePresence>
+        {leftPlayerName && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.8 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[150] bg-red-500 text-white px-6 py-3 rounded-2xl border-4 border-white shadow-[4px_4px_0px_#1a0533]"
+          >
+            <p className="font-black text-sm uppercase whitespace-nowrap">
+              ✨ {leftPlayerName} saiu da sala
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Host Left - Room Closed Notification */}
+      <AnimatePresence>
+        {hostLeft && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white border-4 border-[#1a0533] rounded-[2rem] p-8 flex flex-col items-center gap-4 shadow-[8px_8px_0px_#1a0533] max-w-sm w-full"
+            >
+              <div className="w-20 h-20 bg-red-100 text-red-500 rounded-3xl mx-auto flex items-center justify-center">
+                <X className="w-12 h-12" />
+              </div>
+              <h3 className="text-2xl font-black uppercase text-[#1a0533]">Sala Encerrada</h3>
+              <p className="text-[#1a0533]/70 font-medium text-center">O host encerrou a sala.</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showUnreadyConfirm && (
