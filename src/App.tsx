@@ -1701,34 +1701,31 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                           setRoomId(game.id);
                           setView("multiplayer_join");
                         }}
-                        className="w-full p-2 bg-gray-50 border-3 border-[#1a0533] rounded-lg flex items-center justify-between game-shadow-hover"
+                        className="w-full h-10 bg-gray-50 border-2 border-[#1a0533] rounded-lg flex items-center justify-between px-2 game-shadow-hover"
                       >
                         <div className="flex items-center gap-2">
                           {game.hostAvatar ? (
-                            <Avatar url={game.hostAvatar} size={100} className="w-8 h-8 rounded-lg" />
+                            <Avatar url={game.hostAvatar} size={100} className="w-6 h-6 rounded-md" />
                           ) : (
-                            <div className="w-8 h-8 bg-[#9B59F5] border-2 border-[#1a0533] rounded-lg flex items-center justify-center text-white text-xs font-black">
+                            <div className="w-6 h-6 bg-[#9B59F5] border border-[#1a0533] rounded-md flex items-center justify-center text-white text-[8px] font-black">
                               {(game.hostName || 'H').charAt(0).toUpperCase()}
                             </div>
                           )}
-                          <div className="text-left">
-                            <p className="font-black text-xs text-[#1a0533]">{game.hostName || "Sala"}</p>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <span className={cn(
-                                "text-[7px] font-black uppercase px-1 py-0.5 rounded",
-                                game.difficulty === 'facil' ? "bg-[#4ECB71] text-white" :
-                                game.difficulty === 'medio' ? "bg-[#FFD700] text-[#1a0533]" :
-                                "bg-[#FF4757] text-white"
-                              )}>
-                                {game.difficulty === 'facil' ? 'L' : game.difficulty === 'medio' ? 'M' : 'R'}
-                              </span>
-                              <span className="text-[7px] text-gray-500 font-black">
-                                {game.roundCount}x
-                              </span>
-                            </div>
-                          </div>
+                          <p className="font-black text-[10px] text-[#1a0533]">{game.hostName || "Sala"}</p>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-[#1a0533]" />
+                        <div className="flex items-center gap-1">
+                          <span className={cn(
+                            "text-[8px] font-black uppercase px-1 py-0.5 rounded",
+                            game.difficulty === 'facil' ? "bg-[#4ECB71] text-white" :
+                            game.difficulty === 'medio' ? "bg-[#FFD700] text-[#1a0533]" :
+                            "bg-[#FF4757] text-white"
+                          )}>
+                            {game.difficulty === 'facil' ? 'Lento' : game.difficulty === 'medio' ? 'Médio' : 'Rápido'}
+                          </span>
+                          <span className="text-[8px] text-gray-500 font-black">
+                            {game.roundCount} rod
+                          </span>
+                        </div>
                       </button>
                     ))
                   )}
