@@ -336,10 +336,29 @@ export default function App() {
     soundService.playClick();
   };
 
-  // Clean up and leave room when going home
+  // Clean up and leave/delete room when game ends (ranking) or going home
   useEffect(() => {
+    // Delete room when game ends (ranking) - host deletes the room
+    if (view === "ranking" && !isSolo && roomId && localPlayerId) {
+      const me = playersRef.current.find(p => p.id === localPlayerId);
+      if (me?.isHost) {
+        multiplayerService.deleteRoomWithKeepalive(roomId);
+      }
+    }
+
+    // Clean up when going home
     if (view === "home") {
-      multiplayerService.leaveRoom();
+      // If host leaves, delete the room from Supabase
+      if (!isSolo && roomId && localPlayerId) {
+        const me = playersRef.current.find(p => p.id === localPlayerId);
+        if (me?.isHost) {
+          multiplayerService.deleteRoomWithKeepalive(roomId);
+        } else {
+          multiplayerService.leaveRoom();
+        }
+      } else {
+        multiplayerService.leaveRoom();
+      }
       setRoomId(null);
       setLocalPlayerId(null);
       setIsSolo(true);
