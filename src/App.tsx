@@ -1522,7 +1522,7 @@ export default function App() {
             >
               {/* Header */}
               <div className="flex items-center gap-3 shrink-0">
-                <button onClick={() => setView("mode_selection")} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                <button onClick={() => setView("multiplayer_menu")} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                 </button>
                 <h2 className="text-2xl font-black italic uppercase tracking-tighter cartoon-text text-white drop-shadow-[3px_3px_0px_#1a0533]">
