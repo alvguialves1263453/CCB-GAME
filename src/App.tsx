@@ -1087,66 +1087,76 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
   const roundCountRef = useRef<number>(roundCount);
   useEffect(() => { roundCountRef.current = roundCount; }, [roundCount]);
 
-  // Timer Tick
+  // Timer Tick - runs every 100ms for smooth countdown
   useEffect(() => {
     const interval = setInterval(() => {
-      // 1. Logic for Answer Timer - use state for reliability
-      if (isGameActive && !showResult && !isPreparing && difficulty !== 'facil') {
-        const timeLimit = TIME_LIMITS[difficulty];
-        let remaining = 0;
+      // Check conditions
+      if (!isGameActive || showResult || isPreparing) return;
+      
+      const currentDifficulty = difficultyRef.current;
+      if (currentDifficulty === 'facil') return;
+      
+      const timeLimit = TIME_LIMITS[currentDifficulty];
+      let remaining = 0;
+      
+      // For solo, use start time
+      if (isSolo) {
+        const timeSpent = (Date.now() - startTimeRef.current) / 1000;
+        remaining = Math.max(0, timeLimit - timeSpent);
+      } else if (roomDeadlineRef.current) {
+        // Use deadline from host
+        remaining = Math.max(0, (roomDeadlineRef.current - Date.now()) / 1000);
         
-        if (isSolo) {
-          const timeSpent = (Date.now() - startTimeRef.current) / 1000;
-          remaining = Math.max(0, timeLimit - timeSpent);
-        } else {
-          if (roomDeadlineRef.current) {
-            remaining = Math.max(0, (roomDeadlineRef.current - Date.now()) / 1000);
-          } else {
-            // Fallback: use local time calculation
-            const elapsed = (Date.now() - startTimeRef.current) / 1000;
-            remaining = Math.max(0, timeLimit - elapsed);
-          }
-        }
-
-        setTimeLeft(remaining);
-
-        // Tension tick sound
-        if (remaining <= 3 && remaining > 0) {
-          const now = Date.now();
-          if (now - lastTickTimeRef.current > 200) {
-            soundService.playTick();
-            lastTickTimeRef.current = now;
-          }
-        }
-
+        // If deadline expired but we're still here, use start time as fallback
         if (remaining <= 0) {
-          if (!hasRungBellRef.current) {
-            hasRungBellRef.current = true;
-            soundService.playBell();
-          }
+          const elapsed = (Date.now() - startTimeRef.current) / 1000;
+          remaining = Math.max(0, timeLimit - elapsed);
+        }
+      } else {
+        // No deadline - use start time fallback
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        remaining = Math.max(0, timeLimit - elapsed);
+      }
 
-          if (!selectedOptionRef.current) {
-            handleAnswer(null); 
-          }
+      setTimeLeft(remaining);
 
-          if (isSolo) {
-            handleRoundEnd();
-          } else {
-            showResultRef.current = true;
-            setIsGameActive(false);
-            setShowResult(true);
-            
-            const me = playersRef.current.find(p => p.id === localPlayerId);
-            if (me?.isHost && roomId) {
-               multiplayerService.endRound(roomId);
-            }
+      // Tick sound when low time
+      if (remaining <= 3 && remaining > 0) {
+        const now = Date.now();
+        if (now - lastTickTimeRef.current > 200) {
+          soundService.playTick();
+          lastTickTimeRef.current = now;
+        }
+      }
+
+      // Time's up!
+      if (remaining <= 0) {
+        if (!hasRungBellRef.current) {
+          hasRungBellRef.current = true;
+          soundService.playBell();
+        }
+
+        if (!selectedOptionRef.current) {
+          handleAnswer(null); 
+        }
+
+        if (isSolo) {
+          handleRoundEnd();
+        } else {
+          showResultRef.current = true;
+          setIsGameActive(false);
+          setShowResult(true);
+          
+          const me = playersRef.current.find(p => p.id === localPlayerId);
+          if (me?.isHost && roomId) {
+             multiplayerService.endRound(roomId);
           }
         }
       }
-    }, 50);
+    }, 100);
 
     return () => clearInterval(interval);
-  }, [isSolo]);
+  }, [isGameActive, showResult, isPreparing, difficulty, roomDeadlineRef.current, startTimeRef.current, selectedOptionRef.current]);
 
   const handleRoundEnd = () => {
     if (!isGameActiveRef.current || lastHandledRoundRef.current === currentRoundRef.current) return;
