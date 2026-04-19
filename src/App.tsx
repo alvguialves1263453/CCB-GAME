@@ -291,6 +291,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [leftPlayerName, setLeftPlayerName] = useState<string | null>(null);
   const [hostLeft, setHostLeft] = useState(false);
+  const [frozenPlayers, setFrozenPlayers] = useState<Player[]>([]);
+  const finalPlayersRef = useRef<Player[]>([]);
   const [testStatus, setTestStatus] = useState({
     supabase: 'idle',
     hymns: 'idle',
@@ -415,6 +417,8 @@ export default function App() {
       setLocalPlayerId(null);
       setIsSolo(true);
       setPlayers([]);
+      setFrozenPlayers([]);
+      finalPlayersRef.current = [];
       setQuestions([]);
       setCurrentRound(0);
       setIsGameActive(false);
@@ -462,16 +466,20 @@ export default function App() {
   // Sync prevPlayersRef whenever players changes
   useEffect(() => {
     prevPlayersRef.current = players;
-  }, [players]);
+    // Also save to finalPlayersRef for ranking display
+    if (view !== 'ranking' && players.length > 0) {
+      finalPlayersRef.current = players;
+    }
+  }, [players, view]);
 
-  // Fallback: Poll players every 3 seconds to ensure sync
+  // Fallback: Poll players every 3 seconds to ensure sync (STOP when in ranking!)
   useEffect(() => {
-    if (!roomId || isSolo) return;
+    if (!roomId || isSolo || view === 'ranking') return;
     
     const pollInterval = setInterval(async () => {
       if (!roomId) return;
       const { data } = await supabase.from('players').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
-      if (data) {
+      if (data && data.length > 0) {
         const dbPlayers = data.map((row: any) => ({
           id: row.id,
           nickname: row.nickname,
@@ -501,19 +509,22 @@ export default function App() {
         
         prevPlayersRef.current = dbPlayers;
         
-        setPlayers(prev => dbPlayers.map(dbp => {
-          const existing = prev.find(player => player.id === dbp.id);
-          return { ...dbp, lastAnswerTime: existing?.lastAnswerTime || 0 };
-        }));
+        // ONLY update if we have players in DB and not going to ranking
+        if (dbPlayers.length > 0 && view !== 'ranking') {
+          setPlayers(prev => dbPlayers.map(dbp => {
+            const existing = prev.find(player => player.id === dbp.id);
+            return { ...dbp, lastAnswerTime: existing?.lastAnswerTime || 0 };
+          }));
+        }
       }
     }, 3000);
     
     return () => clearInterval(pollInterval);
-  }, [roomId, isSolo]);
+  }, [roomId, isSolo, view]);
 
-  // Handle Multiplayer Subscriptions
+  // Handle Multiplayer Subscriptions (STOP when in ranking!)
   useEffect(() => {
-    if (!roomId || isSolo) return;
+    if (!roomId || isSolo || view === 'ranking') return;
 
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
@@ -525,24 +536,29 @@ export default function App() {
         const currentIds = new Set(dbPlayers.map(p => p.id));
         const prev = prevPlayersRef.current;
         
-        // Check each previous player
-        for (const p of prev) {
-          if (!currentIds.has(p.id) && p.id !== localPlayerId) {
-            // This player left the room
-            setLeftPlayerName(p.nickname);
-            setTimeout(() => setLeftPlayerName(null), 4000);
-            break; // Only notify once
+        // Check each previous player (only if room has players!)
+        if (dbPlayers.length > 0) {
+          for (const p of prev) {
+            if (!currentIds.has(p.id) && p.id !== localPlayerId) {
+              // This player left the room
+              setLeftPlayerName(p.nickname);
+              setTimeout(() => setLeftPlayerName(null), 4000);
+              break; // Only notify once
+            }
           }
         }
         
         // Update ref for next comparison
         prevPlayersRef.current = dbPlayers;
         
-        // Update state - keep lastAnswerTime
-        setPlayers(prev => dbPlayers.map(dbp => {
-          const existing = prev.find(p => p.id === dbp.id);
-          return { ...dbp, lastAnswerTime: existing?.lastAnswerTime || 0 };
-        }));
+        // ONLY update if we have players in DB and not going to ranking
+        // This prevents overwriting with empty data when players leave
+        if (dbPlayers.length > 0 && viewRef.current !== 'ranking') {
+          setPlayers(prev => dbPlayers.map(dbp => {
+            const existing = prev.find(p => p.id === dbp.id);
+            return { ...dbp, lastAnswerTime: existing?.lastAnswerTime || 0 };
+          }));
+        }
       },
       (room) => {
         // Only process room updates if we have a valid room
@@ -568,7 +584,7 @@ export default function App() {
           
           // Use fixed local countdown to avoid network/device clock drift
           setGameCountdown(3);
-} else if (room.phase === 'answering') {
+        } else if (room.phase === 'answering') {
           if (viewRef.current !== 'game') setView('game');
           
           // Always set startTime when entering answering phase
@@ -594,11 +610,16 @@ export default function App() {
              }
              setTimeLeft(diff === 'facil' ? null : TIME_LIMITS[diff]);
            }
-         } else if (room.phase === 'result') {
-           setIsGameActive(false);
-           setShowResult(true);
+        } else if (room.phase === 'result') {
+          setIsGameActive(false);
+          setShowResult(true);
           setResultCountdown(3);
-          
+           
+          // FREEZE PLAYERS WHEN SHOWING LAST RESULT (before going to ranking!)
+          if (room.currentRound + 1 >= room.roundCount) {
+            setFrozenPlayers([...playersRef.current]);
+          }
+           
           // Host automatically schedules next round after 4s (matches endRound deadline)
           const me = playersRef.current.find(p => p.id === localPlayerId);
           if (me?.isHost && roomId) {
@@ -614,19 +635,23 @@ export default function App() {
               } else {
                 multiplayerService.finishGame(roomId);
                 // Host also needs to update local view immediately
+                setFrozenPlayers([...playersRef.current]);
                 setView('ranking');
               }
             }, 4000);
           }
         } else if (room.phase === 'ranking') {
-          // Just switch to ranking view, don't update players (keeping current state)
-          if (viewRef.current !== 'ranking') setView('ranking');
+          // Freeze players when entering ranking - copy current state for display
+          if (viewRef.current !== 'ranking') {
+            setFrozenPlayers([...playersRef.current]);
+            setView('ranking');
+          }
         }
       }
     );
 
     return () => unsubscribe();
-  }, [roomId, isSolo]);
+  }, [roomId, isSolo, view]);
 
   // Cleanup room when host leaves or reloads
   useEffect(() => {
@@ -1239,6 +1264,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     if (nextIdx < roundCount) {
       startRound(nextIdx);
     } else {
+      // Freeze players when going to ranking - use ref to get latest state
+      setFrozenPlayers([...playersRef.current]);
       setView("ranking");
     }
   };
@@ -2411,9 +2438,13 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <p className="text-[#FFD700] font-black uppercase tracking-[0.3em] text-sm cartoon-text">O coro cantou bonito!</p>
               </div>
 
-              {/* Player list */}
+              {/* Player list - use finalPlayersRef for ranking to ensure players don't disappear */}
               <div className="w-full flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-2">
-                {players.sort((a, b) => b.score - a.score).map((p, idx) => (
+                {(() => {
+                  // Priority: frozenPlayers > finalPlayersRef > players
+                  const displayPlayers = frozenPlayers.length > 0 ? frozenPlayers : (finalPlayersRef.current.length > 0 ? finalPlayersRef.current : players);
+                  return displayPlayers.sort((a, b) => b.score - a.score);
+                })().map((p, idx) => (
                   <motion.div
                     key={p.id}
                     initial={{ x: -50, opacity: 0 }}
