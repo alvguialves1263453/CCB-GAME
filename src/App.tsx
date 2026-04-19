@@ -561,9 +561,9 @@ export default function App() {
     }
   }, [isSolo, isGameActive, showResult, isPreparing, currentRound, players.length]);
 
-  // Discovery listener
+  // Discovery listener - start in multiplayer_menu to find nearby rooms
   useEffect(() => {
-    if (view === "multiplayer_join") {
+    if (view === "multiplayer_menu" || view === "multiplayer_join") {
       multiplayerService.startDiscoveryListener((rooms) => {
         setNearbyRooms(rooms);
       });
