@@ -596,6 +596,17 @@ export default function App() {
             }, 4000);
           }
         } else if (room.phase === 'ranking') {
+          // Sync players when entering ranking phase
+          const me = playersRef.current.find(p => p.id === localPlayerId);
+          const newPlayers = dbPlayers.map(dbp => {
+            const existing = playersRef.current.find(p => p.id === dbp.id);
+            return {
+              ...dbp,
+              lastAnswerTime: existing?.lastAnswerTime || 0
+            };
+          });
+          setPlayers(newPlayers);
+          
           if (viewRef.current !== 'ranking') setView('ranking');
         }
       }
@@ -2411,7 +2422,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     }}
                     className="btn-cartoon btn-white w-full py-3 text-lg italic tracking-widest"
                   >
-                    VOLTAR
+SAIR
                   </motion.button>
                 ) : (
                   <motion.button
