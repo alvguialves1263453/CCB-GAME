@@ -28,6 +28,10 @@ let channel: RealtimeChannel | null = null;
 let currentRoomId: string | null = null;
 let localPlayerId: string | null = null;
 
+// Track subscription state to prevent stale events
+let _isSubscribed = false;
+let _lastPlayerSnapshot: Set<string> = new Set();
+
 let _onPlayersChange: ((players: Player[]) => void) | null = null;
 let _onRoomUpdate: ((room: Room) => void) | null = null;
 
@@ -150,6 +154,7 @@ export const multiplayerService = {
 
     currentRoomId = roomId;
     localPlayerId = playerId;
+    _isSubscribed = false;
     
     channel = supabase.channel(`room_db:${roomId}`);
 
@@ -159,21 +164,34 @@ export const multiplayerService = {
           _onRoomUpdate?.(mapRoom(payload.new));
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, (payload) => {
+        // Handle DELETE - player was removed from room
+        if (payload.old?.id) {
+          _lastPlayerSnapshot.delete(payload.old.id);
+          refreshPlayers(roomId);
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+        // Handle INSERT - new player joined
+        refreshPlayers(roomId);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+        // Handle UPDATE - player state changed
         refreshPlayers(roomId);
       });
 
     await new Promise((resolve) => {
       channel!.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          _isSubscribed = true;
           resolve(true);
         }
       });
     });
 
-    // Initial fetch
-    refreshRoom(roomId);
-    refreshPlayers(roomId);
+    // Initial fetch after confirmed subscription
+    await refreshRoom(roomId);
+    await refreshPlayers(roomId);
   },
 
   async toggleReady(roomId: string, isReady: boolean) {
@@ -264,15 +282,25 @@ export const multiplayerService = {
   },
 
   async leaveRoom() {
-    if (localPlayerId && currentRoomId) {
-      await supabase.from('players').delete().eq('id', localPlayerId);
-    }
-    if (channel) {
-      supabase.removeChannel(channel);
-      channel = null;
-    }
+    const playerIdToRemove = localPlayerId;
+    const roomIdToLeave = currentRoomId;
+    
+    // Clear local state first to prevent new events being processed
     currentRoomId = null;
     localPlayerId = null;
+    _lastPlayerSnapshot.clear();
+    _isSubscribed = false;
+    
+    // Delete from database
+    if (playerIdToRemove && roomIdToLeave) {
+      await supabase.from('players').delete().eq('id', playerIdToRemove);
+    }
+    
+    // Remove channel after database operation completes
+    if (channel) {
+      await supabase.removeChannel(channel);
+      channel = null;
+    }
   },
 
   // Discovery (Keeping it simple for nearby rooms, could use a 'lobbies' view)
