@@ -274,6 +274,7 @@ export default function App() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ correct: boolean; option: string } | null>(null);
   const [lastPoints, setLastPoints] = useState<number | null>(null);
+  const [resultCountdown, setResultCountdown] = useState<number | null>(null);
 
   const [showResult, setShowResult] = useState(false);
   const [isSolo, setIsSolo] = useState(true);
@@ -2353,7 +2354,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         <AnimatedPoints points={lastPoints} />
                       )}
                       <div className="bg-[#1a0533] text-white px-5 py-2 rounded-full font-black text-xs md:text-base uppercase tracking-[0.3em] md:tracking-[0.5em] animate-pulse">
-                        Próximo em {resultCountdown ?? 3}s...
+                        Próximo em {resultCountdown !== null ? resultCountdown : 3}s...
                       </div>
                     </div>
                   </motion.div>
