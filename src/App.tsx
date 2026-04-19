@@ -9,7 +9,7 @@ import { multiplayerService, type Room, type Player as DBPlayer } from "./servic
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
 import { Edit2 } from "lucide-react";
-type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list";
+type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection";
 
 interface Player {
   id: string;
@@ -377,9 +377,8 @@ export default function App() {
           setIsGameActive(false);
           setShowResult(false);
           
-          if (gameCountdown === null && room.deadlineAt) {
-            setGameCountdown(Math.ceil(Math.max(0, (room.deadlineAt - Date.now()) / 1000)));
-          }
+          // Use fixed local countdown to avoid network/device clock drift
+          setGameCountdown(3);
         } else if (room.phase === 'answering') {
           if (viewRef.current !== 'game') setView('game');
           
@@ -399,6 +398,7 @@ export default function App() {
         } else if (room.phase === 'result') {
           setIsGameActive(false);
           setShowResult(true);
+          setResultCountdown(3);
           
           // Host automatically schedules next round after a delay
           const me = playersRef.current.find(p => p.id === localPlayerId);
@@ -546,6 +546,14 @@ export default function App() {
     }
   }, [gameCountdown, isSolo]);
 
+  // Result Timer effect
+  useEffect(() => {
+    if (showResult && resultCountdown !== null && resultCountdown > 0) {
+      const timer = setTimeout(() => setResultCountdown(resultCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showResult, resultCountdown]);
+
   // Load all hymns
   const loadHymns = async () => {
     setIsLoading(true);
@@ -582,6 +590,18 @@ export default function App() {
       supabase.removeChannel(hymnSubscription);
     };
   }, []);
+
+  const handlePlayClick = () => {
+    soundService.playClick();
+    setIsSolo(true);
+    setView("mode_selection");
+  };
+
+  const handleCreateRoom = async () => {
+    setIsLoading(true);
+    // ... logic for creation
+    setIsLoading(false);
+  };
 
   const handleJoinGame = async () => {
     if (!profile) {
@@ -1177,14 +1197,14 @@ export default function App() {
                   <motion.button
                     whileHover={{ scale: 1.05, rotateX: 6, rotateY: 3, y: -6, shadow: "10px 10px 0px 0px #1a0533" }}
                     whileTap={{ scale: 0.95, y: 2 }}
-                    onClick={() => { soundService.playClick(); setIsSolo(true); setView("multiplayer_setup"); }}
+                    onClick={handlePlayClick}
                     className="btn-cartoon btn-purple w-full py-3 md:py-6 gap-2 md:gap-3"
                     style={{ borderRadius: '2rem', fontSize: '1.2rem md:1.4rem', transformStyle: 'preserve-3d' }}
                   >
                     <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 border-2 border-white/40 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
                       <Play className="w-6 h-6 md:w-7 md:h-7 fill-white text-white translate-x-1" />
                     </div>
-                    <span className="font-black uppercase italic tracking-wide cartoon-text-white drop-shadow-xl text-xl md:text-2xl">SOLO</span>
+                    <span className="font-black uppercase italic tracking-wide cartoon-text-white drop-shadow-xl text-xl md:text-2xl">JOGAR</span>
                   </motion.button>
 
                   <motion.button
@@ -1336,7 +1356,7 @@ export default function App() {
                 <motion.button
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
-                  onClick={() => { soundService.playClick(); setView("multiplayer_setup"); }}
+                  onClick={() => { soundService.playClick(); setIsSolo(false); setView("mode_selection"); }}
                   className="btn-cartoon btn-purple py-5 flex flex-col items-center justify-center gap-2 cursor-pointer"
                 >
                   <div className="w-12 h-12 bg-white/20 border-3 border-white/40 rounded-xl flex items-center justify-center text-white">
@@ -1499,21 +1519,22 @@ export default function App() {
                       <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Nível</label>
                       <div className="flex flex-col gap-1.5">
                         {([
-                          { value: 'facil' as Difficulty, label: 'LENTO', color: 'bg-[#4ECB71]', textColor: 'text-white' },
-                          { value: 'medio' as Difficulty, label: 'MÉDIO', color: 'bg-[#FFD700]', textColor: 'text-[#1a0533]' },
-                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', color: 'bg-[#FF4757]', textColor: 'text-white' },
+                          { value: 'facil' as Difficulty, label: 'LENTO', desc: 'Tempo ilimitado', color: 'bg-[#4ECB71]', textColor: 'text-white' },
+                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20s para responder', color: 'bg-[#FFD700]', textColor: 'text-[#1a0533]' },
+                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: '10s para responder', color: 'bg-[#FF4757]', textColor: 'text-white' },
                         ]).map(d => (
                           <button
                             key={d.value}
                             onClick={() => { soundService.playClick(); setDifficulty(d.value); }}
                             className={cn(
-                              "py-1.5 rounded-lg border-4 border-[#1a0533] font-black text-sm uppercase tracking-wider transition-all",
+                              "py-1.5 px-2 flex flex-col items-center justify-center rounded-lg border-4 border-[#1a0533] transition-all",
                               difficulty === d.value
-                                ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-105`
+                                ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-[1.02]`
                                 : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
                             )}
                           >
-                            {d.label}
+                            <span className="font-black text-sm uppercase tracking-wider leading-none">{d.label}</span>
+                            <span className={cn("text-[9px] font-bold uppercase mt-0.5", difficulty === d.value ? "opacity-90" : "opacity-60")}>{d.desc}</span>
                           </button>
                         ))}
                       </div>
@@ -1556,6 +1577,90 @@ export default function App() {
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
                 {view === "multiplayer_join" ? "ENTRAR" : "VAI!"}
               </motion.button>
+            </motion.div>
+          )}
+
+          {view === "mode_selection" && (
+            <motion.div
+              key="mode_selection"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full flex-1 min-h-0 max-w-4xl flex flex-col gap-4 px-2"
+            >
+              <div className="flex items-center justify-between shrink-0">
+                <button 
+                  onClick={() => {
+                    soundService.playClick();
+                    setView(isSolo ? "home" : "multiplayer_menu");
+                  }} 
+                  className="w-10 h-10 md:w-12 md:h-12 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 text-[#1a0533]" />
+                </button>
+                <h2 className="text-2xl md:text-3xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Modo de Jogo</h2>
+                <div className="w-10 h-10 md:w-12 md:h-12 shrink-0" />
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-4 space-y-4">
+                {/* Mode 1 - Unlocked */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    soundService.playClick();
+                    if (isSolo) {
+                      setRoomId(null);
+                      setLocalPlayerId("p_" + Math.random().toString(36).substr(2, 9));
+                      setView("lobby");
+                    } else {
+                      handleCreateRoom();
+                    }
+                  }}
+                  className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                >
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <Music className="w-32 h-32" />
+                  </div>
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
+                    <Music className="w-8 h-8 md:w-10 md:h-10 text-[#4ECB71]" />
+                  </div>
+                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h3 className="text-2xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Qual é o Hino?</h3>
+                    <p className="font-bold text-white/90 mt-1 text-sm md:text-base leading-tight">Ouça o trecho e adivinhe o número e título do hino. Seja rápido para ganhar mais pontos!</p>
+                  </div>
+                  <div className="bg-white text-[#1a0533] px-4 py-2 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-2 md:mt-0 z-10">
+                    JOGAR AGORA
+                  </div>
+                </motion.button>
+
+                {/* Locked Modes */}
+                {[
+                  { title: "Complete a Letra", desc: "Preencha a palavra que falta na estrofe do hino.", icon: <Check className="w-8 h-8 md:w-10 md:h-10 text-[#FF4757]" /> },
+                  { title: "Qual a Voz?", desc: "Identifique se o trecho cantado é Soprano, Contralto, Tenor ou Baixo.", icon: <Users className="w-8 h-8 md:w-10 md:h-10 text-[#FFD700]" /> },
+                  { title: "Soprando a Doutrina", desc: "Perguntas de conhecimentos bíblicos e pontos de doutrina.", icon: <MonitorSpeaker className="w-8 h-8 md:w-10 md:h-10 text-[#38bdf8]" /> },
+                  { title: "Ritmo Certo", desc: "Aperte o botão no tempo exato do compasso do hino.", icon: <Play className="w-8 h-8 md:w-10 md:h-10 text-[#9B59F5]" /> },
+                  { title: "Batalha Musical", desc: "Desafie outro jogador em um duelo de conhecimentos.", icon: <Trophy className="w-8 h-8 md:w-10 md:h-10 text-[#fbbf24]" /> }
+                ].map((mode, idx) => (
+                  <div
+                    key={idx}
+                    className="w-full bg-gray-200 border-4 border-[#1a0533] rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center gap-4 text-left shadow-[4px_4px_0px_rgba(26,5,51,0.2)] relative overflow-hidden grayscale opacity-80"
+                  >
+                    <div className="absolute inset-0 bg-black/5 z-20 flex items-center justify-center pointer-events-none">
+                      <div className="bg-[#1a0533] border-4 border-white px-5 py-2 md:px-8 md:py-3 rounded-2xl rotate-[-5deg] shadow-[4px_4px_0px_rgba(0,0,0,0.5)]">
+                        <span className="text-white font-black italic uppercase tracking-widest text-lg md:text-2xl drop-shadow-[2px_2px_0px_rgba(0,0,0,0.5)]">Em Breve</span>
+                      </div>
+                    </div>
+                    <div className="w-16 h-16 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 opacity-50 shadow-[4px_4px_0px_rgba(26,5,51,0.1)]">
+                      {mode.icon}
+                    </div>
+                    <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left opacity-50">
+                      <h3 className="text-xl md:text-2xl font-black italic uppercase text-[#1a0533]">{mode.title}</h3>
+                      <p className="font-bold text-[#1a0533]/70 mt-1 text-sm md:text-base leading-tight">{mode.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           )}
 
