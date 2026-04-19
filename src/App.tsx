@@ -432,7 +432,19 @@ export default function App() {
         const currentIds = new Set(dbPlayers.map(p => p.id));
         const prev = prevPlayersRef.current;
         
-        // Check for departures
+        // Check for departures or empty room
+        if (dbPlayers.length === 0 && prev.length > 0) {
+          setHostLeft(true);
+          setRoomId(null);
+          setLocalPlayerId(null);
+          setPlayers([]);
+          setTimeout(() => {
+            setHostLeft(false);
+            setView("home");
+          }, 3000);
+          return;
+        }
+        
         for (const p of prev) {
           if (!currentIds.has(p.id) && p.id !== localPlayerId) {
             setLeftPlayerName(p.nickname);
@@ -460,6 +472,19 @@ export default function App() {
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
       (dbPlayers) => {
+        // If room is empty, host left - show message and go home
+        if (dbPlayers.length === 0 && prevPlayersRef.current.length > 0) {
+          setHostLeft(true);
+          setRoomId(null);
+          setLocalPlayerId(null);
+          setPlayers([]);
+          setTimeout(() => {
+            setHostLeft(false);
+            setView("home");
+          }, 3000);
+          return;
+        }
+        
         // Detect players who left (in prev but not in current server response)
         const currentIds = new Set(dbPlayers.map(p => p.id));
         const prev = prevPlayersRef.current;
@@ -1230,7 +1255,7 @@ export default function App() {
                 <X className="w-12 h-12" />
               </div>
               <h3 className="text-2xl font-black uppercase text-[#1a0533]">Sala Encerrada</h3>
-              <p className="text-[#1a0533]/70 font-medium text-center">O host encerrou a sala.</p>
+              <p className="text-[#1a0533]/70 font-medium text-center">O host saiu da sala.</p>
             </motion.div>
           </motion.div>
         )}
