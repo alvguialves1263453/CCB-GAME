@@ -433,7 +433,8 @@ export default function App() {
         const prev = prevPlayersRef.current;
         
         // Check for departures or empty room (but not if we're in ranking - game ended)
-        if (dbPlayers.length === 0 && prev.length > 0 && view !== 'ranking') {
+        const inRanking = viewRef.current === 'ranking' || view === 'ranking';
+        if (dbPlayers.length === 0 && prev.length > 0 && !inRanking) {
           setHostLeft(true);
           setRoomId(null);
           setLocalPlayerId(null);
@@ -473,8 +474,12 @@ export default function App() {
       roomId,
       (dbPlayers) => {
         // If room is empty, host left - show message and go home
-        // BUT don't trigger if we're in ranking phase (game ended normally)
-        if (dbPlayers.length === 0 && prevPlayersRef.current.length > 0 && view !== 'ranking') {
+        // BUT don't trigger if:
+        // 1. We're in ranking phase (game ended normally)
+        // 2. We just finished the game (last round)
+        const justFinishedGame = viewRef.current === 'ranking' || (view === 'ranking');
+        
+        if (dbPlayers.length === 0 && prevPlayersRef.current.length > 0 && !justFinishedGame) {
           setHostLeft(true);
           setRoomId(null);
           setLocalPlayerId(null);
