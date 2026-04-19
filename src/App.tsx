@@ -1,6 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker } from "lucide-react";
+
+const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
+  const [secondsLeft, setSecondsLeft] = useState(60);
+  
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      onComplete();
+      return;
+    }
+    
+    const timer = setTimeout(() => setSecondsLeft(s => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [secondsLeft, onComplete]);
+  
+  return (
+    <div className="flex items-center justify-center gap-2 py-2 bg-[#FFD700] border-4 border-[#1a0533] rounded-xl">
+      <span className="text-sm font-black uppercase text-[#1a0533]/70">Fechando em</span>
+      <span className="text-xl font-black text-[#1a0533]">{secondsLeft}s</span>
+    </div>
+  );
+};
 import confetti from "canvas-confetti";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
@@ -388,6 +409,13 @@ export default function App() {
     }
   }, []);
 
+  // Play sounds on important events
+  useEffect(() => {
+    if (view === 'ranking') {
+      soundService.playVictory();
+    }
+  }, [view]);
+
   // Delete room when host closes tab
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -698,7 +726,7 @@ export default function App() {
     if (gameCountdown !== null && gameCountdown > 0) {
       const timer = setTimeout(() => {
         setGameCountdown(gameCountdown - 1);
-        soundService.playTick();
+        soundService.playCountdown();
       }, 1000);
       return () => clearTimeout(timer);
     } else if (gameCountdown === 0) {
@@ -1040,6 +1068,13 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     }
 
     setFeedback({ correct: isUserCorrect, option: option || "Tempo Esgotado" });
+
+    // Play sound based on answer
+    if (isUserCorrect) {
+      soundService.playCorrect();
+    } else if (option) {
+      soundService.playWrong();
+    }
 
     // Update local state immediately for instant feedback
     setPlayers(current => current.map(p => {
@@ -2362,8 +2397,24 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 ))}
               </div>
 
+              {/* Timer countdown in ranking - auto close after 60 seconds */}
+              {view === 'ranking' && !isSolo && (
+                <RankingCountdown onComplete={() => {
+                  if (roomId && localPlayerId) {
+                    const me = players.find(p => p.id === localPlayerId);
+                    if (me?.isHost) {
+                      multiplayerService.deleteRoomWithKeepalive(roomId);
+                    } else {
+                      multiplayerService.leaveRoom();
+                    }
+                  }
+                  setView("home");
+                  setIsGameActive(false);
+                }} />
+              )}
+
               {/* Buttons - Host sees X to close, Guests see Sair */}
-              <div className="w-full shrink-0">
+              <div className="w-full shrink-0 mt-2">
                 {!isSolo && localPlayerId && players.find(p => p.id === localPlayerId)?.isHost ? (
                   <p className="text-center text-[#1a0533]/50 text-xs font-bold">Aperte X para fechar a sala</p>
                 ) : !isSolo ? (

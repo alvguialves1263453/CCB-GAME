@@ -163,6 +163,60 @@ class SoundService {
       osc.stop(t + 0.6);
     } catch(e) {}
   }
+
+  playVictory() {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      
+      const t = this.ctx.currentTime;
+      // Fanfarra de vitória estilo jogo - notas alegres sublindo
+      const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+      
+      notes.forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gainNode = this.ctx.createGain();
+        
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, t + i * 0.15);
+        
+        gainNode.gain.setValueAtTime(0, t + i * 0.15);
+        gainNode.gain.linearRampToValueAtTime(0.2, t + i * 0.15 + 0.05);
+        gainNode.gain.setValueAtTime(0.2, t + i * 0.15 + 0.15);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, t + i * 0.15 + 0.3);
+        
+        osc.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+        
+        osc.start(t + i * 0.15);
+        osc.stop(t + i * 0.15 + 0.3);
+      });
+    } catch(e) {}
+  }
+
+  playCountdown() {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gainNode = this.ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(880, t);
+      osc.frequency.setValueAtTime(1100, t + 0.05);
+      
+      gainNode.gain.setValueAtTime(0.15, t);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+      
+      osc.connect(gainNode);
+      gainNode.connect(this.ctx.destination);
+      
+      osc.start();
+      osc.stop(t + 0.2);
+    } catch(e) {}
+  }
 }
 
 export const soundService = new SoundService();
