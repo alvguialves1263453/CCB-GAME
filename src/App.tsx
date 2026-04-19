@@ -210,7 +210,7 @@ export default function App() {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string }[]>([]);
+  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty: string; roundCount: number }[]>([]);
   const [gameCountdown, setGameCountdown] = useState<number | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -1703,9 +1703,30 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         }}
                         className="w-full p-3 bg-gray-50 border-4 border-[#1a0533] rounded-xl flex items-center justify-between game-shadow-hover"
                       >
-                        <div className="text-left">
-                          <p className="font-black text-sm text-[#1a0533]">{game.hostName || "Sala Musical"}</p>
-                          <p className="text-[9px] text-[#9B59F5] font-black uppercase opacity-70">ID: {game.id}</p>
+                        <div className="flex items-center gap-3">
+                          {game.hostAvatar ? (
+                            <Avatar url={game.hostAvatar} size={100} className="w-12 h-12 rounded-xl" />
+                          ) : (
+                            <div className="w-12 h-12 bg-[#9B59F5] border-2 border-[#1a0533] rounded-xl flex items-center justify-center text-white text-xl font-black">
+                              {(game.hostName || 'H').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="text-left">
+                            <p className="font-black text-sm text-[#1a0533]">{game.hostName || "Sala Musical"}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={cn(
+                                "text-[8px] font-black uppercase px-1.5 py-0.5 rounded",
+                                game.difficulty === 'facil' ? "bg-[#4ECB71] text-white" :
+                                game.difficulty === 'medio' ? "bg-[#FFD700] text-[#1a0533]" :
+                                "bg-[#FF4757] text-white"
+                              )}>
+                                {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
+                              </span>
+                              <span className="text-[8px] text-gray-500 font-black uppercase">
+                                {game.roundCount} ROD
+                              </span>
+                            </div>
+                          </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-[#1a0533]" />
                       </button>

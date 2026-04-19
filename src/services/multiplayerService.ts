@@ -316,9 +316,15 @@ export const multiplayerService = {
       const threeMinsAgo = new Date(Date.now() - 3 * 60000).toISOString();
       await supabase.from('rooms').delete().lt('updated_at', threeMinsAgo).not('phase', 'eq', 'ranking');
 
-      const { data } = await supabase.from('rooms').select('id, players(nickname)').eq('phase', 'lobby');
+      const { data } = await supabase.from('rooms').select('id, round_count, difficulty, players(id, nickname, avatar)').eq('phase', 'lobby');
       if (data) {
-         const formatted = data.map((r: any) => ({ id: r.id, hostName: r.players?.[0]?.nickname || 'Host' }));
+         const formatted = data.map((r: any) => ({
+           id: r.id,
+           hostName: r.players?.[0]?.nickname || 'Host',
+           hostAvatar: r.players?.[0]?.avatar || null,
+           difficulty: r.difficulty || 'facil',
+           roundCount: r.round_count || 5
+         }));
          onNearbyRoomsChange(formatted);
       }
     };
