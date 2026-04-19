@@ -31,6 +31,8 @@ let localPlayerId: string | null = null;
 // Track subscription state to prevent stale events
 let _isSubscribed = false;
 let _lastPlayerSnapshot: Set<string> = new Set();
+let _currentRefreshId = 0;
+let _refreshTimeout: NodeJS.Timeout | null = null;
 
 let _onPlayersChange: ((players: Player[]) => void) | null = null;
 let _onRoomUpdate: ((room: Room) => void) | null = null;
@@ -61,7 +63,6 @@ const mapPlayer = (row: any): Player => ({
 const refreshPlayers = async (roomId: string) => {
   const { data } = await supabase.from('players').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
   if (data) {
-    // Update snapshot with current player IDs
     _lastPlayerSnapshot = new Set(data.map(p => p.id));
     _onPlayersChange?.(data.map(mapPlayer));
   }

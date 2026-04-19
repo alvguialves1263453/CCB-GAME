@@ -387,6 +387,11 @@ export default function App() {
     }
   }, []);
 
+  // Sync prevPlayersRef whenever players changes
+  useEffect(() => {
+    prevPlayersRef.current = players;
+  }, [players]);
+
   // Handle Multiplayer Subscriptions
   useEffect(() => {
     if (!roomId || isSolo) return;
@@ -394,43 +399,27 @@ export default function App() {
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
       (dbPlayers) => {
-        // Get current player IDs from the server response
-        const currentPlayerIds = new Set(dbPlayers.map(p => p.id));
+        // Detect players who left (in prev but not in current server response)
+        const currentIds = new Set(dbPlayers.map(p => p.id));
+        const prev = prevPlayersRef.current;
         
-        // Check if I was removed from the room
-        if (localPlayerId && !currentPlayerIds.has(localPlayerId)) {
-          setHostLeft(true);
-          setTimeout(() => {
-            setHostLeft(false);
-            setView("home");
-          }, 3000);
-          return;
-        }
-
-        // Get previous player IDs from state (last committed)
-        const prev = playersRef.current || [];
-        const prevPlayerIds = new Set(prev.map(p => p.id));
-        
-        // Find players that left - only if they're NOT coming back (not in current list)
-        // This prevents false notifications when player reconnects with new ID
-        for (const oldId of prevPlayerIds) {
-          if (!currentPlayerIds.has(oldId) && oldId !== localPlayerId) {
-            const oldPlayer = prev.find(p => p.id === oldId);
-            if (oldPlayer && dbPlayers.every(p => p.nickname !== oldPlayer.nickname)) {
-              // Double-check: is this nickname really gone?
-              setLeftPlayerName(oldPlayer.nickname);
-              setTimeout(() => setLeftPlayerName(null), 4000);
-            }
-            break;
+        // Check each previous player
+        for (const p of prev) {
+          if (!currentIds.has(p.id) && p.id !== localPlayerId) {
+            // This player left the room
+            setLeftPlayerName(p.nickname);
+            setTimeout(() => setLeftPlayerName(null), 4000);
+            break; // Only notify once
           }
         }
-
-        setPlayers(dbPlayers.map(dbp => {
+        
+        // Update ref for next comparison
+        prevPlayersRef.current = dbPlayers;
+        
+        // Update state - keep lastAnswerTime
+        setPlayers(prev => dbPlayers.map(dbp => {
           const existing = prev.find(p => p.id === dbp.id);
-          return {
-            ...dbp,
-            lastAnswerTime: existing?.lastAnswerTime || 0
-          };
+          return { ...dbp, lastAnswerTime: existing?.lastAnswerTime || 0 };
         }));
       },
       (room) => {
