@@ -308,13 +308,7 @@ export const multiplayerService = {
   // Discovery (Keeping it simple for nearby rooms, could use a 'lobbies' view)
   async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
     const fetchLobbies = async () => {
-      // Cleanup 1: Remove rooms stuck in lobby for 15+ min
-      const fifteenMinsAgo = new Date(Date.now() - 15 * 60000).toISOString();
-      await supabase.from('rooms').delete().eq('phase', 'lobby').lt('created_at', fifteenMinsAgo);
-
-      // Cleanup 2: Remove ANY room with no heartbeat for 3+ minutes (stale/ghost rooms)
-      const threeMinsAgo = new Date(Date.now() - 3 * 60000).toISOString();
-      await supabase.from('rooms').delete().lt('updated_at', threeMinsAgo).not('phase', 'eq', 'ranking');
+      // REMOVED: Auto-delete rooms after 3 minutes - this was causing rooms to be deleted during ranking!
 
       const { data } = await supabase.from('rooms').select('id, round_count, difficulty, players(id, nickname, avatar)').eq('phase', 'lobby');
       if (data) {
