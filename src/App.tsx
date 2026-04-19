@@ -903,7 +903,7 @@ export default function App() {
         } else {
           // Create new
           setIsSolo(false);
-          const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl);
+const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty);
           if (result) {
             setRoomId(result.room.id);
             setLocalPlayerId(result.player.id);

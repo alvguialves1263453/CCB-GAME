@@ -76,7 +76,7 @@ const refreshRoom = async (roomId: string) => {
 };
 
 export const multiplayerService = {
-  async createRoom(nickname: string, avatar?: string): Promise<{ room: Room; player: Player } | null> {
+  async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'): Promise<{ room: Room; player: Player } | null> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let roomId = '';
     for (let i = 0; i < 5; i++) {
@@ -93,7 +93,7 @@ export const multiplayerService = {
       phase: 'lobby',
       current_round: 0,
       round_count: 5,
-      difficulty: 'facil'
+      difficulty: difficulty
     }).select().single();
 
     if (roomError) {
