@@ -263,7 +263,8 @@ export default function App() {
   const questionsRef = useRef(questions);
   const feedbackRef = useRef(feedback);
   const selectedOptionRef = useRef(selectedOption);
-  const playersRef = useRef(players);
+  const playersRef = useRef<Player[]>(players);
+  const prevPlayersRef = useRef<Player[]>([]);
 
   useEffect(() => {
     isGameActiveRef.current = isGameActive;
