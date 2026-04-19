@@ -472,6 +472,9 @@ export default function App() {
         if (!room) {
           // Room was deleted - host left
           setHostLeft(true);
+          setRoomId(null);
+          setLocalPlayerId(null);
+          setPlayers([]);
           setTimeout(() => {
             setHostLeft(false);
             setView("home");
@@ -1301,7 +1304,15 @@ export default function App() {
                     if (!isSolo && roomId) {
                       const me = playersRef.current.find(p => p.id === localPlayerId);
                       if (me?.isHost) {
+                        // Host: delete room and all players
                         multiplayerService.deleteRoomWithKeepalive(roomId);
+                        // Clean up local state immediately
+                        setPlayers([]);
+                        setRoomId(null);
+                        setLocalPlayerId(null);
+                        setView("home");
+                        setIsGameActive(false);
+                        return;
                       } else {
                         multiplayerService.leaveRoom();
                       }
