@@ -432,19 +432,8 @@ export default function App() {
         const currentIds = new Set(dbPlayers.map(p => p.id));
         const prev = prevPlayersRef.current;
         
-        // Check for departures or empty room (but not if we're in ranking - game ended)
-        const inRanking = viewRef.current === 'ranking' || view === 'ranking';
-        if (dbPlayers.length === 0 && prev.length > 0 && !inRanking) {
-          setHostLeft(true);
-          setRoomId(null);
-          setLocalPlayerId(null);
-          setPlayers([]);
-          setTimeout(() => {
-            setHostLeft(false);
-            setView("home");
-          }, 3000);
-          return;
-        }
+        // NEVER show empty room message - this is causing players to disappear
+        // The game ending naturally should keep players visible in ranking
         
         for (const p of prev) {
           if (!currentIds.has(p.id) && p.id !== localPlayerId) {
@@ -473,25 +462,10 @@ export default function App() {
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
       (dbPlayers) => {
-        // If room is empty, host left - show message and go home
-        // BUT don't trigger if:
-        // 1. We're in ranking phase (game ended normally)
-        // 2. We just finished the game (last round)
-        const justFinishedGame = viewRef.current === 'ranking' || (view === 'ranking');
+        // NEVER show host left message - this breaks the ranking display
+        // The game will end naturally and stay on ranking until host closes
         
-        if (dbPlayers.length === 0 && prevPlayersRef.current.length > 0 && !justFinishedGame) {
-          setHostLeft(true);
-          setRoomId(null);
-          setLocalPlayerId(null);
-          setPlayers([]);
-          setTimeout(() => {
-            setHostLeft(false);
-            setView("home");
-          }, 3000);
-          return;
-        }
-        
-        // Detect players who left (in prev but not in current server response)
+        // Detect players who left (only during active game, not in ranking)
         const currentIds = new Set(dbPlayers.map(p => p.id));
         const prev = prevPlayersRef.current;
         
@@ -598,17 +572,7 @@ export default function App() {
             }, 4000);
           }
         } else if (room.phase === 'ranking') {
-          // Sync players when entering ranking phase
-          const me = playersRef.current.find(p => p.id === localPlayerId);
-          const newPlayers = dbPlayers.map(dbp => {
-            const existing = playersRef.current.find(p => p.id === dbp.id);
-            return {
-              ...dbp,
-              lastAnswerTime: existing?.lastAnswerTime || 0
-            };
-          });
-          setPlayers(newPlayers);
-          
+          // Just switch to ranking view, don't update players (keeping current state)
           if (viewRef.current !== 'ranking') setView('ranking');
         }
       }
