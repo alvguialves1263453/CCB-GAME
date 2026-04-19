@@ -1059,6 +1059,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     setResultCountdown(null);
     setFeedback(null);
     setLastPoints(null);
+    hasRungBellRef.current = false;
     setTimeLeft(difficulty === 'facil' ? null : TIME_LIMITS[difficulty]);
     startTimeRef.current = Date.now();
 
@@ -1188,11 +1189,18 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     if (isSolo) {
       setIsGameActive(false);
       setShowResult(true);
+      setResultCountdown(3);
 
-      const timer = setTimeout(() => {
-        nextRoundLocal();
-      }, 3000);
-      setResultCountdown(timer as any);
+      const timer = setInterval(() => {
+        setResultCountdown(prev => {
+          if (prev !== null && prev <= 1) {
+            clearInterval(timer);
+            nextRoundLocal();
+            return null;
+          }
+          return prev !== null ? prev - 1 : null;
+        });
+      }, 1000);
     } else {
       // For multiplayer, the Timer Tick interval already calls endRound when time is up or everyone answered.
       // So here we do nothing. The DB phase change will trigger UI update.
