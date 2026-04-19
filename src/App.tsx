@@ -275,7 +275,7 @@ export default function App() {
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
-  });
+  }, [isGameActive, showResult, currentRound, difficulty, questions, feedback, selectedOption, players]);
 
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -554,9 +554,20 @@ export default function App() {
              setFeedback(null);
              setResultCountdown(null);
              setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
+             
+             // Start timer - use deadline from DB or calculate from current time
+             if (room.deadlineAt) {
+               roomDeadlineRef.current = room.deadlineAt;
+             } else if (difficultyRef.current !== 'facil') {
+               roomDeadlineRef.current = Date.now() + TIME_LIMITS[difficultyRef.current] * 1000;
+             } else {
+               roomDeadlineRef.current = null;
+             }
+             startTimeRef.current = Date.now();
+          } else {
+            // Update deadline if it changed
+            roomDeadlineRef.current = room.deadlineAt;
           }
-
-          roomDeadlineRef.current = room.deadlineAt;
         } else if (room.phase === 'result') {
           setIsGameActive(false);
           setShowResult(true);
@@ -1077,20 +1088,23 @@ export default function App() {
 
   // Timer Tick
   useEffect(() => {
-    // Only check if active game phase or if checking multiplayer deadlines
     const interval = setInterval(() => {
       // 1. Logic for Answer Timer
-      if (isGameActiveRef.current && !showResultRef.current && !isPreparing && difficultyRef.current !== 'facil') {
+      const currentDifficulty = difficultyRef.current;
+      if (isGameActiveRef.current && !showResultRef.current && !isPreparing && currentDifficulty !== 'facil') {
         let remaining = 0;
+        const timeLimit = TIME_LIMITS[currentDifficulty];
+        
         if (isSolo) {
           const timeSpent = (Date.now() - startTimeRef.current) / 1000;
-          const limit = TIME_LIMITS[difficultyRef.current];
-          remaining = Math.max(0, limit - timeSpent);
+          remaining = Math.max(0, timeLimit - timeSpent);
         } else {
           if (roomDeadlineRef.current) {
             remaining = Math.max(0, (roomDeadlineRef.current - Date.now()) / 1000);
           } else {
-            remaining = Infinity;
+            // Fallback: use local time calculation
+            const elapsed = (Date.now() - startTimeRef.current) / 1000;
+            remaining = Math.max(0, timeLimit - elapsed);
           }
         }
 
