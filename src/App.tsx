@@ -22,6 +22,32 @@ const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
     </div>
   );
 };
+
+const AnimatedPoints = ({ points }: { points: number }) => {
+  const [display, setDisplay] = useState(0);
+  
+  useEffect(() => {
+    // Fast count up animation
+    if (display < points) {
+      const step = Math.max(1, Math.floor(points / 20));
+      const timer = setTimeout(() => setDisplay(p => Math.min(p + step, points)), 20);
+      return () => clearTimeout(timer);
+    }
+  }, [display, points]);
+  
+  if (display >= points) return null;
+  
+  return (
+    <motion.div
+      initial={{ scale: 0.5, opacity: 0, y: 20 }}
+      animate={{ scale: [1, 1.3, 1.1], opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="text-3xl md:text-5xl font-black italic text-[#FFD700] drop-shadow-[2px_2px_0px_#1a0533]"
+    >
+      +{display}
+    </motion.div>
+  );
+};
 import confetti from "canvas-confetti";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
@@ -246,6 +272,7 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ correct: boolean; option: string } | null>(null);
+  const [lastPoints, setLastPoints] = useState<number | null>(null);
 
   const [showResult, setShowResult] = useState(false);
   const [isSolo, setIsSolo] = useState(true);
@@ -1029,6 +1056,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     setSelectedOption(null);
     setShowResult(false);
     setResultCountdown(null);
+    setFeedback(null);
+    setLastPoints(null);
     setTimeLeft(difficulty === 'facil' ? null : TIME_LIMITS[difficulty]);
     startTimeRef.current = Date.now();
 
@@ -1072,8 +1101,10 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     // Play sound based on answer
     if (isUserCorrect) {
       soundService.playCorrect();
+      setLastPoints(pointsToAdd);
     } else if (option) {
       soundService.playWrong();
+      setLastPoints(0);
     }
 
     // Update local state immediately for instant feedback
@@ -2309,6 +2340,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       <h3 className={cn("text-5xl md:text-9xl font-black italic uppercase cartoon-text", feedback?.correct ? "text-[#4ECB71]" : "text-[#FF4757]")}>
                         {feedback?.correct ? "BOA!" : "QUASE!"}
                       </h3>
+                      {lastPoints !== null && lastPoints > 0 && (
+                        <AnimatedPoints points={lastPoints} />
+                      )}
                       <div className="bg-[#1a0533] text-white px-5 py-2 rounded-full font-black text-xs md:text-base uppercase tracking-[0.3em] md:tracking-[0.5em] animate-pulse">
                         Próximo em {resultCountdown ?? 3}s...
                       </div>
