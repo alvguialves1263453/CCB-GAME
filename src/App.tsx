@@ -407,16 +407,6 @@ export default function App() {
           }
         }
 
-        // Check if room was deleted (host left)
-        if (!room) {
-          setHostLeft(true);
-          setTimeout(() => {
-            setHostLeft(false);
-            setView("home");
-          }, 3000);
-          return;
-        }
-
         setPlayers(prev => {
           return dbPlayers.map(dbp => {
             const existing = prev.find(p => p.id === dbp.id);
@@ -428,7 +418,15 @@ export default function App() {
         });
       },
       (room) => {
-        if (!room) return;
+        if (!room) {
+          // Room was deleted - host left
+          setHostLeft(true);
+          setTimeout(() => {
+            setHostLeft(false);
+            setView("home");
+          }, 3000);
+          return;
+        }
         
         setRoundCount(room.roundCount);
         setDifficulty(room.difficulty as Difficulty);
