@@ -2827,27 +2827,14 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <>
                       <button
                         onClick={async () => {
-                          const { data: allPerguntas, error: perpError } = await supabase.from('biblia_perguntas').select('id, pergunta, correta, opcao1, opcao2, opcao3');
-                          console.log('[DEBUG] Perguntas fetched:', allPerguntas, perpError);
-                          alert('Debug: ' + JSON.stringify({ count: allPerguntas?.length, error: perpError }));
-                          if (perpError) {
-                            console.error('[DEBUG] Error fetching perguntas:', perpError);
-                            alert('Erro ao buscar perguntas: ' + perpError.message);
-                            return;
-                          }
+                          const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
                           if (!allPerguntas || allPerguntas.length === 0) {
-                            alert('Nenhuma pergunta encontrada no banco!');
+                            alert('Nenhuma pergunta encontrada!');
                             return;
                           }
                           const perguntas = allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount);
-                          console.log('[DEBUG] Selected perguntas:', perguntas.length);
-                          try {
-                            await bibliaService.startGame(bibliaRoomId!, perguntas, bibliaRoundCount, difficulty);
-                            console.log('[DEBUG] startGame called');
-                          } catch (e) {
-                            console.error('[DEBUG] startGame error:', e);
-                            alert('Erro ao iniciar jogo');
-                          }
+                          await bibliaService.startGame(bibliaRoomId!, preguntas, bibliaRoundCount, difficulty);
+                          setView('biblia_game');
                         }}
                         disabled={bibliaPlayers.length < 1}
                         className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
