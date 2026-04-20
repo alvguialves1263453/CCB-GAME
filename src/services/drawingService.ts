@@ -101,7 +101,7 @@ const getVotes = async (submissionId: number) => {
 };
 
 export const drawingService = {
-  async createRoom(nickname: string, avatar?: string, roundCount: number = 3): Promise<{ roomId: string; playerId: string } | null> {
+  async createRoom(nickname: string, avatar?: string, roundCount: number = 3, category: string = 'Todos'): Promise<{ roomId: string; playerId: string } | null> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let roomId = '';
     for (let i = 0; i < 5; i++) {
@@ -117,6 +117,7 @@ export const drawingService = {
       phase: 'lobby',
       current_round: 0,
       round_count: roundCount,
+      game_type: category,
     });
 
     if (roomError) {
@@ -273,7 +274,24 @@ export const drawingService = {
   },
 
   async startDrawingGame(roomId: string, roundCount: number) {
-    const { data: prompts } = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
+    // Get room category
+    const { data: room } = await supabase.from('drawing_rooms').select('game_type').eq('id', roomId).single();
+    const category = room?.game_type || 'Todos';
+    
+    // Fetch prompts by category
+    let prompts;
+    if (category === 'Todos') {
+      const result = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
+      prompts = result.data;
+    } else {
+      const result = await supabase.from('drawing_prompts').select('prompt').eq('category', category).order('random()').limit(1);
+      prompts = result.data;
+      // If no prompts in category, get any prompt
+      if (!prompts || prompts.length === 0) {
+        const fallback = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
+        prompts = fallback.data;
+      }
+    }
     const prompt = prompts?.[0]?.prompt || 'Desenhe algo';
 
     await supabase.from('drawing_rooms').update({

@@ -259,7 +259,7 @@ export default function App() {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty: string; roundCount: number }[]>([]);
+  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty: string; roundCount: number; gameType: string }[]>([]);
   const [gameCountdown, setGameCountdown] = useState<number | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -302,7 +302,7 @@ export default function App() {
   });
 
   // Drawing game states
-  const [nearbyDrawingRooms, setNearbyDrawingRooms] = useState<{ id: string; hostName: string; roundCount: number }[]>([]);
+  const [drawingCategory, setDrawingCategory] = useState<string>('Todos');
   const [drawingGameMode, setDrawingGameMode] = useState(false);
   const [drawingRoomId, setDrawingRoomId] = useState<string | null>(null);
   const [drawingLocalPlayerId, setDrawingLocalPlayerId] = useState<string | null>(null);
@@ -815,17 +815,7 @@ export default function App() {
     }
   }, [view]);
 
-  // Drawing rooms discovery
-  useEffect(() => {
-    if (view === "drawing_setup") {
-      drawingService.startDiscoveryListener((rooms) => {
-        setNearbyDrawingRooms(rooms);
-      });
-      return () => {
-        drawingService.stopDiscoveryListener();
-      };
-    }
-  }, [view]);
+  // Drawing rooms discovery - removed, now combined with nearbyRooms
 
   // Countdown Timer
   useEffect(() => {
@@ -1818,9 +1808,15 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         key={idx}
                         onClick={() => {
                           soundService.playClick();
-                          setIsManualJoin(false);
-                          setRoomId(game.id);
-                          setView("multiplayer_join");
+                          if (game.gameType === 'drawing') {
+                            setDrawingRoomId(game.id);
+                            setDrawingGameMode(true);
+                            setView("drawing_setup");
+                          } else {
+                            setIsManualJoin(false);
+                            setRoomId(game.id);
+                            setView("multiplayer_join");
+                          }
                         }}
                         className="w-full p-2 bg-white border-2 border-[#1a0533] rounded-lg flex flex-col gap-1 game-shadow-hover"
                       >
@@ -1829,16 +1825,25 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                           <span className="font-black text-[10px] text-[#9B59F5]">#{game.id}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-[9px] font-black px-2 py-0.5 rounded",
-                            game.difficulty === 'facil' ? "bg-[#4ECB71] text-white" :
-                            game.difficulty === 'medio' ? "bg-[#FFD700] text-[#1a0533]" :
-                            "bg-[#FF4757] text-white"
-                          )}>
-                            {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
-                          </span>
-                          <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
-                          <span className="text-[9px] font-black text-[#1a0533]">Qual é o Hino?</span>
+                          {game.gameType === 'drawing' ? (
+                            <>
+                              <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
+                              <span className="text-[9px] font-black text-[#9B59F5]">Desenho</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className={cn(
+                                "text-[9px] font-black px-2 py-0.5 rounded",
+                                game.difficulty === 'facil' ? "bg-[#4ECB71] text-white" :
+                                game.difficulty === 'medio' ? "bg-[#FFD700] text-[#1a0533]" :
+                                "bg-[#FF4757] text-white"
+                              )}>
+                                {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
+                              </span>
+                              <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
+                              <span className="text-[9px] font-black text-[#1a0533]">Qual é o Hino?</span>
+                            </>
+                          )}
                         </div>
                       </button>
                     ))
@@ -2109,7 +2114,6 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
           )}
 
           {/* Drawing Setup */}
-          {(view === "drawing_setup") && (
             <motion.div
               key="drawing_setup"
               initial={{ opacity: 0, x: 100 }}
@@ -2167,6 +2171,26 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   </div>
                 </div>
 
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Categoria</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {['Todos', 'Instrumentos', 'Igreja', 'Biblia'].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => { soundService.playClick(); setDrawingCategory(cat); }}
+                        className={cn(
+                          "py-2 rounded-lg border-4 border-[#1a0533] font-black text-xs transition-all",
+                          drawingCategory === cat
+                            ? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                            : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <motion.button
                   whileHover={!profile || isLoading ? {} : { scale: 1.03 }}
                   whileTap={!profile || isLoading ? {} : { scale: 0.97 }}
@@ -2174,7 +2198,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   onClick={async () => {
                     soundService.playClick();
                     setIsLoading(true);
-                    const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingRoundCount);
+                    const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingRoundCount, drawingCategory);
                     if (result) {
                       setDrawingRoomId(result.roomId);
                       setDrawingLocalPlayerId(result.playerId);
@@ -2191,55 +2215,6 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
                   CRIAR SALA
                 </motion.button>
-              </div>
-
-              {/* Nearby Drawing Rooms */}
-              <div className="cartoon-panel bg-white p-4 flex flex-col overflow-hidden" style={{ maxHeight: '30vh' }}>
-                <div className="flex items-center gap-2 mb-3 shrink-0">
-                  <div className="w-8 h-8 bg-[#9B59F5] border-4 border-[#1a0533] rounded-lg flex items-center justify-center text-white game-shadow">
-                    <Wifi className="w-4 h-4" />
-                  </div>
-                  <h3 className="text-base font-black italic uppercase cartoon-text text-[#1a0533]">Salas Amigas</h3>
-                </div>
-
-                <div className="flex-grow overflow-y-auto no-scrollbar space-y-2">
-                  {nearbyDrawingRooms.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center opacity-30 gap-2 py-4">
-                      <MonitorSpeaker className="w-12 h-12 animate-wiggle text-[#1a0533]" />
-                      <p className="font-black uppercase tracking-widest text-center text-[10px]">Buscando...</p>
-                    </div>
-                  ) : (
-                    nearbyDrawingRooms.map((room, idx) => (
-                      <button
-                        key={idx}
-                        onClick={async () => {
-                          soundService.playClick();
-                          setDrawingRoomId(room.id);
-                          setIsLoading(true);
-                          const playerId = await drawingService.joinRoom(room.id, profile.nickname, profile.avatarUrl);
-                          if (playerId) {
-                            setDrawingLocalPlayerId(playerId);
-                            setIsDrawingHost(false);
-                            setView("drawing_lobby");
-                          } else {
-                            alert("Sala não encontrada.");
-                          }
-                          setIsLoading(false);
-                        }}
-                        className="w-full p-2 bg-white border-2 border-[#1a0533] rounded-lg flex flex-col gap-1 game-shadow-hover"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-black text-xs text-[#1a0533]">{room.hostName || "Host"}</span>
-                          <span className="font-black text-[10px] text-[#9B59F5]">#{room.id}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-bold text-gray-600">{room.roundCount} RODADAS</span>
-                          <span className="text-[9px] font-black text-[#9B59F5]">Desenho</span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
               </div>
             </motion.div>
           )}

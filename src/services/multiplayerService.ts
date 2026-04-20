@@ -307,28 +307,52 @@ export const multiplayerService = {
     }
   },
 
-  // Discovery (Keeping it simple for nearby rooms, could use a 'lobbies' view)
-  async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
+  // Discovery (Keeping it simple for nearby rooms)
+  async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[]) => void) {
     const fetchLobbies = async () => {
-      // REMOVED: Auto-delete rooms after 3 minutes - this was causing rooms to be deleted during ranking!
-
-      const { data } = await supabase.from('rooms').select('id, round_count, difficulty, players(id, nickname, avatar)').eq('phase', 'lobby');
-      if (data) {
-         const formatted = data.map((r: any) => ({
-           id: r.id,
-           hostName: r.players?.[0]?.nickname || 'Host',
-           hostAvatar: r.players?.[0]?.avatar || null,
-           difficulty: r.difficulty || 'facil',
-           roundCount: r.round_count || 5
-         }));
-         onNearbyRoomsChange(formatted);
+      // Fetch hymn rooms
+      const { data: hymnRooms } = await supabase.from('rooms').select('id, round_count, difficulty, players(id, nickname, avatar)').eq('phase', 'lobby');
+      
+      // Fetch drawing rooms
+      const { data: drawingRooms } = await supabase.from('drawing_rooms').select('id, round_count').eq('phase', 'lobby');
+      
+      const allRooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[] = [];
+      
+      if (hymnRooms) {
+        for (const r of hymnRooms) {
+          const { data: players } = await supabase.from('players').select('nickname, avatar').eq('room_id', r.id).eq('is_host', true).limit(1);
+          allRooms.push({
+            id: r.id,
+            hostName: players?.[0]?.nickname || 'Host',
+            gameType: 'hino',
+            difficulty: r.difficulty || 'facil',
+            roundCount: r.round_count || 5
+          });
+        }
       }
+      
+      if (drawingRooms) {
+        for (const r of drawingRooms) {
+          const { data: players } = await supabase.from('drawing_players').select('nickname, avatar').eq('room_id', r.id).eq('is_host', true).limit(1);
+          allRooms.push({
+            id: r.id,
+            hostName: players?.[0]?.nickname || 'Host',
+            gameType: 'drawing',
+            roundCount: r.round_count || 3
+          });
+        }
+      }
+      
+      onNearbyRoomsChange(allRooms);
     };
     
     fetchLobbies();
     
     const channel = supabase.channel('lobby_discovery_db')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+         fetchLobbies();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drawing_rooms' }, () => {
          fetchLobbies();
       })
       .subscribe();
