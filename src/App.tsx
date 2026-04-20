@@ -2827,13 +2827,16 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <>
                       <button
                         onClick={async () => {
-                          const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+                          console.log('allPerguntas:', allPerguntas?.length);
                           if (!allPerguntas || allPerguntas.length === 0) {
                             alert('Nenhuma pergunta encontrada!');
                             return;
                           }
-                          const perguntas = allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount);
-                          await bibliaService.startGame(bibliaRoomId!, preguntas, bibliaRoundCount, difficulty);
+                          const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
+                          const selected = shuffled.slice(0, bibliaRoundCount);
+                          console.log('selected:', selected.length);
+                          await bibliaService.startGame(bibliaRoomId!, selected, bibliaRoundCount, difficulty);
                           setView('biblia_game');
                         }}
                         disabled={bibliaPlayers.length < 1}
