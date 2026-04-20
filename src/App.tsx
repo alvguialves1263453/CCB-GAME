@@ -312,6 +312,7 @@ export default function App() {
   const [drawingRoundCount, setDrawingRoundCount] = useState(3);
   const [drawingCurrentPrompt, setDrawingCurrentPrompt] = useState<string>('');
   const [drawingTimeLeft, setDrawingTimeLeft] = useState<number>(60);
+  const [drawingCountdown, setDrawingCountdown] = useState<number | null>(null);
   const [drawingSubmissions, setDrawingSubmissions] = useState<any[]>([]);
   const [currentDrawingIndex, setCurrentDrawingIndex] = useState(0);
   const [hasSubmittedDrawing, setHasSubmittedDrawing] = useState(false);
@@ -2439,7 +2440,15 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         }
                         soundService.playClick();
                         await drawingService.startDrawingGame(drawingRoomId!, drawingRoundCount);
-                        setView("drawing_game");
+                        
+                        // Show countdown (3, 2, 1) before starting
+                        [3, 2, 1].forEach((num, idx) => {
+                          setTimeout(() => setDrawingCountdown(num), idx * 1000);
+                        });
+                        setTimeout(() => {
+                          setDrawingCountdown(null);
+                          setView("drawing_game");
+                        }, 3000);
                       }}
                       className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest"
                     >
@@ -2467,6 +2476,27 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
             </motion.div>
           )}
 
+          {/* Drawing Countdown */}
+          {drawingCountdown && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-[#1a0533]"
+            >
+              <motion.div
+                key={drawingCountdown}
+                initial={{ scale: 2, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
+                transition={{ type: "spring", damping: 10 }}
+                className="text-[10rem] md:text-[15rem] font-black italic text-[#FFD700] drop-shadow-[8px_8px_0px_rgba(155,89,245,0.8)]"
+              >
+                {drawingCountdown}
+              </motion.div>
+            </motion.div>
+          )}
+
           {/* Drawing Game */}
           {view === "drawing_game" && (
             <motion.div
@@ -2474,43 +2504,47 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 flex flex-col gap-2 pb-20 md:pb-3"
+              className="w-full flex-1 flex flex-col gap-3 pb-20 md:pb-3"
             >
-              <div className="flex items-center justify-between gap-2 px-2">
-                <button onClick={() => setView("drawing_lobby")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
-                  <X className="w-5 h-5 text-[#1a0533]" />
-                </button>
-                <div className="flex-1 bg-white border-4 border-[#1a0533] px-4 py-2 rounded-xl game-shadow text-center">
-                  <span className="text-sm font-black italic uppercase cartoon-text text-[#1a0533]">{drawingCurrentPrompt}</span>
+              {/* Header - Prompt + Timer */}
+              <div className="flex items-center gap-3 px-2">
+                <div className="bg-[#9B59F5] border-4 border-[#1a0533] px-4 py-2 rounded-xl shadow-[3px_3px_0px_#1a0533]">
+                  <span className="text-lg font-black italic uppercase tracking-tighter text-white">{drawingCurrentPrompt}</span>
                 </div>
                 <div className={cn(
-                  "w-16 h-11 flex items-center justify-center border-4 border-[#1a0533] rounded-xl font-black text-xl",
+                  "w-14 h-14 flex items-center justify-center border-4 border-[#1a0533] rounded-xl font-black text-2xl shadow-[3px_3px_0px_#1a0533]",
                   drawingTimeLeft <= 10 ? "bg-[#FF4757] text-white animate-pulse" :
                   drawingTimeLeft <= 20 ? "bg-[#FFD700] text-[#1a0533]" :
                   "bg-white text-[#1a0533]"
                 )}>
-                  {drawingTimeLeft}
+                  {drawingTimeLeft}s
                 </div>
               </div>
 
-              <DrawingCanvasView
-                prompt={drawingCurrentPrompt}
-                timeLeft={drawingTimeLeft}
-                isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
-                onSubmit={async (drawingData) => {
-                  await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, drawingData);
-                  setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
-                }}
-                onTimeUp={async () => {
-                  if (!drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)) {
-                    await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, JSON.stringify([]));
-                  }
-                }}
-              />
+              {/* Canvas Area */}
+              <div className="flex-1 bg-white border-4 border-[#1a0533] rounded-2xl overflow-hidden shadow-[4px_4px_0px_#1a0533]">
+                <DrawingCanvasView
+                  prompt={drawingCurrentPrompt}
+                  timeLeft={drawingTimeLeft}
+                  isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
+                  onSubmit={async (drawingData) => {
+                    await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, drawingData);
+                    setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
+                  }}
+                  onTimeUp={async () => {
+                    if (!drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)) {
+                      await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, JSON.stringify([]));
+                    }
+                  }}
+                />
+              </div>
 
-              <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                <span className="font-bold">{drawingSubmissions.length}/{drawingPlayers.length}</span>
-                <span>enviaram</span>
+              {/* Status Bar */}
+              <div className="flex items-center justify-center gap-3 bg-white border-4 border-[#1a0533] px-6 py-2 rounded-xl">
+                <span className="font-black text-[#9B59F5]">{drawingSubmissions.length}</span>
+                <span className="text-gray-500">/</span>
+                <span className="font-black text-[#1a0533]">{drawingPlayers.length}</span>
+                <span className="text-xs text-gray-500 uppercase">enviaram</span>
               </div>
             </motion.div>
           )}
