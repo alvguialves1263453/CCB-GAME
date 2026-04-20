@@ -2543,12 +2543,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   timeLeft={drawingTimeLeft}
                   isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
                   onSubmit={async (drawingData) => {
-                    await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, drawingData);
+                    await drawingService.submitDrawing(drawingRoomId!, drawingData);
                     setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
                   }}
                   onTimeUp={async () => {
                     if (!drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)) {
-                      await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, JSON.stringify([]));
+                      await drawingService.submitDrawing(drawingRoomId!, JSON.stringify([]));
                     }
                   }}
                 />

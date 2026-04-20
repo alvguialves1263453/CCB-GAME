@@ -22,6 +22,7 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(6);
   const [tool, setTool] = useState<"pencil" | "eraser">("pencil");
+  const currentPathRef = useRef<Path | null>(null);
 
   // Initialize canvas size
   useEffect(() => {
@@ -33,8 +34,8 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
       if (!parent) return;
       
       const rect = parent.getBoundingClientRect();
-      const w = rect.width || 300;
-      const h = rect.height || 300;
+      const w = Math.max(rect.width, 300);
+      const h = Math.max(rect.height, 300);
       
       canvas.width = w;
       canvas.height = h;
@@ -48,6 +49,18 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
 
     init();
     setTimeout(init, 100);
+    setTimeout(init, 300);
+
+    const resizeObserver = new ResizeObserver(() => {
+      init();
+    });
+    
+    const parent = canvas.parentElement;
+    if (parent) {
+      resizeObserver.observe(parent);
+    }
+
+    return () => resizeObserver.disconnect();
   }, []);
 
   // Time up
@@ -56,6 +69,34 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
       onTimeUp();
     }
   }, [timeLeft, isSubmitted, onTimeUp]);
+
+  const getCanvasCoords = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const canvasWidth = canvas.width || 300;
+    const canvasHeight = canvas.height || 300;
+    const rectWidth = rect.width || 300;
+    const rectHeight = rect.height || 300;
+    
+    const scaleX = canvasWidth / rectWidth;
+    const scaleY = canvasHeight / rectHeight;
+    
+    if ('touches' in e) {
+      const touch = e.touches[0];
+      return {
+        x: (touch.clientX - rect.left) * scaleX,
+        y: (touch.clientY - rect.top) * scaleY
+      };
+    } else {
+      const mouseEvent = e as unknown as { nativeEvent: { offsetX: number; offsetY: number } };
+      return {
+        x: (mouseEvent.nativeEvent.offsetX || 0) * scaleX,
+        y: (mouseEvent.nativeEvent.offsetY || 0) * scaleY
+      };
+    }
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isSubmitted) return;
@@ -66,17 +107,20 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     
-    setIsDrawing(true);
+    const { x, y } = getCanvasCoords(e);
+    const newPath: Path = { points: [{ x, y }], color: tool === "eraser" ? "#FFFFFF" : color, width: brushSize };
     
-    const x = e.nativeEvent.offsetX;
-    const y = e.nativeEvent.offsetY;
+    currentPathRef.current = newPath;
+    setIsDrawing(true);
+    setPaths(prev => [...prev, newPath]);
     
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color;
+    ctx.strokeStyle = newPath.color;
     ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    ctx.stroke();
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -88,14 +132,16 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     
-    const x = e.nativeEvent.offsetX;
-    const y = e.nativeEvent.offsetY;
+    const { x, y } = getCanvasCoords(e);
+    const currentPath = currentPathRef.current;
+    if (!currentPath) return;
+    
+    currentPath.points.push({ x, y });
+    
+    setPaths(prev => [...prev]);
     
     ctx.lineTo(x, y);
     ctx.stroke();
-    
-    // Save point
-    setPaths(prev => [...prev, { points: [{ x, y }], color: tool === "eraser" ? "#FFFFFF" : color, width: brushSize }]);
   };
 
   const handleMouseUp = () => {
@@ -112,19 +158,21 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
+    const { x, y } = getCanvasCoords(e);
     
+    const newPath: Path = { points: [{ x, y }], color: tool === "eraser" ? "#FFFFFF" : color, width: brushSize };
+    
+    currentPathRef.current = newPath;
     setIsDrawing(true);
+    setPaths(prev => [...prev, newPath]);
     
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color;
+    ctx.strokeStyle = newPath.color;
     ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    ctx.stroke();
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -137,10 +185,13 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
+    const { x, y } = getCanvasCoords(e);
+    const currentPath = currentPathRef.current;
+    if (!currentPath) return;
+    
+    currentPath.points.push({ x, y });
+    
+    setPaths(prev => [...prev]);
     
     ctx.lineTo(x, y);
     ctx.stroke();
