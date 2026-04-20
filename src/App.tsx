@@ -1982,8 +1982,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                             className={cn(
                               "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
                               botCount === n
-                                ? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
-                                : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                             )}
                           >
                             {n}
