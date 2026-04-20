@@ -2827,8 +2827,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <>
                       <button
                         onClick={async () => {
-                          const { data: allPerguntas, error: perpError } = await supabase.from('biblia_perguntas').select('*');
-                          console.log('[DEBUG] Perguntas fetched:', allPerguntas?.length, perpError);
+                          const { data: allPerguntas, error: perpError } = await supabase.from('biblia_perguntas').select('id, pergunta, correta, opcao1, opcao2, opcao3');
+                          console.log('[DEBUG] Perguntas fetched:', allPerguntas, perpError);
+                          alert('Debug: ' + JSON.stringify({ count: allPerguntas?.length, error: perpError }));
                           if (perpError) {
                             console.error('[DEBUG] Error fetching perguntas:', perpError);
                             alert('Erro ao buscar perguntas: ' + perpError.message);
