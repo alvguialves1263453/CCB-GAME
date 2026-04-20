@@ -1472,23 +1472,23 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: -20 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-              className="w-full flex-grow flex flex-col items-center justify-center gap-[1.5vh] px-4 py-2"
+              className="w-full flex-grow flex flex-col items-center justify-center gap-2 md:gap-[1.5vh] px-3 md:px-4 py-1 md:py-2"
             >
               {/* GAME TITLE - CCB QUIZ */}
               <motion.div
-                className="relative mb-4 flex flex-col items-center shrink-0"
+                className="relative mb-2 md:mb-4 flex flex-col items-center shrink-0"
                 initial={{ y: -40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1, type: 'spring', stiffness: 120 }}
               >
                 <div className="relative z-10 text-center">
                   <motion.h1
-                    className="text-[45px] sm:text-[60px] md:text-[80px] font-black italic uppercase tracking-tighter leading-none m-0 p-0"
+                    className="text-[32px] sm:text-[50px] md:text-[70px] font-black italic uppercase tracking-tighter leading-none m-0 p-0"
                     style={{
                       color: '#FFD700',
-                      WebkitTextStroke: '4px #1a0533',
+                      WebkitTextStroke: '3px #1a0533',
                       paintOrder: 'stroke fill',
-                      filter: 'drop-shadow(6px 6px 0px #1a0533)',
+                      filter: 'drop-shadow(4px 4px 0px #1a0533)',
                     }}
                     animate={reducedMotion ? {} : { rotate: [-1.5, 1.5, -1.5], scale: [1, 1.03, 1] }}
                     transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
@@ -1496,44 +1496,44 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     CCB
                   </motion.h1>
                   <motion.div
-                    className="bg-[#9B59F5] border-2 md:border-4 border-[#1a0533] px-4 md:px-6 py-1.5 md:py-2.5 rounded-xl md:rounded-2xl shadow-[4px_4px_0px_#1a0533] mt-[-15px] md:mt-[-20px] relative z-20"
-                    animate={reducedMotion ? {} : { rotate: [2, -2, 2], y: [0, 4, 0] }}
+                    className="bg-[#9B59F5] border-2 md:border-4 border-[#1a0533] px-3 md:px-6 py-1 md:py-2.5 rounded-lg md:rounded-2xl shadow-[3px_3px_0px_#1a0533] mt-[-10px] md:mt-[-18px] relative z-20"
+                    animate={reducedMotion ? {} : { rotate: [2, -2, 2], y: [0, 3, 0] }}
                     transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
                   >
-                    <span className="text-xl sm:text-2xl md:text-3xl font-black italic uppercase text-white cartoon-text" style={{ WebkitTextStroke: '1px #1a0533' }}>QUIZ</span>
+                    <span className="text-lg sm:text-2xl md:text-3xl font-black italic uppercase text-white cartoon-text" style={{ WebkitTextStroke: '1px #1a0533' }}>QUIZ</span>
                   </motion.div>
 
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
-                    className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-white/70 italic mt-3 md:mt-4"
+                    className="text-[9px] sm:text-xs font-black uppercase tracking-[0.2em] text-white/70 italic mt-2 md:mt-3"
                     style={{ filter: 'drop-shadow(1px 1px 0px rgba(26,5,51,0.5))' }}
                   >
                     Desenvolvido por Guilherme Alves
                   </motion.p>
                 </div>
 
-                <div className="absolute -top-6 -right-10 animate-pulse">
-                  <Sparkles className="text-yellow-300 w-10 h-10 drop-shadow-md" />
+                <div className="absolute -top-4 -right-8 animate-pulse">
+                  <Sparkles className="text-yellow-300 w-8 h-8 drop-shadow-md" />
                 </div>
               </motion.div>
               {/* GARTIC STYLE CONTENT CONTAINER */}
-              <div className="w-full flex-grow flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 py-2 px-4 max-w-6xl mx-auto">
+              <div className="w-full flex-grow flex flex-col md:flex-row items-center justify-center gap-4 md:gap-10 py-1 md:py-2 px-2 md:px-4 max-w-6xl mx-auto">
 
                 {/* LEFT SIDE: AVATAR PANEL */}
                 <div className="flex flex-col items-center shrink-0">
-                  <div className="relative group p-6 md:p-10 bg-white/10 rounded-[4rem] border-4 border-[#1a0533]/20 shadow-2xl backdrop-blur-md relative transition-transform hover:scale-105">
+                  <div className="relative group p-4 md:p-8 bg-white/10 rounded-[3rem] md:rounded-[4rem] border-4 border-[#1a0533]/20 shadow-2xl backdrop-blur-md relative transition-transform hover:scale-105">
 
                     {/* Floating Sparkles decoration */}
-                    <div className="absolute -top-4 -left-4 animate-pulse">
-                      <Star className="text-yellow-400 w-8 h-8 fill-yellow-400 drop-shadow-[2px_2px_0px_#1a0533]" />
+                    <div className="absolute -top-3 -left-3 animate-pulse">
+                      <Star className="text-yellow-400 w-6 h-6 fill-yellow-400 drop-shadow-[2px_2px_0px_#1a0533]" />
                     </div>
 
-                    <div className="relative mb-3 md:mb-4 group flex flex-col items-center">
-                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 110 : 140} className="shadow-[6px_6px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
+                    <div className="relative mb-2 md:mb-4 group flex flex-col items-center">
+                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 90 : 140} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
 
-                      <div className="text-center transition-transform mt-4">
+                      <div className="text-center transition-transform mt-2 md:mt-3">
                         <div className="relative">
                           <input 
                             type="text" 
@@ -1544,7 +1544,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                               setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
                               localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
                             }}
-                            className="bg-transparent text-lg md:text-2xl font-black text-white italic cartoon-text-white drop-shadow-md tracking-tight leading-tight text-center focus:outline-none border-b-2 border-white/20 focus:border-white/50 transition-colors w-full max-w-[150px] md:max-w-[200px]"
+                            className="bg-transparent text-base md:text-2xl font-black text-white italic cartoon-text-white drop-shadow-md tracking-tight leading-tight text-center focus:outline-none border-b-2 border-white/20 focus:border-white/50 transition-colors w-full max-w-[120px] md:max-w-[200px]"
                           />
                         </div>
                       </div>
@@ -1553,11 +1553,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         whileHover={{ scale: 1.1, rotate: 5 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setIsEditingProfile(true)}
-                        className="mt-3 md:mt-4 bg-[#FFD700] p-2 md:p-2.5 rounded-lg md:rounded-xl border-[2px] md:border-[3px] border-[#1a0533] text-[#1a0533] shadow-[3px_3px_0px_#1a0533] md:shadow-[4px_4px_0px_#1a0533] hover:bg-yellow-400 transition-colors z-20"
+                        className="mt-2 md:mt-4 bg-[#FFD700] p-1.5 md:p-2.5 rounded-lg md:rounded-xl border-[2px] md:border-[3px] border-[#1a0533] text-[#1a0533] shadow-[2px_2px_0px_#1a0533] md:shadow-[4px_4px_0px_#1a0533] hover:bg-yellow-400 transition-colors z-20"
                       >
-                        <div className="flex items-center gap-1.5 md:gap-2 px-1">
-                          <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4 stroke-[3px]" />
-                          <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Mudar Foto</span>
+                        <div className="flex items-center gap-1 md:gap-2">
+                          <Edit2 className="w-3 h-3 md:w-4 md:h-4 stroke-[3px]" />
+                          <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">Mudar Foto</span>
                         </div>
                       </motion.button>
                     </div>
@@ -1565,55 +1565,55 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 </div>
 
                 {/* RIGHT SIDE: MAIN BUTTONS PANEL */}
-                <div className="w-full md:w-[400px] flex flex-col gap-5 py-4">
+                <div className="w-full md:w-[400px] flex flex-col gap-3 md:gap-5 py-2 md:py-4">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handlePlayClick}
-                    className="btn-cartoon btn-purple w-full py-3 md:py-6 gap-2 md:gap-3"
+                    className="btn-cartoon btn-purple w-full py-2 md:py-5 gap-2"
                   >
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 border-2 border-white/40 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
-                      <Play className="w-6 h-6 md:w-7 md:h-7 fill-white text-white translate-x-1" />
+                    <div className="w-8 h-8 md:w-12 md:h-12 bg-white/20 border-2 border-white/40 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                      <Play className="w-5 h-5 md:w-7 md:h-7 fill-white text-white translate-x-1" />
                     </div>
-                    <span className="font-black uppercase italic tracking-wide cartoon-text-white drop-shadow-xl text-xl md:text-2xl">JOGAR</span>
+                    <span className="font-black uppercase italic tracking-wide cartoon-text-white drop-shadow-xl text-lg md:text-2xl">JOGAR</span>
                   </motion.button>
 
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => { soundService.playClick(); setIsSolo(false); setView("multiplayer_menu"); }}
-                    className="btn-cartoon btn-yellow w-full py-3 md:py-6 gap-2 md:gap-3"
+                    className="btn-cartoon btn-yellow w-full py-2 md:py-5 gap-2"
                   >
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-black/10 border-2 border-[#1a0533]/30 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
-                      <Users className="w-6 h-6 md:w-8 md:h-8 text-[#1a0533]" />
+                    <div className="w-8 h-8 md:w-12 md:h-12 bg-black/10 border-2 border-[#1a0533]/30 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                      <Users className="w-5 h-5 md:w-8 md:h-8 text-[#1a0533]" />
                     </div>
-                    <span className="font-black uppercase italic tracking-wide text-xl md:text-2xl" style={{ WebkitTextStroke: '2px #1a0533', paintOrder: 'stroke fill', color: '#1a0533' }}>GRUPO</span>
+                    <span className="font-black uppercase italic tracking-wide text-lg md:text-2xl" style={{ WebkitTextStroke: '2px #1a0533', paintOrder: 'stroke fill', color: '#1a0533' }}>GRUPO</span>
                   </motion.button>
 
                   {/* BOTTOM ROW ICONS */}
-                  <div className="flex justify-between items-center px-4 mt-2">
-                    <div className="flex gap-4">
+                  <div className="flex justify-between items-center px-2 md:px-4 mt-1 md:mt-2">
+                    <div className="flex gap-3 md:gap-4">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setView("hymn_list"); }}
-                        className="w-16 h-16 bg-white border-4 border-[#1a0533] rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
+                        className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
                       >
-                        <Music className="w-8 h-8 text-[#9B59F5]" />
+                        <Music className="w-6 h-6 md:w-8 md:h-8 text-[#9B59F5]" />
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setShowSettings(true); }}
-                        className="w-16 h-16 bg-white border-4 border-[#1a0533] rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
+                        className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
                       >
-                        <Settings className="w-8 h-8 text-[#9B59F5]" />
+                        <Settings className="w-6 h-6 md:w-8 md:h-8 text-[#9B59F5]" />
                       </motion.button>
                     </div>
 
                     <div className="flex flex-col items-end opacity-40">
-                      <p className="text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V0.3.0</p>
-                      <p className="text-[10px] font-black uppercase text-white cartoon-text tracking-widest">BETA</p>
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V0.3.0</p>
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest">BETA</p>
                     </div>
                   </div>
                 </div>
@@ -1621,11 +1621,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               </div>
 
               {/* Instrument decoration strip */}
-              <div className="flex gap-4 opacity-40">
-                <ViolinSVG size={28} />
-                <SaxophoneSVG size={28} />
-                <TubaSVG size={28} />
-                <ClarinetSVG size={28} />
+              <div className="flex gap-3 md:gap-4 opacity-30 md:opacity-40">
+                <ViolinSVG size={22} />
+                <SaxophoneSVG size={22} />
+                <TubaSVG size={22} />
+                <ClarinetSVG size={22} />
               </div>
             </motion.div>
           )}
@@ -1967,7 +1967,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full flex-1 min-h-0 max-w-4xl flex flex-col gap-4 px-2"
+              className="w-full flex-1 min-h-0 max-w-4xl flex flex-col gap-3 px-2 pb-20 md:pb-4"
             >
               <div className="flex items-center justify-between shrink-0">
                 <button 
@@ -1975,15 +1975,15 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     soundService.playClick();
                     setView(isSolo ? "home" : "multiplayer_menu");
                   }} 
-                  className="w-10 h-10 md:w-12 md:h-12 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0"
+                  className="w-9 h-9 md:w-12 md:h-12 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0"
                 >
-                  <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 text-[#1a0533]" />
+                  <ArrowLeft className="w-4 h-4 md:w-6 md:h-6 text-[#1a0533]" />
                 </button>
-                <h2 className="text-2xl md:text-3xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Modo de Jogo</h2>
-                <div className="w-10 h-10 md:w-12 md:h-12 shrink-0" />
+                <h2 className="text-xl md:text-3xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Modo de Jogo</h2>
+                <div className="w-9 h-9 md:w-12 md:h-12 shrink-0" />
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-4 space-y-4">
+              <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-4 space-y-3">
                 {/* Mode 1 - Unlocked */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -1992,19 +1992,19 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     soundService.playClick();
                     setView("multiplayer_setup");
                   }}
-                  className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                  className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
                 >
                   <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                    <Music className="w-32 h-32" />
+                    <Music className="w-24 h-24 md:w-32 md:h-32" />
                   </div>
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
-                    <Music className="w-8 h-8 md:w-10 md:h-10 text-[#4ECB71]" />
+                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
+                    <Music className="w-6 h-6 md:w-10 md:h-10 text-[#4ECB71]" />
                   </div>
                   <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
-                    <h3 className="text-2xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Qual é o Hino?</h3>
-                    <p className="font-bold text-white/90 mt-1 text-sm md:text-base leading-tight">Ouça o trecho e adivinhe o número e título do hino. Seja rápido para ganhar mais pontos!</p>
+                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Qual é o Hino?</h3>
+                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Ouça o trecho e adivinhe o número e título do hino. Seja rápido para ganhar mais pontos!</p>
                   </div>
-                  <div className="bg-white text-[#1a0533] px-4 py-2 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-2 md:mt-0 z-10">
+                  <div className="bg-white text-[#1a0533] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-1 md:mt-0 z-10">
                     JOGAR AGORA
                   </div>
                 </motion.button>
@@ -2045,7 +2045,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full flex-1 min-h-0 max-w-5xl flex flex-col gap-3"
+              className="w-full flex-1 min-h-0 max-w-5xl flex flex-col gap-2 pb-20 md:pb-3"
             >
               <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2 shrink-0">
                 <div className="flex items-center gap-3">
