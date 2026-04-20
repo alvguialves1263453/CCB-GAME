@@ -2317,7 +2317,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 </div>
               </div>
 
-              <div className="flex-grow cartoon-panel p-3 md:p-4 flex flex-col items-center justify-start gap-2 md:gap-3 relative overflow-hidden min-h-0 pb-20 md:pb-4">
+              <div className="flex-grow cartoon-panel p-3 md:p-4 flex flex-col items-center justify-between gap-2 md:gap-3 relative overflow-hidden min-h-0">
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
                 <div className="flex flex-col items-center text-center gap-1 max-w-4xl w-full flex-shrink">
@@ -2332,7 +2332,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   </div>
                 </div>
 
-                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 max-w-4xl px-2 mt-2 md:mt-auto shrink-0">
+                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 max-w-4xl px-2 shrink-0">
                   {questions[currentRound].options.map((option, idx) => (
                     <button
                       key={idx}
