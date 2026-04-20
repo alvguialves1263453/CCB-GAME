@@ -2845,10 +2845,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     </button>
 )}
  
- {bibliaIsHost && bibliaRoomId && (
+{bibliaIsHost && bibliaRoomId && bibliaPlayers.length > 0 && (
                      <>
-<button
-                          onClick={async () => {
+                       <button
+                         onClick={async () => {
+                           alert('CLICOU EM COMEÇAR!');
+                           console.log('[BIBLIA] Starting game...');
                             console.log('[BIBLIA] Starting game...');
                             const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
                             console.log('[BIBLIA] Perguntas:', allPerguntas?.length);
