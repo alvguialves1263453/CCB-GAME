@@ -427,4 +427,48 @@ export const drawingService = {
     await supabase.from('drawing_players').delete().eq('room_id', roomId);
     await supabase.from('drawing_rooms').delete().eq('id', roomId);
   },
+
+  async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string }[]) => void) {
+    const fetchLobbies = async () => {
+      const { data } = await supabase.from('drawing_rooms')
+        .select('id, round_count')
+        .eq('phase', 'lobby');
+      
+      if (data && data.length > 0) {
+        const formatted = await Promise.all(data.map(async (r: any) => {
+          const { data: players } = await supabase.from('drawing_players')
+            .select('nickname, avatar')
+            .eq('room_id', r.id)
+            .eq('is_host', true)
+            .limit(1);
+          
+          return {
+            id: r.id,
+            hostName: players?.[0]?.nickname || 'Host',
+            roundCount: r.round_count || 3
+          };
+        }));
+        onNearbyRoomsChange(formatted);
+      } else {
+        onNearbyRoomsChange([]);
+      }
+    };
+    
+    fetchLobbies();
+    
+    const channel = supabase.channel('drawing_lobby_discovery_db')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drawing_rooms' }, () => {
+        fetchLobbies();
+      })
+      .subscribe();
+      
+    (this as any)._discoveryChannel = channel;
+  },
+
+  stopDiscoveryListener() {
+    if ((this as any)._discoveryChannel) {
+      supabase.removeChannel((this as any)._discoveryChannel);
+      (this as any)._discoveryChannel = null;
+    }
+  },
 };
