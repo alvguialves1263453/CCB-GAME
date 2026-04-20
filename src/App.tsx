@@ -500,9 +500,11 @@ export default function App() {
     }
     
     if (bibliaParam) {
-      setBibliaRoomId(bibliaParam.toUpperCase());
-      setBibliaGameMode(true);
-      setView("biblia_setup");
+      setRoomId(bibliaParam.toUpperCase());
+      setBibliaGameMode(true);  //Marca que é modo biblia
+      setIsSolo(false);
+      setIsManualJoin(false);
+      setView("multiplayer_join");
     }
     
     if (drawingParam) {
@@ -1247,7 +1249,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
         return;
       }
 
-      const q = await prepareQuestions();
+      const q = await prepareQuestions(bibliaGameMode);
       if (q && roomId) {
         setIsLoading(true);
         // Start game in DB
@@ -1257,8 +1259,31 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     }
   };
 
-  const prepareQuestions = async () => {
+  const prepareQuestions = async (isBiblia: boolean = false) => {
     setIsLoading(true);
+    
+    // Se modo Biblia, buscar de biblia_perguntas
+    if (isBiblia) {
+      const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+      if (!allPerguntas || allPerguntas.length === 0) {
+        alert("Nenhuma pergunta da Biblia!");
+        setIsLoading(false);
+        return null;
+      }
+      const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, roundCount);
+      const q = selected.map((p: any) => ({
+        hinario: 0,
+        numero: p.id,
+        snippet: p.pergunta,
+        options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
+        correct: 0
+      }));
+      setIsLoading(false);
+      return q;
+    }
+    
+    // Modo normal (hino)
     let currentHymns = hymns;
     if (currentHymns.length === 0) {
       currentHymns = await fetchHymns();
@@ -2219,7 +2244,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     soundService.playClick();
-                    setView("biblia_setup");
+                    setBibliaGameMode(true);  // Ativar modo biblia
+                    setView("multiplayer_setup");
                   }}
                   className="w-full bg-[#8B5CF6] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
                 >
