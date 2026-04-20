@@ -2114,6 +2114,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
           )}
 
           {/* Drawing Setup */}
+          {(view === "drawing_setup") && (
             <motion.div
               key="drawing_setup"
               initial={{ opacity: 0, x: 100 }}
