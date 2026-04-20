@@ -1968,9 +1968,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                             <>
                               <span className={cn(
                                 "text-[9px] font-black px-2 py-0.5 rounded",
-                                game.difficulty === 'facil' ? "bg-[#4ECB71] text-white" :
-                                game.difficulty === 'medio' ? "bg-[#FFD700] text-[#1a0533]" :
-                                "bg-[#FF4757] text-white"
+                                game.difficulty === 'facil' ? "bg-[#22C55E] text-white" :
+                                game.difficulty === 'medio' ? "bg-[#F59E0B] text-white" :
+                                "bg-[#8B5CF6] text-white"
                               )}>
                                 {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
                               </span>
@@ -2082,9 +2082,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Nível</label>
                       <div className="flex flex-col gap-1.5">
                         {([
-                          { value: 'facil' as Difficulty, label: 'LENTO', desc: 'Tempo ilimitado', color: 'bg-[#4ECB71]', textColor: 'text-white' },
-                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20s para responder', color: 'bg-[#FFD700]', textColor: 'text-[#1a0533]' },
-                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: '10s para responder', color: 'bg-[#FF4757]', textColor: 'text-white' },
+                          { value: 'facil' as Difficulty, label: 'LENTO', desc: 'Tempo ilimitado', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20s para responder', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: '10s para responder', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
                         ]).map(d => (
                           <button
                             key={d.value}
@@ -2205,13 +2205,13 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <BookOpen className="w-24 h-24 md:w-32 md:h-32" />
                   </div>
                   <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
-                    <BookOpen className="w-6 h-6 md:w-10 md:h-10 text-[#FF4757]" />
+                    <BookOpen className="w-6 h-6 md:w-10 md:h-10 text-[#8B5CF6]" />
                   </div>
                   <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
                     <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Quiz da Bíblia</h3>
                     <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Teste seus conhecimentos da Palavra de Deus!</p>
                   </div>
-                  <div className="bg-white text-[#FF4757] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-1 md:mt-0 z-10">
+                  <div className="bg-white text-[#8B5CF6] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#F59E0B] transition-colors mt-1 md:mt-0 z-10">
                     JOGAR AGORA
                   </div>
                 </motion.button>
@@ -2687,15 +2687,15 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Rodadas</label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[1, 2, 3, 4, 5].map(n => (
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[5, 10, 15, 20].map(n => (
                       <button
                         key={n}
                         onClick={() => { soundService.playClick(); setBibliaRoundCount(n); }}
                         className={cn(
                           "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
                           bibliaRoundCount === n
-                            ? "bg-[#FF4757] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                            ? "bg-[#8B5CF6] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
                             : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                         )}
                       >
@@ -2708,18 +2708,22 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Dificuldade</label>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {(['facil', 'medio', 'dificil'] as const).map(d => (
+                    {([
+                      { value: 'facil' as Difficulty, label: 'Fácil', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                      { value: 'medio' as Difficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                      { value: 'dificil' as Difficulty, label: 'Difícil', color: 'bg-[#8B5CF6]', textColor: 'text-white' }
+                    ] as const).map(d => (
                       <button
-                        key={d}
-                        onClick={() => { soundService.playClick(); setDifficulty(d); }}
+                        key={d.value}
+                        onClick={() => { soundService.playClick(); setDifficulty(d.value); }}
                         className={cn(
                           "py-2 rounded-lg border-4 border-[#1a0533] font-black text-xs transition-all capitalize",
-                          difficulty === d
-                            ? "bg-[#FF4757] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                          difficulty === d.value
+                            ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-105`
                             : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                         )}
                       >
-                        {d}
+                        {d.label}
                       </button>
                     ))}
                   </div>
@@ -2782,8 +2786,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               </div>
 
               <div className="flex items-center justify-between bg-white border-4 border-[#1a0533] rounded-xl px-4 py-2">
-                <span className="text-sm font-black text-[#1a0533]">Dificuldade: <span className="text-[#FF4757] uppercase">{difficulty}</span></span>
-                <span className="text-sm font-black text-[#1a0533]">Rodadas: <span className="text-[#FF4757]">{bibliaRoundCount}</span></span>
+                <span className="text-sm font-black text-[#1a0533]">Dificuldade: <span className={cn("uppercase", difficulty === 'facil' ? "text-[#22C55E]" : difficulty === 'medio' ? "text-[#F59E0B]" : "text-[#8B5CF6]")}>{difficulty}</span></span>
+                <span className="text-sm font-black text-[#1a0533]">Rodadas: <span className="text-[#8B5CF6]">{bibliaRoundCount}</span></span>
               </div>
 
               {bibliaIsHost ? (

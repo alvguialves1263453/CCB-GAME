@@ -94,7 +94,8 @@ export const bibliaService = {
     }).select().single();
 
     if (roomError) {
-      console.error("Error creating biblia room:", roomError);
+      console.error("Error creating biblia room:", roomError.message, roomError.details, roomError.hint);
+      alert("Erro ao criar sala: " + roomError.message);
       return null;
     }
 
