@@ -2107,34 +2107,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   </div>
                 </motion.button>
 
-                {/* Mode 2 - Desenho Musical (Multiplayer Drawing) */}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    soundService.playClick();
-                    setDrawingGameMode(true);
-                    setView("drawing_setup");
-                  }}
-                  className="w-full bg-[#9B59F5] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
-                >
-                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                    <Pencil className="w-24 h-24 md:w-32 md:h-32" />
-                  </div>
-                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
-                    <Pencil className="w-6 h-6 md:w-10 md:h-10 text-[#9B59F5]" />
-                  </div>
-                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
-                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Desenho Musical</h3>
-                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Desenhe o prompt e vote nos desenhos dos outros jogadores!</p>
-                  </div>
-                  <div className="bg-white text-[#9B59F5] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-1 md:mt-0 z-10">
-                    MULTIPLAYER
-                  </div>
-                </motion.button>
-
                 {/* Locked Modes */}
                 {[
+                  { title: "Desenho Musical", desc: "Desenhe o prompt e vote nos desenhos dos outros jogadores!", icon: <Pencil className="w-8 h-8 md:w-10 md:h-10 text-[#9B59F5]" /> },
                   { title: "Complete a Letra", desc: "Preencha a palavra que falta na estrofe do hino.", icon: <Check className="w-8 h-8 md:w-10 md:h-10 text-[#FF4757]" /> },
                   { title: "Qual a Voz?", desc: "Identifique se o trecho cantado é Soprano, Contralto, Tenor ou Baixo.", icon: <Users className="w-8 h-8 md:w-10 md:h-10 text-[#FFD700]" /> },
                   { title: "Soprando a Doutrina", desc: "Perguntas de conhecimentos bíblicos e pontos de doutrina.", icon: <MonitorSpeaker className="w-8 h-8 md:w-10 md:h-10 text-[#38bdf8]" /> },
