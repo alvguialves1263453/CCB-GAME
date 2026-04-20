@@ -788,19 +788,38 @@ export default function App() {
         if (!room) return;
         
         setBibliaRoundCount(room.roundCount);
+        setBibliaCurrentPergunta(room.questions?.[room.currentRound - 1]?.pergunta || 'N/A');
+        setBibliaOpcoes(room.questions?.[room.currentRound - 1]?.options || []);
         
         if (room.phase === 'lobby') {
           if (viewRef.current !== 'biblia_lobby') setView('biblia_lobby');
         } else if (room.phase === 'preparing') {
+          console.log('[BIBLIA] preparing phase');
           if (viewRef.current !== 'biblia_game') setView('biblia_game');
           setBibliaCountdown(3);
+          
+          // Auto start after 3s
+          if (bibliaIsHost) {
+            setTimeout(async () => {
+              const q = room.questions?.[0];
+              if (q) {
+                await bibliaService.startRound(bibliaRoomId!, 1, 15, q.pergunta);
+              }
+            }, 3500);
+          }
         } else if (room.phase === 'answering') {
-          console.log('[BIBLIA] answering phase, room:', room);
+          console.log('[BIBLIA] answering, questions:', room.questions);
           if (viewRef.current !== 'biblia_game') setView('biblia_game');
           bibliaStartTimeRef.current = Date.now();
           
+          // Set pergunta and options
+          const q = room.questions?.[room.currentRound - 1];
+          if (q) {
+            setBibliaCurrentPergunta(q.pergunta);
+            setBibliaOpcoes(q.options || []);
+          }
+          
           if (room.questions && room.questions.length > 0) {
-            console.log('[BIBLIA] questions:', room.questions);
             const pergunta = room.questions[room.currentRound - 1];
             if (pergunta) {
               setBibliaCurrentPergunta(pergunta.pergunta);
