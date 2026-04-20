@@ -314,7 +314,7 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
   // Discovery (Keeping it simple for nearby rooms)
   async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[]) => void) {
     const fetchLobbies = async () => {
-      const { data: hymnRooms } = await supabase.from('rooms').select('id, round_count, difficulty, players(id, nickname, avatar)').eq('phase', 'lobby');
+      const { data: hymnRooms } = await supabase.from('rooms').select('id, round_count, difficulty, game_type, players(id, nickname, avatar)').eq('phase', 'lobby');
       
       const allRooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[] = [];
       
@@ -324,7 +324,7 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
           allRooms.push({
             id: r.id,
             hostName: players?.[0]?.nickname || 'Host',
-            gameType: 'hino',
+            gameType: r.game_type || 'hino',
             difficulty: r.difficulty || 'facil',
             roundCount: r.round_count || 5
           });

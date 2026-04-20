@@ -1078,7 +1078,7 @@ export default function App() {
     setIsLoading(true);
     soundService.playClick();
     try {
-      const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount);
+const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
       if (result) {
         setRoomId(result.room.id);
         setLocalPlayerId(result.player.id);
@@ -2030,7 +2030,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                             {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
                           </span>
                           <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
-                          <span className="text-[9px] font-black text-[#1a0533]">Qual é o Hino?</span>
+                          <span className="text-[9px] font-black text-[#1a0533]">{game.gameType === 'biblia' ? 'Quiz da Biblia' : 'Qual é o Hino?'}</span>
                         </div>
                       </button>
                     ))
