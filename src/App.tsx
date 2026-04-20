@@ -2424,8 +2424,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <h4 className="font-black uppercase text-[9px] tracking-widest text-center border-b-2 border-gray-300 pb-1.5 text-[#1a0533]">Configurações</h4>
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
+                        <span>TEMA:</span>
+                        <span className="bg-[#9B59F5] text-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingCategory}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
                         <span>RODADAS:</span>
-                        <span className="bg-[#9B59F5] text-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingRoundCount}</span>
+                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingRoundCount}</span>
                       </div>
                     </div>
                   </div>
@@ -2533,7 +2537,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               </div>
 
               {/* Canvas Area */}
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 relative" style={{ minHeight: '300px' }}>
                 <DrawingCanvasView
                   prompt={drawingCurrentPrompt}
                   timeLeft={drawingTimeLeft}
