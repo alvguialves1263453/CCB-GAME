@@ -2444,14 +2444,17 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         soundService.playClick();
                         await drawingService.startDrawingGame(drawingRoomId!, drawingRoundCount);
                         
-                        // Show countdown (3, 2, 1) before starting
-                        [3, 2, 1].forEach((num, idx) => {
-                          setTimeout(() => setDrawingCountdown(num), idx * 1000);
-                        });
-                        setTimeout(() => {
-                          setDrawingCountdown(null);
-                          setView("drawing_game");
-                        }, 3000);
+                        // Wait for room update and show game
+                        setTimeout(async () => {
+                          const room = await drawingService.getRoom(drawingRoomId!);
+                          if (room) {
+                            setDrawingCurrentPrompt(room.currentPrompt || '');
+                            if (room.deadline_at) {
+                              setDrawingTimeLeft(Math.max(0, Math.ceil((room.deadline_at - Date.now()) / 1000)));
+                            }
+                            setView('drawing_game');
+                          }
+                        }, 1000);
                       }}
                       className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest"
                     >

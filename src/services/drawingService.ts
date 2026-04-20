@@ -490,4 +490,9 @@ export const drawingService = {
       (this as any)._discoveryChannel = null;
     }
   },
+
+  async getRoom(roomId: string): Promise<Partial<DrawingRoom> | null> {
+    const { data } = await supabase.from('drawing_rooms').select('*').eq('id', roomId).single();
+    return data;
+  },
 };
