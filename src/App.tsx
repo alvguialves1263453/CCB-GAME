@@ -54,12 +54,13 @@ import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
+import { bibliaService, type BibliaRoom, type BibliaPlayer } from "./services/bibliaService";
 import { drawingService, type DrawingPlayer, type DrawingRoom, type DrawingSubmission, type DrawingVote } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
 import { DrawingCanvasView } from "./components/DrawingComponents";
-import { Edit2 } from "lucide-react";
-type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection" | "drawing_setup" | "drawing_lobby" | "drawing_game" | "drawing_voting" | "drawing_ranking";
+import { Edit2, BookOpen } from "lucide-react";
+type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection" | "biblia_setup" | "biblia_lobby" | "biblia_game" | "biblia_ranking" | "drawing_setup" | "drawing_lobby" | "drawing_game" | "drawing_voting" | "drawing_ranking";
 
 interface Player {
   id: string;
@@ -327,6 +328,22 @@ export default function App() {
   const [isDrawingHost, setIsDrawingHost] = useState(false);
   const drawingStartTimeRef = useRef<number>(0);
   const drawingVotingStartTimeRef = useRef<number>(0);
+  
+  // Biblia game states
+  const [bibliaGameMode, setBibliaGameMode] = useState(false);
+  const [bibliaRoomId, setBibliaRoomId] = useState<string | null>(null);
+  const [bibliaLocalPlayerId, setBibliaLocalPlayerId] = useState<string | null>(null);
+  const [bibliaPlayers, setBibliaPlayers] = useState<BibliaPlayer[]>([]);
+  const [bibliaRound, setBibliaRound] = useState(1);
+  const [bibliaRoundCount, setBibliaRoundCount] = useState(5);
+  const [bibliaCurrentPergunta, setBibliaCurrentPergunta] = useState<string>('');
+  const [bibliaOpcoes, setBibliaOpcoes] = useState<string[]>([]);
+  const [bibliaTimeLeft, setBibliaTimeLeft] = useState<number>(15);
+  const [bibliaCountdown, setBibliaCountdown] = useState<number | null>(null);
+  const [bibliaSubmissions, setBibliaSubmissions] = useState<any[]>([]);
+  const [bibliaFinalRanking, setBibliaFinalRanking] = useState<BibliaPlayer[]>([]);
+  const [bibliaIsHost, setBibliaIsHost] = useState(false);
+  const bibliaStartTimeRef = useRef<number>(0);
   
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
@@ -744,6 +761,62 @@ export default function App() {
     return () => clearInterval(interval);
   }, [view]);
 
+  // Handle biblia Game Subscriptions
+  useEffect(() => {
+    if (!bibliaRoomId || !bibliaGameMode) return;
+
+    const unsubscribe = bibliaService.subscribeToRoom(
+      bibliaRoomId,
+      (dbPlayers) => setBibliaPlayers(dbPlayers),
+      (room) => {
+        if (!room) return;
+        
+        setBibliaRoundCount(room.roundCount);
+        
+        if (room.phase === 'lobby') {
+          if (viewRef.current !== 'biblia_lobby') setView('biblia_lobby');
+        } else if (room.phase === 'preparing') {
+          if (viewRef.current !== 'biblia_game') setView('biblia_game');
+          setBibliaCountdown(3);
+        } else if (room.phase === 'answering') {
+          if (viewRef.current !== 'biblia_game') setView('biblia_game');
+          bibliaStartTimeRef.current = Date.now();
+          
+          if (room.questions && room.questions.length > 0) {
+            const pergunta = room.questions[room.currentRound - 1];
+            if (pergunta) {
+              setBibliaCurrentPergunta(pergunta.pergunta);
+              // Shuffle options
+              const options = [pergunta.correta, pergunta.opcao1, pergunta.opcao2, pergunta.opcao3].sort(() => Math.random() - 0.5);
+              setBibliaOpcoes(options);
+            }
+          }
+          
+          setBibliaRound(room.currentRound);
+          setBibliaTimeLeft(15);
+        } else if (room.phase === 'result') {
+          // Handle result phase
+        } else if (room.phase === 'ranking') {
+          setBibliaFinalRanking(bibliaPlayers);
+          setView('biblia_ranking');
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [bibliaRoomId, bibliaGameMode]);
+
+  // biblia game countdown timer
+  useEffect(() => {
+    if (view !== 'biblia_game') return;
+    
+    const interval = setInterval(() => {
+      setBibliaTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [view]);
+
   // Cleanup room when host leaves or reloads
   useEffect(() => {
     if (!roomId || isSolo) return;
@@ -865,7 +938,18 @@ export default function App() {
     }
   }, [view]);
 
-  // Drawing rooms discovery - removed, now combined with nearbyRooms
+  // biblia rooms discovery - also on mode_selection
+  useEffect(() => {
+    if (view === "mode_selection") {
+      bibliaService.startDiscoveryListener((rooms) => {
+        // Could add to nearby rooms list for biblia
+        console.log('biblia rooms:', rooms);
+      });
+      return () => {
+        bibliaService.stopDiscoveryListener();
+      };
+    }
+  }, [view]);
 
   // Countdown Timer
   useEffect(() => {
@@ -2107,6 +2191,31 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   </div>
                 </motion.button>
 
+                {/* Quiz da BiblIA */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    soundService.playClick();
+                    setView("biblia_setup");
+                  }}
+                  className="w-full bg-[#FF4757] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                >
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <BookOpen className="w-24 h-24 md:w-32 md:h-32" />
+                  </div>
+                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
+                    <BookOpen className="w-6 h-6 md:w-10 md:h-10 text-[#FF4757]" />
+                  </div>
+                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Quiz da Bíblia</h3>
+                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Teste seus conhecimentos da Palavra de Deus!</p>
+                  </div>
+                  <div className="bg-white text-[#FF4757] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-1 md:mt-0 z-10">
+                    JOGAR AGORA
+                  </div>
+                </motion.button>
+
                 {/* Locked Modes */}
                 {[
                   { title: "Desenho Musical", desc: "Desenhe o prompt e vote nos desenhos dos outros jogadores!", icon: <Pencil className="w-8 h-8 md:w-10 md:h-10 text-[#9B59F5]" /> },
@@ -2536,6 +2645,264 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <span className="text-[#1a0533] font-black">{drawingPlayers.length}</span>
                 <span className="text-gray-500 text-sm uppercase">enviaram</span>
               </div>
+            </motion.div>
+          )}
+
+          {/* biblIA Setup */}
+          {(view === "biblia_setup") && (
+            <motion.div
+              key="biblia_setup"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+            >
+              <div className="flex items-center justify-between px-2 shrink-0">
+                <button onClick={() => { setBibliaGameMode(false); setView("mode_selection"); }} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
+                  <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                </button>
+                <h2 className="text-2xl md:text-3xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Quiz da Biblia</h2>
+                <div className="w-10 h-10" />
+              </div>
+
+              <div className="cartoon-panel bg-white p-4 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar url={profile?.avatarUrl || "1.png"} size={70} />
+                  <input 
+                    type="text" 
+                    maxLength={15}
+                    placeholder="Seu Nome"
+                    value={profile?.nickname}
+                    onChange={(e) => {
+                      const newNick = e.target.value;
+                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
+                      localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
+                    }}
+                    className="bg-white border-2 border-[#190c33] px-3 py-1.5 rounded-xl font-black text-center text-sm flex-1 focus:outline-none focus:border-[#FF4757] shadow-sm"
+                  />
+                  <button onClick={() => setIsEditingProfile(true)} className="bg-[#FFD700] p-2 rounded-lg border-2 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Rodadas</label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => { soundService.playClick(); setBibliaRoundCount(n); }}
+                        className={cn(
+                          "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
+                          bibliaRoundCount === n
+                            ? "bg-[#FF4757] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
+                        )}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Dificuldade</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['facil', 'medio', 'dificil'] as const).map(d => (
+                      <button
+                        key={d}
+                        onClick={() => { soundService.playClick(); setDifficulty(d); }}
+                        className={cn(
+                          "py-2 rounded-lg border-4 border-[#1a0533] font-black text-xs transition-all capitalize",
+                          difficulty === d
+                            ? "bg-[#FF4757] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
+                        )}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    if (!profile?.nickname) {
+                      alert("Escreve o teu nome primeiro!");
+                      return;
+                    }
+                    soundService.playClick();
+                    setIsLoading(true);
+                    const result = await bibliaService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount);
+                    setIsLoading(false);
+                    if (result) {
+                      setBibliaRoomId(result.room.id);
+                      setBibliaLocalPlayerId(result.player.id);
+                      setBibliaIsHost(true);
+                      setBibliaPlayers([result.player]);
+                      setView("biblia_lobby");
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-[#FF4757] border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] disabled:opacity-50"
+                >
+                  {isLoading ? "A criar..." : "CRIAR SALA"}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* biblIA Lobby */}
+          {(view === "biblia_lobby") && bibliaRoomId && (
+            <motion.div
+              key="biblia_lobby"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+            >
+              <div className="flex items-center justify-between px-2 shrink-0">
+                <button onClick={async () => { soundService.playClick(); await bibliaService.leaveRoom(); setBibliaGameMode(false); setBibliaRoomId(null); setView("mode_selection"); }} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
+                  <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                </button>
+                <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#FF4757]">{bibliaRoomId}</span></span>
+                <div className="w-10 h-10" />
+              </div>
+
+              <div className="bg-white border-4 border-[#1a0533] rounded-xl p-4 flex flex-col gap-2">
+                <h3 className="text-lg font-black uppercase italic tracking-tighter cartoon-text text-[#1a0533]">Jogadores ({bibliaPlayers.length})</h3>
+                {bibliaPlayers.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 p-2 bg-gray-100 rounded-lg border-2 border-[#1a0533]">
+                    <Avatar url={p.avatar || "1.png"} size={40} />
+                    <span className="flex-1 font-black text-[#1a0533]">{p.nickname}</span>
+                    {p.isHost && <span className="bg-[#FFD700] text-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">HOST</span>}
+                    {p.isReady && <span className="bg-[#4ECB71] text-white px-2 py-0.5 rounded-md text-xs font-black">PRONTO</span>}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between bg-white border-4 border-[#1a0533] rounded-xl px-4 py-2">
+                <span className="text-sm font-black text-[#1a0533]">Dificuldade: <span className="text-[#FF4757] uppercase">{difficulty}</span></span>
+                <span className="text-sm font-black text-[#1a0533]">Rodadas: <span className="text-[#FF4757]">{bibliaRoundCount}</span></span>
+              </div>
+
+              {bibliaIsHost ? (
+                <button
+                  onClick={async () => {
+                    const allReady = bibliaPlayers.every(p => p.isReady);
+                    if (!allReady) {
+                      await bibliaService.toggleReady(bibliaRoomId!, true);
+                      setBibliaPlayers(prev => prev.map(p => p.id === bibliaLocalPlayerId ? { ...p, isReady: true } : p));
+                    } else {
+                      // Start game - fetch perguntas from biblia_perguntas
+                      const { data: perguntas } = await supabase.from('biblia_perguntas').select('*').order('RANDOM()').limit(bibliaRoundCount);
+                      if (perguntas && perguntas.length > 0) {
+                        await bibliaService.startGame(bibliaRoomId!, perguntas, bibliaRoundCount, difficulty);
+                        setView('biblia_game');
+                      }
+                    }
+                  }}
+                  disabled={bibliaPlayers.length < 1}
+                  className={cn(
+                    "w-full py-3 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533]",
+                    bibliaPlayers.every(p => p.isReady) ? "bg-[#4ECB71] text-white" : "bg-[#FF4757] text-white"
+                  )}
+                >
+                  {bibliaPlayers.every(p => p.isReady) ? "COMEÇAR!" : "PRONTO!"}
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    const me = bibliaPlayers.find(p => p.id === bibliaLocalPlayerId);
+                    await bibliaService.toggleReady(bibliaRoomId!, !me?.isReady);
+                    setBibliaPlayers(prev => prev.map(p => p.id === bibliaLocalPlayerId ? { ...p, isReady: !p.isReady } : p));
+                  }}
+                  className={cn(
+                    "w-full py-3 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533]",
+                    bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "btn-green" : "bg-[#FF4757] text-white"
+                  )}
+                >
+                  {bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "PRONTO!" : "ESTOU PRONTO"}
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* biblIA Game */}
+          {view === "biblia_game" && (
+            <motion.div
+              key="biblia_game"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full flex-1 min-h-0 flex flex-col gap-2 pb-20 md:pb-3"
+            >
+              <div className="flex items-center justify-between px-4 py-2 bg-white border-b-4 border-[#1a0533] shrink-0">
+                <span className="text-sm font-black text-[#1a0533]">Rodada {bibliaRound}/{bibliaRoundCount}</span>
+                <div className={cn(
+                  "w-14 h-14 flex items-center justify-center rounded-xl font-black text-2xl border-4 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]",
+                  bibliaTimeLeft <= 5 ? "bg-[#FF4757] text-white animate-pulse" :
+                  bibliaTimeLeft <= 10 ? "bg-[#FFD700] text-[#1a0533]" :
+                  "bg-white text-[#1a0533]"
+                )}>
+                  {bibliaTimeLeft}
+                </div>
+              </div>
+
+              <div className="flex-1 flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-lg bg-white border-4 border-[#1a0533] rounded-2xl p-6 shadow-[4px_4px_0px_#1a0533]">
+                  <h3 className="text-xl md:text-2xl font-black text-center text-[#1a0533] mb-6">{bibliaCurrentPergunta}</h3>
+                  
+                  <div className="flex flex-col gap-3">
+                    {bibliaOpcoes.map((opcao, idx) => (
+                      <button
+                        key={idx}
+                        onClick={async () => {
+                          soundService.playClick();
+                          // Handle answer
+                        }}
+                        className="w-full py-4 bg-[#FF4757] border-4 border-[#1a0533] rounded-xl font-black text-lg text-white shadow-[3px_3px_0px_#1a0533] hover:bg-[#ff6b7a] transition-colors"
+                      >
+                        {opcao}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* biblIA Ranking */}
+          {view === "biblia_ranking" && bibliaFinalRanking.length > 0 && (
+            <motion.div
+              key="biblia_ranking"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-lg mx-auto flex flex-col gap-4 pb-20 md:pb-3"
+            >
+              <div className="text-center">
+                <h2 className="text-3xl md:text-4xl font-black italic uppercase cartoon-text text-[#FFD700] drop-shadow-[3px_3px_0px_#1a0533]">FIM DE JOGO!</h2>
+                <p className="text-[#1a0533] font-bold">Ranking Final</p>
+              </div>
+
+              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 flex flex-col gap-2 shadow-[4px_4px_0px_#1a0533]">
+                {bibliaFinalRanking.sort((a, b) => b.score - a.score).map((p, idx) => (
+                  <div key={p.id} className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl border-4 border-[#1a0533]",
+                    idx === 0 ? "bg-[#FFD700]" : idx === 1 ? "bg-gray-300" : idx === 2 ? "bg-amber-600" : "bg-gray-100"
+                  )}>
+                    <span className="w-8 h-8 flex items-center justify-center bg-[#1a0533] text-white rounded-lg font-black">{idx + 1}</span>
+                    <Avatar url={p.avatar || "1.png"} size={40} />
+                    <span className="flex-1 font-black text-[#1a0533]">{p.nickname}</span>
+                    <span className="text-xl font-black text-[#1a0533]">{p.score}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => { setView("mode_selection"); setBibliaGameMode(false); }} className="w-full py-4 bg-[#1a0533] border-4 border-[#1a0533] rounded-xl font-black text-xl text-white shadow-[3px_3px_0px_#1a0533]">
+                VOLTAR AO MENU
+              </button>
             </motion.div>
           )}
 
