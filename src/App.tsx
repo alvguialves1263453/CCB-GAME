@@ -248,7 +248,7 @@ const MusicalNotesBackground = ({ reducedMotion }: { reducedMotion?: boolean }) 
 };
 
 
-type Difficulty = 'facil' | 'medio' | 'dificil';
+type Difficulty = 'facil' | 'medio' | 'dificil' | 'aleatorio';
 
 const TIME_LIMITS = {
   facil: Infinity,
@@ -1271,7 +1271,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     
     // Se modo Biblia, buscar de biblia_perguntas
     if (isBiblia) {
-      const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+      let query = supabase.from('biblia_perguntas').select('*');
+      // Se não for aleatório, filtrar por dificuldade
+      if (difficulty !== 'aleatorio') {
+        query = query.eq('dificuldade', difficulty);
+      }
+      const { data: allPerguntas } = await query;
       if (!allPerguntas || allPerguntas.length === 0) {
         alert("Nenhuma pergunta da Biblia!");
         setIsLoading(false);
@@ -2142,9 +2147,10 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Nível</label>
                       <div className="flex flex-col gap-1.5">
                         {([
-                          { value: 'facil' as Difficulty, label: 'LENTO', desc: 'Tempo ilimitado', color: 'bg-[#22C55E]', textColor: 'text-white' },
-                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20s para responder', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: '10s para responder', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                          { value: 'facil' as Difficulty, label: 'LENTO', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                          { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
                         ]).map(d => (
                           <button
                             key={d.value}
@@ -2768,11 +2774,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Dificuldade</label>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1.5">
                     {([
                       { value: 'facil' as Difficulty, label: 'Fácil', color: 'bg-[#22C55E]', textColor: 'text-white' },
                       { value: 'medio' as Difficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                      { value: 'dificil' as Difficulty, label: 'Difícil', color: 'bg-[#8B5CF6]', textColor: 'text-white' }
+                      { value: 'dificil' as Difficulty, label: 'Difícil', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                      { value: 'aleatorio' as Difficulty, label: 'Misto', color: 'bg-[#EC4899]', textColor: 'text-white' }
                     ] as const).map(d => (
                       <button
                         key={d.value}
@@ -2881,7 +2888,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   <div className="bg-white border-4 border-[#1a0533] rounded-xl p-4 flex flex-col gap-2 shadow-[3px_3px_0px_#1a0533]">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black uppercase text-[#1a0533]/70">Dificuldade</span>
-                      <span className={cn("text-xs font-black uppercase px-2 py-0.5 rounded", difficulty === 'facil' ? "bg-[#22C55E] text-white" : difficulty === 'medio' ? "bg-[#F59E0B] text-white" : "bg-[#8B5CF6] text-white")}>{difficulty}</span>
+                      <span className={cn("text-xs font-black uppercase px-2 py-0.5 rounded", difficulty === 'facil' ? "bg-[#22C55E] text-white" : difficulty === 'medio' ? "bg-[#F59E0B] text-white" : difficulty === 'dificil' ? "bg-[#8B5CF6] text-white" : "bg-[#EC4899] text-white")}>{difficulty === 'aleatorio' ? 'Misto' : difficulty}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black uppercase text-[#1a0533]/70">Rodadas</span>
