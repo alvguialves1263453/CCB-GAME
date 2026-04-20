@@ -2825,24 +2825,27 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
                   {bibliaIsHost && (
                     <>
-                      {!bibliaPlayers.every(p => p.isReady) && bibliaPlayers.length > 0 && (
-                        <div className="text-center text-xs font-bold text-orange-600 bg-orange-50 border-2 border-orange-300 rounded-lg px-2 py-1">
-                          Nem todos os jogadores estão prontos
-                        </div>
-                      )}
                       <button
                         onClick={async () => {
-                          const allReady = bibliaPlayers.every(p => p.isReady);
-                          if (!allReady) {
-                            if (!confirm('Nem todos os jogadores estão prontos. Iniciar mesmo assim?')) {
-                              return;
-                            }
+                          const { data: allPerguntas, error: perpError } = await supabase.from('biblia_perguntas').select('*');
+                          console.log('[DEBUG] Perguntas fetched:', allPerguntas?.length, perpError);
+                          if (perpError) {
+                            console.error('[DEBUG] Error fetching perguntas:', perpError);
+                            alert('Erro ao buscar perguntas: ' + perpError.message);
+                            return;
                           }
-                          const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
-                          const perguntas = allPerguntas ? allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount) : [];
-                          if (perguntas && perguntas.length > 0) {
+                          if (!allPerguntas || allPerguntas.length === 0) {
+                            alert('Nenhuma pergunta encontrada no banco!');
+                            return;
+                          }
+                          const perguntas = allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount);
+                          console.log('[DEBUG] Selected perguntas:', perguntas.length);
+                          try {
                             await bibliaService.startGame(bibliaRoomId!, perguntas, bibliaRoundCount, difficulty);
-                            setView('biblia_game');
+                            console.log('[DEBUG] startGame called');
+                          } catch (e) {
+                            console.error('[DEBUG] startGame error:', e);
+                            alert('Erro ao iniciar jogo');
                           }
                         }}
                         disabled={bibliaPlayers.length < 1}
@@ -2852,28 +2855,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       </button>
                     </>
                   )}
-                </div>
+</div>
               </div>
-            </motion.div>
-          )}
-                >
-                  {bibliaPlayers.every(p => p.isReady) ? "COMEÇAR!" : "PRONTO!"}
-                </button>
-              ) : (
-                <button
-                  onClick={async () => {
-                    const me = bibliaPlayers.find(p => p.id === bibliaLocalPlayerId);
-                    await bibliaService.toggleReady(bibliaRoomId!, !me?.isReady);
-                    setBibliaPlayers(prev => prev.map(p => p.id === bibliaLocalPlayerId ? { ...p, isReady: !p.isReady } : p));
-                  }}
-                  className={cn(
-                    "w-full py-3 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533]",
-                    bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "btn-green" : "bg-[#FF4757] text-white"
-                  )}
-                >
-                  {bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "PRONTO!" : "ESTOU PRONTO"}
-                </button>
-              )}
             </motion.div>
           )}
 
