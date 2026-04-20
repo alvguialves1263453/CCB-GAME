@@ -729,6 +729,17 @@ export default function App() {
     return () => unsubscribe();
   }, [drawingRoomId, drawingGameMode]);
 
+  // Drawing game countdown timer
+  useEffect(() => {
+    if (view !== 'drawing_game') return;
+    
+    const interval = setInterval(() => {
+      setDrawingTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [view]);
+
   // Cleanup room when host leaves or reloads
   useEffect(() => {
     if (!roomId || isSolo) return;
