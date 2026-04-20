@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Pencil, Eraser, Undo2, Redo2, Trash2, Send } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -9,7 +9,6 @@ interface Path {
   points: Point[];
   color: string;
   width: number;
-  opacity: number;
 }
 
 interface DrawingCanvasViewProps {
@@ -27,41 +26,43 @@ const COLORS = [
 
 export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubmitted }: DrawingCanvasViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [paths, setPaths] = useState<Path[]>([]);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
   const [currentColor, setCurrentColor] = useState("#000000");
-  const [brushSize, setBrushSize] = useState(5);
+  const [brushSize, setBrushSize] = useState(6);
   const [tool, setTool] = useState<"pencil" | "eraser">("pencil");
   const [history, setHistory] = useState<Path[]>([]);
   const [redoStack, setRedoStack] = useState<Path[]>([]);
 
-  // Initialize canvas size
+  // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
     
-    const updateSize = () => {
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-      redrawCanvas();
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      redrawAll();
     };
     
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Time up handler
+  // Time up
   useEffect(() => {
     if (timeLeft <= 0 && !isSubmitted) {
       onTimeUp();
     }
   }, [timeLeft, isSubmitted, onTimeUp]);
 
-  const redrawCanvas = useCallback(() => {
+  const redrawAll = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -79,7 +80,6 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
       ctx.lineWidth = path.width;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.globalAlpha = path.opacity;
       
       ctx.moveTo(path.points[0].x, path.points[0].y);
       for (let i = 1; i < path.points.length; i++) {
@@ -87,184 +87,169 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
       }
       ctx.stroke();
     }
-    
-    ctx.globalAlpha = 1;
-  }, [paths]);
+  };
 
   useEffect(() => {
-    redrawCanvas();
-  }, [paths, redrawCanvas]);
+    redrawAll();
+  }, [paths]);
 
-  const getCanvasPoint = (e: React.MouseEvent | React.TouchEvent): Point | null => {
+  const getPos = (e: React.MouseEvent | React.TouchEvent): Point | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     
     const rect = canvas.getBoundingClientRect();
-    let clientX, clientY;
+    let clientX: number, clientY: number;
     
-    if ('touches' in e) {
+    if ('touches' in e && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
-    } else {
+    } else if ('clientX' in e) {
       clientX = e.clientX;
       clientY = e.clientY;
+    } else {
+      return null;
     }
     
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
     };
   };
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+  const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
     if (isSubmitted) return;
     e.preventDefault();
+    e.stopPropagation();
     
-    const point = getCanvasPoint(e);
-    if (!point) return;
-    
-    setIsDrawing(true);
-    setCurrentPath([point]);
+    const pos = getPos(e);
+    if (pos) {
+      setIsDrawing(true);
+      setCurrentPath([pos]);
+    }
   };
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+  const moveDraw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing || isSubmitted) return;
     e.preventDefault();
+    e.stopPropagation();
     
-    const point = getCanvasPoint(e);
-    if (!point) return;
-    
-    setCurrentPath(prev => [...prev, point]);
+    const pos = getPos(e);
+    if (pos) {
+      setCurrentPath(prev => [...prev, pos]);
+      
+      // Draw immediately
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx || currentPath.length < 1) return;
+      
+      ctx.beginPath();
+      ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : currentColor;
+      ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      
+      const prevPos = currentPath[currentPath.length - 1];
+      ctx.moveTo(prevPos.x, prevPos.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
   };
 
-  const stopDrawing = () => {
+  const endDraw = () => {
     if (!isDrawing) return;
-    
     setIsDrawing(false);
     
     if (currentPath.length > 1) {
       const newPath: Path = {
         points: currentPath,
         color: tool === "eraser" ? "#FFFFFF" : currentColor,
-        width: tool === "eraser" ? brushSize * 2 : brushSize,
-        opacity: 1
+        width: tool === "eraser" ? brushSize * 2 : brushSize
       };
-      
       setPaths(prev => [...prev, newPath]);
       setHistory(prev => [...prev, newPath]);
       setRedoStack([]);
     }
-    
     setCurrentPath([]);
   };
 
   const undo = () => {
     if (paths.length === 0) return;
-    
-    const lastPath = paths[paths.length - 1];
+    const last = paths[paths.length - 1];
     setPaths(prev => prev.slice(0, -1));
-    setRedoStack(prev => [...prev, lastPath]);
+    setRedoStack(prev => [...prev, last]);
   };
 
   const redo = () => {
     if (redoStack.length === 0) return;
-    
-    const pathToRedo = redoStack[redoStack.length - 1];
-    setPaths(prev => [...prev, pathToRedo]);
+    const next = redoStack[redoStack.length - 1];
+    setPaths(prev => [...prev, next]);
     setRedoStack(prev => prev.slice(0, -1));
   };
 
-  const clearCanvas = () => {
+  const clear = () => {
     setPaths([]);
     setHistory([]);
     setRedoStack([]);
-    redrawCanvas();
+    redrawAll();
   };
 
-  const handleSubmit = () => {
+  const submit = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
     const dataUrl = canvas.toDataURL("image/png");
     onSubmit(JSON.stringify({ paths, imageData: dataUrl }));
   };
 
-  // Render current path while drawing
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || currentPath.length < 2) return;
-    
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    
-    ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : currentColor;
-    ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    
-    ctx.beginPath();
-    ctx.moveTo(currentPath[0].x, currentPath[0].y);
-    for (let i = 1; i < currentPath.length; i++) {
-      ctx.lineTo(currentPath[i].x, currentPath[i].y);
-    }
-    ctx.stroke();
-  }, [currentPath, currentColor, brushSize, tool]);
-
   return (
-    <div className="w-full h-full flex flex-col bg-[#F5F5F5]">
-      {/* Canvas Area */}
-      <div 
-        ref={containerRef} 
-        className="flex-1 bg-white m-2 rounded-lg overflow-hidden shadow-inner"
-        style={{ touchAction: 'none' }}
-      >
+    <div className="w-full h-full flex flex-col">
+      {/* Canvas */}
+      <div className="flex-1 relative bg-white border-4 border-[#1a0533] m-2 rounded-xl overflow-hidden shadow-[4px_4px_0px_#1a0533]">
         <canvas
           ref={canvasRef}
           className="w-full h-full touch-none cursor-crosshair"
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
+          onMouseDown={startDraw}
+          onMouseMove={moveDraw}
+          onMouseUp={endDraw}
+          onMouseLeave={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={moveDraw}
+          onTouchEnd={endDraw}
         />
         
         {isSubmitted && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-            <div className="bg-white px-8 py-4 rounded-2xl">
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+            <div className="bg-white border-4 border-[#1a0533] px-8 py-4 rounded-2xl shadow-[4px_4px_0px_#1a0533]">
               <p className="text-2xl font-black text-[#4ECB71]">ENVIADO!</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Toolbar - Gartic Phone Style */}
-      <div className="bg-[#2C2C2C] px-2 py-3 flex flex-col gap-2">
-        {/* Colors Row */}
-        <div className="flex items-center justify-center gap-1.5">
+      {/* Toolbar - Clean Style */}
+      <div className="bg-white border-4 border-[#1a0533] mx-2 mb-2 rounded-xl p-3 flex flex-col gap-2 shadow-[4px_4px_0px_#1a0533]">
+        {/* Cores */}
+        <div className="flex items-center justify-center gap-2">
           {COLORS.map(color => (
             <button
               key={color}
               onClick={() => { setCurrentColor(color); setTool("pencil"); }}
               className={cn(
-                "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110",
-                currentColor === color && tool === "pencil" 
-                  ? "border-white ring-2 ring-[#FFD700] ring-offset-2 ring-offset-[#2C2C2C]" 
-                  : "border-gray-500"
+                "w-8 h-8 rounded-full border-3 border-[#1a0533] transition-transform hover:scale-110",
+                currentColor === color && tool === "pencil" && "ring-4 ring-[#FFD700] ring-offset-2"
               )}
               style={{ backgroundColor: color }}
             />
           ))}
         </div>
 
-        {/* Tools Row */}
+        {/* Ferramentas */}
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={() => setTool("pencil")}
             className={cn(
-              "p-2 rounded-lg transition-transform hover:scale-110",
-              tool === "pencil" ? "bg-[#FFD700] text-black" : "bg-[#444] text-white"
+              "p-2 rounded-lg border-2 border-[#1a0533] font-bold text-sm",
+              tool === "pencil" ? "bg-[#9B59F5] text-white" : "bg-gray-100 text-[#1a0533]"
             )}
           >
             <Pencil className="w-5 h-5" />
@@ -273,73 +258,54 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
           <button
             onClick={() => setTool("eraser")}
             className={cn(
-              "p-2 rounded-lg transition-transform hover:scale-110",
-              tool === "eraser" ? "bg-[#FFD700] text-black" : "bg-[#444] text-white"
+              "p-2 rounded-lg border-2 border-[#1a0533] font-bold text-sm",
+              tool === "eraser" ? "bg-[#9B59F5] text-white" : "bg-gray-100 text-[#1a0533]"
             )}
           >
             <Eraser className="w-5 h-5" />
           </button>
 
-          <div className="w-px h-8 bg-gray-600 mx-1" />
+          <div className="w-px h-8 bg-gray-300" />
 
-          <button
-            onClick={undo}
-            disabled={paths.length === 0}
-            className="p-2 rounded-lg bg-[#444] text-white disabled:opacity-30 disabled:cursor-not-allowed transition-transform hover:scale-110"
-          >
+          <button onClick={undo} disabled={paths.length === 0} className="p-2 rounded-lg border-2 border-[#1a0533] bg-gray-100 disabled:opacity-30">
             <Undo2 className="w-5 h-5" />
           </button>
-          
-          <button
-            onClick={redo}
-            disabled={redoStack.length === 0}
-            className="p-2 rounded-lg bg-[#444] text-white disabled:opacity-30 disabled:cursor-not-allowed transition-transform hover:scale-110"
-          >
+          <button onClick={redo} disabled={redoStack.length === 0} className="p-2 rounded-lg border-2 border-[#1a0533] bg-gray-100 disabled:opacity-30">
             <Redo2 className="w-5 h-5" />
           </button>
-          
-          <button
-            onClick={clearCanvas}
-            className="p-2 rounded-lg bg-[#444] text-white transition-transform hover:scale-110"
-          >
+          <button onClick={clear} className="p-2 rounded-lg border-2 border-[#1a0533] bg-gray-100">
             <Trash2 className="w-5 h-5" />
           </button>
 
-          <div className="w-px h-8 bg-gray-600 mx-1" />
+          <div className="w-px h-8 bg-gray-300" />
 
-          {/* Brush Size */}
-          <div className="flex items-center gap-1 bg-[#444] px-2 py-1 rounded-lg">
-            <div 
-              className="rounded-full bg-white"
-              style={{ width: brushSize, height: brushSize }}
-            />
+          {/* Tamanho */}
+          <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-lg border-2 border-[#1a0533]">
+            <div className="rounded-full bg-[#1a0533]" style={{ width: brushSize, height: brushSize }} />
             <input
               type="range"
-              min={3}
-              max={25}
+              min={2}
+              max={30}
               value={brushSize}
               onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-16 accent-[#FFD700]"
+              className="w-16 accent-[#9B59F5]"
             />
           </div>
         </div>
 
-        {/* Send Button */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleSubmit}
+        {/* Enviar */}
+        <button
+          onClick={submit}
           disabled={isSubmitted}
           className={cn(
-            "w-full py-3 rounded-xl font-black text-lg tracking-widest flex items-center justify-center gap-2",
+            "w-full py-3 rounded-lg border-4 border-[#1a0533] font-black text-lg tracking-widest shadow-[3px_3px_0px_#1a0533] transition-transform",
             isSubmitted 
-              ? "bg-gray-500 text-gray-300 cursor-not-allowed" 
-              : "bg-[#4ECB71] text-white hover:bg-[#3db960]"
+              ? "bg-gray-400 text-gray-200 cursor-not-allowed" 
+              : "bg-[#4ECB71] text-white hover:translate-y-0.5 hover:shadow-[1px_1px_0px_#1a0533]"
           )}
         >
-          <Send className="w-5 h-5" />
-          {isSubmitted ? "ENVIADO!" : "ENVIAR DESENHO"}
-        </motion.button>
+          {isSubmitted ? "ENVIADO!" : "✓ ENVIAR DESENHO"}
+        </button>
       </div>
     </div>
   );

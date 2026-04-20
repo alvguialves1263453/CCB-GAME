@@ -2500,7 +2500,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
             </motion.div>
           )}
 
-          {/* Drawing Game - Gartic Phone Style */}
+          {/* Drawing Game */}
           {view === "drawing_game" && (
             <motion.div
               key="drawing_game"
@@ -2509,14 +2509,14 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               exit={{ opacity: 0 }}
               className="w-full h-full flex flex-col"
             >
-              {/* Header - Prompt */}
-              <div className="bg-[#1a1a2e] px-4 py-3 flex items-center justify-between shrink-0">
+              {/* Header */}
+              <div className="bg-white border-b-4 border-[#1a0533] px-4 py-3 flex items-center justify-between shrink-0">
                 <div className="flex-1">
-                  <span className="text-sm text-gray-400 uppercase tracking-wider">Desenhe:</span>
-                  <p className="text-2xl font-black text-white">{drawingCurrentPrompt}</p>
+                  <span className="text-xs text-gray-500 uppercase tracking-wider">Desenhe:</span>
+                  <p className="text-xl font-black text-[#1a0533]">{drawingCurrentPrompt}</p>
                 </div>
                 <div className={cn(
-                  "w-16 h-16 flex items-center justify-center rounded-2xl font-black text-3xl",
+                  "w-14 h-14 flex items-center justify-center rounded-xl font-black text-2xl border-4 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]",
                   drawingTimeLeft <= 10 ? "bg-[#FF4757] text-white animate-pulse" :
                   drawingTimeLeft <= 20 ? "bg-[#FFD700] text-[#1a0533]" :
                   "bg-white text-[#1a0533]"
@@ -2544,11 +2544,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               </div>
 
               {/* Status Bar */}
-              <div className="bg-[#1a1a2e] px-4 py-2 flex items-center justify-center gap-2 shrink-0">
-                <span className="text-[#FFD700] font-black">{drawingSubmissions.length}</span>
-                <span className="text-gray-500">/</span>
-                <span className="text-white font-black">{drawingPlayers.length}</span>
-                <span className="text-gray-400 text-sm uppercase">enviaram</span>
+              <div className="bg-white border-t-4 border-[#1a0533] px-4 py-2 flex items-center justify-center gap-2 shrink-0">
+                <span className="text-[#9B59F5] font-black">{drawingSubmissions.length}</span>
+                <span className="text-gray-400">/</span>
+                <span className="text-[#1a0533] font-black">{drawingPlayers.length}</span>
+                <span className="text-gray-500 text-sm uppercase">enviaram</span>
               </div>
             </motion.div>
           )}
