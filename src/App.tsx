@@ -1942,15 +1942,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         key={idx}
                         onClick={() => {
                           soundService.playClick();
-                          if (game.gameType === 'drawing') {
-                            setDrawingRoomId(game.id);
-                            setDrawingGameMode(true);
-                            setView("drawing_setup");
-                          } else {
-                            setIsManualJoin(false);
-                            setRoomId(game.id);
-                            setView("multiplayer_join");
-                          }
+                          setIsManualJoin(false);
+                          setRoomId(game.id);
+                          setView("multiplayer_join");
                         }}
                         className="w-full p-2 bg-white border-2 border-[#1a0533] rounded-lg flex flex-col gap-1 game-shadow-hover"
                       >
@@ -1959,25 +1953,16 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                           <span className="font-black text-[10px] text-[#9B59F5]">#{game.id}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          {game.gameType === 'drawing' ? (
-                            <>
-                              <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
-                              <span className="text-[9px] font-black text-[#9B59F5]">Desenho</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className={cn(
-                                "text-[9px] font-black px-2 py-0.5 rounded",
-                                game.difficulty === 'facil' ? "bg-[#22C55E] text-white" :
-                                game.difficulty === 'medio' ? "bg-[#F59E0B] text-white" :
-                                "bg-[#8B5CF6] text-white"
-                              )}>
-                                {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
-                              </span>
-                              <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
-                              <span className="text-[9px] font-black text-[#1a0533]">Qual é o Hino?</span>
-                            </>
-                          )}
+                          <span className={cn(
+                            "text-[9px] font-black px-2 py-0.5 rounded",
+                            game.difficulty === 'facil' ? "bg-[#22C55E] text-white" :
+                            game.difficulty === 'medio' ? "bg-[#F59E0B] text-white" :
+                            "bg-[#8B5CF6] text-white"
+                          )}>
+                            {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
+                          </span>
+                          <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
+                          <span className="text-[9px] font-black text-[#1a0533]">Qual é o Hino?</span>
                         </div>
                       </button>
                     ))

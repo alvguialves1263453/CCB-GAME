@@ -310,11 +310,7 @@ export const multiplayerService = {
   // Discovery (Keeping it simple for nearby rooms)
   async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[]) => void) {
     const fetchLobbies = async () => {
-      // Fetch hymn rooms
       const { data: hymnRooms } = await supabase.from('rooms').select('id, round_count, difficulty, players(id, nickname, avatar)').eq('phase', 'lobby');
-      
-      // Fetch drawing rooms
-      const { data: drawingRooms } = await supabase.from('drawing_rooms').select('id, round_count').eq('phase', 'lobby');
       
       const allRooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[] = [];
       
@@ -327,18 +323,6 @@ export const multiplayerService = {
             gameType: 'hino',
             difficulty: r.difficulty || 'facil',
             roundCount: r.round_count || 5
-          });
-        }
-      }
-      
-      if (drawingRooms) {
-        for (const r of drawingRooms) {
-          const { data: players } = await supabase.from('drawing_players').select('nickname, avatar').eq('room_id', r.id).eq('is_host', true).limit(1);
-          allRooms.push({
-            id: r.id,
-            hostName: players?.[0]?.nickname || 'Host',
-            gameType: 'drawing',
-            roundCount: r.round_count || 3
           });
         }
       }
