@@ -321,3 +321,29 @@ canvas { pointer-events: none; }
   box-sizing: border-box;
 }
 
+/* ===========================
+   iOS Safari Safe Area Fix
+   =========================== */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  html, body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+:root {
+  --saf-area-bottom: 0px;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  :root {
+    --saf-area-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Extra padding for mobile to avoid Safari toolbar */
+@media screen and (max-width: 768px) {
+  html, body {
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+  }
+}
+

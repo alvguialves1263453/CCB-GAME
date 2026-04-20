@@ -2254,7 +2254,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-2 overflow-hidden relative"
+              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-2 overflow-hidden relative pb-4 md:pb-2"
             >
               {/* Overlay de Countdown */}
               <AnimatePresence>
@@ -2317,11 +2317,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 </div>
               </div>
 
-              <div className="flex-grow cartoon-panel p-4 flex flex-col items-center justify-start gap-2 relative overflow-hidden min-h-0">
+              <div className="flex-grow cartoon-panel p-3 md:p-4 flex flex-col items-center justify-start gap-2 md:gap-3 relative overflow-hidden min-h-0 pb-20 md:pb-4">
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
                 <div className="flex flex-col items-center text-center gap-1 max-w-4xl w-full flex-shrink">
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[#9B59F5] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533] mt-2 animate-bounce-subtle shrink-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[#9B59F5] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533] mt-1 md:mt-2 animate-bounce-subtle shrink-0">
                     <Music className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <h2 className="text-xl md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#FFD700] shrink-0">Qual é o hino?</h2>
@@ -2332,14 +2332,14 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   </div>
                 </div>
 
-                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-2 max-w-4xl px-2 mt-auto shrink-0">
+                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 max-w-4xl px-2 mt-2 md:mt-auto shrink-0">
                   {questions[currentRound].options.map((option, idx) => (
                     <button
                       key={idx}
                       disabled={!isGameActive || !!selectedOption}
                       onClick={() => handleAnswer(option)}
                       className={cn(
-                        "btn-cartoon p-2 md:p-3 text-left flex items-center gap-2 relative overflow-hidden",
+                        "btn-cartoon py-3 md:py-2 px-3 md:px-4 text-left flex items-center gap-2 relative overflow-hidden",
                         // Default state (no answer yet)
                         !selectedOption ? "bg-white text-[#1a0533]" : "",
                         // Waiting for others (answered, but no result yet)
@@ -2416,7 +2416,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
               animate={{ opacity: 1, scale: 1, rotate: 0 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="w-full flex-1 min-h-0 max-w-4xl flex flex-col items-center gap-[1.5vh] overflow-hidden px-4 py-2"
+              className="w-full flex-1 min-h-0 max-w-4xl flex flex-col items-center gap-[1.5vh] overflow-hidden px-4 py-2 pb-6 md:pb-2"
             >
               {/* X button for host in ranking - only show for host, guests see VOLTAR button below */}
               {!isSolo && localPlayerId && players.find(p => p.id === localPlayerId)?.isHost && (
