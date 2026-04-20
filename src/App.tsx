@@ -492,11 +492,17 @@ export default function App() {
     const drawingParam = params.get("drawing");
     const bibliaParam = params.get("biblia");
     
-    if (roomParam || bibliaParam) {
-      setRoomId((roomParam || bibliaParam).toUpperCase());
+    if (roomParam) {
+      setRoomId(roomParam.toUpperCase());
       setIsSolo(false);
       setIsManualJoin(false);
       setView("multiplayer_join");
+    }
+    
+    if (bibliaParam) {
+      setBibliaRoomId(bibliaParam.toUpperCase());
+      setBibliaGameMode(true);
+      setView("biblia_setup");
     }
     
     if (drawingParam) {
@@ -2728,14 +2734,15 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     }
                     soundService.playClick();
                     setIsLoading(true);
-                    const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount, 'biblia');
+                    const result = await bibliaService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount);
                     setIsLoading(false);
                     if (result) {
-                      setRoomId(result.room.id);
-                      setLocalPlayerId(result.player.id);
-                      setIsHost(true);
-                      setPlayers([result.player]);
-                      setView("lobby");
+                      setBibliaRoomId(result.room.id);
+                      setBibliaLocalPlayerId(result.player.id);
+                      setBibliaIsHost(true);
+                      setBibliaGameMode(true);
+                      setBibliaPlayers([result.player]);
+                      setView("biblia_lobby");
                     }
                   }}
                   disabled={isLoading}
@@ -2827,36 +2834,27 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     >
                       {bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "PRONTO!" : "ESTOU PRONTO"}
                     </button>
-                  )}
-
-{bibliaIsHost && (
-                    <>
-                      <button
-                        onClick={async () => {
-                          // Buscar perguntas do banco biblia_perguntas
-                          const { data: allPerguntas, error: err } = await supabase.from('biblia_perguntas').select('id, pergunta, correta, opcao1, opcao2, opcao3');
-                          console.log('[BIBLIA] Perguntas from DB:', allPerguntas?.length, err);
-                          if (!allPerguntas || allPerguntas.length === 0) {
-                            alert('Nenhuma pergunta da Biblia encontrada no banco!');
-                            console.log('[BIBLIA] Error:', err);
-                            return;
-                          }
-                          // Embaralhar e selecionar
-                          const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
-                          const selected = shuffled.slice(0, bibliaRoundCount);
-                          console.log('[BIBLIA] Selected:', selected.length, selected[0]);
-                          // Criar formato de perguntas
-                          const bibliaQuestions = selected.map((p: any, idx: number) => ({
-                            id: p.id,
-                            pergunta: p.pergunta,
-                            options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
-                            correct: 0,
-                            tipo: 'biblia'
-                          }));
-                          console.log('[BIBLIA] Questions to start:', bibliaQuestions);
-                          await multiplayerService.startGame(roomId!, bibliaQuestions, bibliaRoundCount, difficulty);
-                          console.log('[BIBLIA] Game started!');
-                        }}
+)}
+ 
+ {bibliaIsHost && bibliaRoomId && (
+                     <>
+                       <button
+                         onClick={async () => {
+                           const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+                           if (!allPerguntas || allPerguntas.length === 0) {
+                             alert('Nenhuma pergunta da Biblia!');
+                             return;
+                           }
+                           const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
+                           const selected = shuffled.slice(0, bibliaRoundCount);
+                           const bibliaQuestions = selected.map((p: any) => ({
+                             pergunta: p.pergunta,
+                             options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
+                             correct: 0
+                           }));
+                           await bibliaService.startGame(bibliaRoomId!, bibliaQuestions, bibliaRoundCount, difficulty);
+                           setView('biblia_game');
+                         }}
                         disabled={players.length < 1}
                         className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
                       >
