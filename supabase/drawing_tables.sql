@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS drawing_rooms (
   phase TEXT DEFAULT 'lobby' CHECK (phase IN ('lobby', 'drawing', 'voting', 'reveal', 'ranking')),
   current_round INTEGER DEFAULT 0,
   round_count INTEGER DEFAULT 3,
+  game_type TEXT DEFAULT 'Todos',
   current_prompt TEXT,
   current_drawing_index INTEGER DEFAULT 0,
   deadline_at BIGINT,
