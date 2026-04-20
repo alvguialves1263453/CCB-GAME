@@ -2728,13 +2728,16 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
                 <button
                   onClick={async () => {
-                    if (!profile?.nickname) {
+                    const nick = profile?.nickname?.trim();
+                    if (!nick) {
                       alert("Escreve o teu nome primeiro!");
                       return;
                     }
                     soundService.playClick();
                     setIsLoading(true);
-                    const result = await bibliaService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount);
+                    console.log('[BIBLIA] Creating room for:', nick);
+                    const result = await bibliaService.createRoom(nick, profile.avatarUrl, difficulty, bibliaRoundCount);
+                    console.log('[BIBLIA] Room created:', result);
                     setIsLoading(false);
                     if (result) {
                       setBibliaRoomId(result.room.id);
@@ -2743,6 +2746,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       setBibliaGameMode(true);
                       setBibliaPlayers([result.player]);
                       setView("biblia_lobby");
+                    } else {
+                      alert('Erro ao criar sala. Ver console (F12)');
                     }
                   }}
                   disabled={isLoading}
