@@ -2847,26 +2847,29 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
  
  {bibliaIsHost && bibliaRoomId && (
                      <>
-                       <button
-                         onClick={async () => {
-                           const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
-                           if (!allPerguntas || allPerguntas.length === 0) {
-                             alert('Nenhuma pergunta da Biblia!');
-                             return;
-                           }
-                           const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
-                           const selected = shuffled.slice(0, bibliaRoundCount);
-                           const bibliaQuestions = selected.map((p: any) => ({
-                             pergunta: p.pergunta,
-                             options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
-                             correct: 0
-                           }));
-                           await bibliaService.startGame(bibliaRoomId!, bibliaQuestions, bibliaRoundCount, difficulty);
-                           setView('biblia_game');
-                         }}
-                        disabled={players.length < 1}
-                        className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
-                      >
+<button
+                          onClick={async () => {
+                            console.log('[BIBLIA] Starting game...');
+                            const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+                            console.log('[BIBLIA] Perguntas:', allPerguntas?.length);
+                            if (!allPerguntas || allPerguntas.length === 0) {
+                              alert('Nenhuma pergunta da Biblia!');
+                              return;
+                            }
+                            const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
+                            const selected = shuffled.slice(0, bibliaRoundCount);
+                            const bibliaQuestions = selected.map((p: any) => ({
+                              pergunta: p.pergunta,
+                              options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
+                              correct: 0
+                            }));
+                            console.log('[BIBLIA] calling startGame:', bibliaQuestions);
+                            await bibliaService.startGame(bibliaRoomId!, bibliaQuestions, bibliaRoundCount, difficulty);
+                            setView('biblia_game');
+                          }}
+                         disabled={bibliaPlayers.length < 1}
+                         className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
+                       >
                         COMEÇAR!
                       </button>
                     </>
