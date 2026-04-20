@@ -253,7 +253,8 @@ type Difficulty = 'facil' | 'medio' | 'dificil' | 'aleatorio';
 const TIME_LIMITS = {
   facil: Infinity,
   medio: 20,
-  dificil: 10
+  dificil: 10,
+  aleatorio: 20  // Misto usa 20 segundos
 };
 
 export default function App() {
