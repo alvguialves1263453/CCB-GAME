@@ -76,7 +76,8 @@ const refreshRoom = async (roomId: string) => {
 };
 
 export const multiplayerService = {
-  async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'): Promise<{ room: Room; player: Player } | null> {
+  async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil', roundCount: number = 5): Promise<{ room: Room; player: Player } | null> {
+    console.log('[DEBUG] createRoom called with roundCount:', roundCount);
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let roomId = '';
     for (let i = 0; i < 5; i++) {
@@ -87,12 +88,13 @@ export const multiplayerService = {
     const joinedAt = Date.now();
 
     // Insert Room
+    console.log('[DEBUG] inserting room with round_count:', roundCount);
     const { data: roomData, error: roomError } = await supabase.from('rooms').insert({
       id: roomId,
       host_id: playerId,
       phase: 'lobby',
       current_round: 0,
-      round_count: 5,
+      round_count: roundCount,
       difficulty: difficulty
     }).select().single();
 

@@ -862,7 +862,7 @@ export default function App() {
     setIsLoading(true);
     soundService.playClick();
     try {
-      const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl);
+      const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount);
       if (result) {
         setRoomId(result.room.id);
         setLocalPlayerId(result.player.id);
@@ -957,7 +957,7 @@ export default function App() {
         } else {
           // Create new
           setIsSolo(false);
-const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty);
+const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount);
           if (result) {
             setRoomId(result.room.id);
             setLocalPlayerId(result.player.id);
