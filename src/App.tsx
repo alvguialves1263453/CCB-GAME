@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil, Share2 } from "lucide-react";
 
 const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -2184,7 +2184,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     soundService.playClick();
                     setView("biblia_setup");
                   }}
-                  className="w-full bg-[#FF4757] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                  className="w-full bg-[#8B5CF6] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
                 >
                   <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
                     <BookOpen className="w-24 h-24 md:w-32 md:h-32" />
@@ -2741,62 +2741,121 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
             </motion.div>
           )}
 
-          {/* biblIA Lobby */}
+{/* biblIA Lobby */}
           {(view === "biblia_lobby") && bibliaRoomId && (
             <motion.div
               key="biblia_lobby"
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full flex-1 min-h-0 max-w-5xl flex flex-col gap-2 mx-auto"
             >
               <div className="flex items-center justify-between px-2 shrink-0">
-                <button onClick={async () => { soundService.playClick(); await bibliaService.leaveRoom(); setBibliaGameMode(false); setBibliaRoomId(null); setView("mode_selection"); }} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
+                <button onClick={async () => { soundService.playClick(); await bibliaService.leaveRoom(); setBibliaGameMode(false); setBibliaRoomId(null); setView("mode_selection"); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                 </button>
-                <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#FF4757]">{bibliaRoomId}</span></span>
-                <div className="w-10 h-10" />
+                <div className="bg-white border-4 border-[#1a0533] px-4 py-1.5 rounded-xl game-shadow">
+                  <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#8B5CF6]">{bibliaRoomId}</span></span>
+                </div>
+                <button onClick={() => { soundService.playClick(); navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?biblia=' + bibliaRoomId); alert('Link copiado!'); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                  <Share2 className="w-5 h-5 text-[#1a0533]" />
+                </button>
               </div>
 
-              <div className="bg-white border-4 border-[#1a0533] rounded-xl p-4 flex flex-col gap-2">
-                <h3 className="text-lg font-black uppercase italic tracking-tighter cartoon-text text-[#1a0533]">Jogadores ({bibliaPlayers.length})</h3>
-                {bibliaPlayers.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 p-2 bg-gray-100 rounded-lg border-2 border-[#1a0533]">
-                    <Avatar url={p.avatar || "1.png"} size={40} />
-                    <span className="flex-1 font-black text-[#1a0533]">{p.nickname}</span>
-                    {p.isHost && <span className="bg-[#FFD700] text-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">HOST</span>}
-                    {p.isReady && <span className="bg-[#4ECB71] text-white px-2 py-0.5 rounded-md text-xs font-black">PRONTO</span>}
+              <div className="flex-1 min-h-0 cartoon-panel p-4 flex flex-col md:flex-row gap-4 overflow-hidden">
+                {/* Players section */}
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div className="flex items-center gap-2 mb-3 shrink-0">
+                    <Users className="w-5 h-5 text-[#1a0533]" />
+                    <span className="text-lg font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">Jogadores</span>
+                    <span className="bg-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">{bibliaPlayers.length}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex-1 overflow-y-auto space-y-2">
+                    {bibliaPlayers.map((p) => (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={cn(
+                          "flex items-center gap-3 p-3 bg-white rounded-xl border-4 border-[#1a0533] shadow-[3px_3px_0px_#1a0533]",
+                          p.isReady ? "bg-green-50" : "bg-gray-50"
+                        )}
+                      >
+                        <Avatar url={p.avatar || "1.png"} size={50} />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-black text-[#1a0533] truncate">{p.nickname}</div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {p.isHost && <span className="bg-[#FFD700] text-[#1a0533] px-1.5 py-0.5 rounded text-[9px] font-black">HOST</span>}
+                            {p.isReady && <span className="bg-[#4ECB71] text-white px-1.5 py-0.5 rounded text-[9px] font-black">PRONTO</span>}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
 
-              <div className="flex items-center justify-between bg-white border-4 border-[#1a0533] rounded-xl px-4 py-2">
-                <span className="text-sm font-black text-[#1a0533]">Dificuldade: <span className={cn("uppercase", difficulty === 'facil' ? "text-[#22C55E]" : difficulty === 'medio' ? "text-[#F59E0B]" : "text-[#8B5CF6]")}>{difficulty}</span></span>
-                <span className="text-sm font-black text-[#1a0533]">Rodadas: <span className="text-[#8B5CF6]">{bibliaRoundCount}</span></span>
-              </div>
+                {/* Info section */}
+                <div className="w-full md:w-64 flex flex-col gap-3">
+                  <div className="bg-white border-4 border-[#1a0533] rounded-xl p-4 flex flex-col gap-2 shadow-[3px_3px_0px_#1a0533]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase text-[#1a0533]/70">Dificuldade</span>
+                      <span className={cn("text-xs font-black uppercase px-2 py-0.5 rounded", difficulty === 'facil' ? "bg-[#22C55E] text-white" : difficulty === 'medio' ? "bg-[#F59E0B] text-white" : "bg-[#8B5CF6] text-white")}>{difficulty}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase text-[#1a0533]/70">Rodadas</span>
+                      <span className="text-xs font-black uppercase bg-[#8B5CF6] text-white px-2 py-0.5 rounded">{bibliaRoundCount}</span>
+                    </div>
+                  </div>
 
-              {bibliaIsHost ? (
-                <button
-                  onClick={async () => {
-                    const allReady = bibliaPlayers.every(p => p.isReady);
-                    if (!allReady) {
-                      await bibliaService.toggleReady(bibliaRoomId!, true);
-                      setBibliaPlayers(prev => prev.map(p => p.id === bibliaLocalPlayerId ? { ...p, isReady: true } : p));
-                    } else {
-                      // Start game - fetch perguntas from biblia_perguntas
-                      const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
-                      const perguntas = allPerguntas ? allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount) : [];
-                      if (perguntas && perguntas.length > 0) {
-                        await bibliaService.startGame(bibliaRoomId!, perguntas, bibliaRoundCount, difficulty);
-                        setView('biblia_game');
-                      }
-                    }
-                  }}
-                  disabled={bibliaPlayers.length < 1}
-                  className={cn(
-                    "w-full py-3 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533]",
-                    bibliaPlayers.every(p => p.isReady) ? "bg-[#4ECB71] text-white" : "bg-[#FF4757] text-white"
+                  {!bibliaIsHost && (
+                    <button
+                      onClick={async () => {
+                        const me = bibliaPlayers.find(p => p.id === bibliaLocalPlayerId);
+                        await bibliaService.toggleReady(bibliaRoomId!, !me?.isReady);
+                        setBibliaPlayers(prev => prev.map(p => p.id === bibliaLocalPlayerId ? { ...p, isReady: !me?.isReady } : p));
+                      }}
+                      className={cn(
+                        "w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533]",
+                        bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "bg-[#4ECB71] text-white" : "bg-white text-[#1a0533]"
+                      )}
+                    >
+                      {bibliaPlayers.find(p => p.id === bibliaLocalPlayerId)?.isReady ? "PRONTO!" : "ESTOU PRONTO"}
+                    </button>
                   )}
+
+                  {bibliaIsHost && (
+                    <>
+                      {!bibliaPlayers.every(p => p.isReady) && bibliaPlayers.length > 0 && (
+                        <div className="text-center text-xs font-bold text-orange-600 bg-orange-50 border-2 border-orange-300 rounded-lg px-2 py-1">
+                          Nem todos os jogadores estão prontos
+                        </div>
+                      )}
+                      <button
+                        onClick={async () => {
+                          const allReady = bibliaPlayers.every(p => p.isReady);
+                          if (!allReady) {
+                            if (!confirm('Nem todos os jogadores estão prontos. Iniciar mesmo assim?')) {
+                              return;
+                            }
+                          }
+                          const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+                          const perguntas = allPerguntas ? allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount) : [];
+                          if (perguntas && perguntas.length > 0) {
+                            await bibliaService.startGame(bibliaRoomId!, perguntas, bibliaRoundCount, difficulty);
+                            setView('biblia_game');
+                          }
+                        }}
+                        disabled={bibliaPlayers.length < 1}
+                        className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
+                      >
+                        COMEÇAR!
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
                 >
                   {bibliaPlayers.every(p => p.isReady) ? "COMEÇAR!" : "PRONTO!"}
                 </button>
