@@ -284,11 +284,11 @@ export const drawingService = {
       const result = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
       prompts = result.data;
     } else {
-      const result = await supabase.from('drawing_prompts').select('prompt').eq('category', category).order('random()').limit(1);
+      const result = await supabase.from('drawing_prompts').select('prompt').eq('category', category).limit(1);
       prompts = result.data;
       // If no prompts in category, get any prompt
       if (!prompts || prompts.length === 0) {
-        const fallback = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
+        const fallback = await supabase.from('drawing_prompts').select('prompt').limit(1);
         prompts = fallback.data;
       }
     }
