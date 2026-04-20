@@ -289,6 +289,7 @@ export default function App() {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [bgMusicOn, setBgMusicOn] = useState(true);
   const [leftPlayerName, setLeftPlayerName] = useState<string | null>(null);
   const [hostLeft, setHostLeft] = useState(false);
   const [frozenPlayers, setFrozenPlayers] = useState<Player[]>([]);
@@ -327,6 +328,15 @@ export default function App() {
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
   }, [isGameActive, showResult, currentRound, difficulty, questions, feedback, selectedOption, players]);
+
+  useEffect(() => {
+    if (bgMusicOn && (view === "game" || view === "lobby" || view === "multiplayer_menu" || view === "mode_selection")) {
+      soundService.startBgMusic();
+    } else {
+      soundService.stopBgMusic();
+    }
+    return () => soundService.stopBgMusic();
+  }, [view, bgMusicOn]);
 
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -1602,7 +1612,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     </div>
 
                     <div className="flex flex-col items-end opacity-40">
-                      <p className="text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V0.2.5</p>
+                      <p className="text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V0.3.0</p>
                       <p className="text-[10px] font-black uppercase text-white cartoon-text tracking-widest">BETA</p>
                     </div>
                   </div>
@@ -2538,7 +2548,12 @@ SAIR
                 <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 w-10 h-10 bg-gray-100 border-2 border-[#1a0533] rounded-xl flex items-center justify-center hover:bg-gray-200">
                    <X className="w-6 h-6 text-[#1a0533]" />
                 </button>
-                <h2 className="text-2xl font-black italic uppercase text-[#1a0533] tracking-tighter">Testar Conexões</h2>
+                <h2 className="text-2xl font-black italic uppercase text-[#1a0533] tracking-tighter">Configurações</h2>
+                 <button onClick={() => setBgMusicOn(!bgMusicOn)} className="btn-cartoon py-3 font-bold flex items-center justify-between px-6 mt-2">
+                    <span>Música de Fundo</span>
+                    <div className={cn("w-4 h-4 rounded-full border-2 border-black/20", bgMusicOn ? 'bg-green-400' : 'bg-gray-300')} />
+                 </button>
+                 <h3 className="text-lg font-black italic uppercase text-[#1a0533] tracking-tighter mt-4">Testar Conexões</h3>
                 <div className="flex flex-col gap-3 mt-4">
                    <button onClick={async () => {
                      setTestStatus(prev => ({ ...prev, supabase: 'testing' }));
