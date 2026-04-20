@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Pencil, Eraser, Undo2, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -23,93 +23,53 @@ const COLORS = ["#000000", "#FF4757", "#FFD700", "#4ECB71", "#9B59F5", "#38bdf8"
 
 export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubmitted }: DrawingCanvasViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPos, setCurrentPos] = useState<Point | null>(null);
   const [paths, setPaths] = useState<Path[]>([]);
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(6);
   const [tool, setTool] = useState<"pencil" | "eraser">("pencil");
 
-  // Use ResizeObserver to properly handle canvas sizing
-  useLayoutEffect(() => {
+  // Initialize canvas on mount
+  useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
 
-    const resize = () => {
-      const rect = container.getBoundingClientRect();
-      const width = rect.width;
-      const height = rect.height;
+    const initCanvas = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
       
-      if (width > 0 && height > 0) {
-        // Save current content
+      const rect = parent.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        
         const ctx = canvas.getContext("2d");
-        const imageData = ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
-        
-        // Resize canvas
-        canvas.width = width;
-        canvas.height = height;
-        
-        // Restore content
-        if (imageData) {
-          ctx?.putImageData(imageData, 0, 0);
-        } else {
-          // Fill white background
-          const newCtx = canvas.getContext("2d");
-          if (newCtx) {
-            newCtx.fillStyle = "#FFFFFF";
-            newCtx.fillRect(0, 0, width, height);
-          }
+        if (ctx) {
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-        
-        // Redraw all paths
-        redrawAll();
       }
     };
 
-    const observer = new ResizeObserver(resize);
-    observer.observe(container);
+    // Delay to ensure parent has size
+    const timer = setTimeout(initCanvas, 50);
     
-    // Initial resize with delay to ensure container has size
-    setTimeout(resize, 100);
-
-    return () => observer.disconnect();
+    // Also try on resize
+    const handleResize = () => initCanvas();
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
+  // Time up handler
   useEffect(() => {
     if (timeLeft <= 0 && !isSubmitted) {
       onTimeUp();
     }
   }, [timeLeft, isSubmitted, onTimeUp]);
-
-  const redrawAll = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    for (const path of paths) {
-      if (path.points.length < 2) continue;
-      ctx.beginPath();
-      ctx.strokeStyle = path.color;
-      ctx.lineWidth = path.width;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.moveTo(path.points[0].x, path.points[0].y);
-      for (let i = 1; i < path.points.length; i++) {
-        ctx.lineTo(path.points[i].x, path.points[i].y);
-      }
-      ctx.stroke();
-    }
-  }, [paths]);
-
-  useEffect(() => {
-    redrawAll();
-  }, [redrawAll]);
 
   const getPoint = (e: React.MouseEvent | React.TouchEvent): Point | null => {
     const canvas = canvasRef.current;
@@ -132,22 +92,11 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
   const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (isSubmitted) return;
     e.preventDefault();
-    e.stopPropagation();
     
     const point = getPoint(e);
     if (point) {
       setIsDrawing(true);
-      setCurrentPos(point);
-    }
-  };
-
-  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || isSubmitted || !currentPos) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const point = getPoint(e);
-    if (point) {
+      
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
@@ -158,36 +107,76 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
       ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.moveTo(currentPos.x, currentPos.y);
+      ctx.moveTo(point.x, point.y);
+    }
+  };
+
+  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing || isSubmitted) return;
+    e.preventDefault();
+    
+    const point = getPoint(e);
+    if (point) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
       
-      setCurrentPos(point);
+      // Also add to paths
+      setPaths(prev => [...prev, {
+        points: [point],
+        color: tool === "eraser" ? "#FFFFFF" : color,
+        width: tool === "eraser" ? brushSize * 2 : brushSize
+      }]);
     }
   };
 
   const handleEnd = () => {
-    if (!isDrawing) return;
     setIsDrawing(false);
-    if (currentPos) {
-      const newPath: Path = {
-        points: [currentPos],
-        color: tool === "eraser" ? "#FFFFFF" : color,
-        width: tool === "eraser" ? brushSize * 2 : brushSize
-      };
-      setPaths(prev => [...prev, newPath]);
-    }
-    setCurrentPos(null);
   };
 
   const undo = () => {
     if (paths.length === 0) return;
     setPaths(prev => prev.slice(0, -1));
+    
+    // Redraw canvas
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    const newPaths = paths.slice(0, -1);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    for (const path of newPaths) {
+      if (path.points.length < 2) continue;
+      ctx.beginPath();
+      ctx.strokeStyle = path.color;
+      ctx.lineWidth = path.width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) {
+        ctx.lineTo(path.points[i].x, path.points[i].y);
+      }
+      ctx.stroke();
+    }
   };
 
   const clear = () => {
     setPaths([]);
-    redrawAll();
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
 
   const submit = () => {
@@ -200,10 +189,10 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
   return (
     <div className="w-full h-full flex flex-col">
       {/* Canvas */}
-      <div ref={containerRef} className="flex-1 relative bg-white border-4 border-[#1a0533] m-2 rounded-xl overflow-hidden shadow-[4px_4px_0px_#1a0533]">
+      <div className="flex-1 relative bg-white border-4 border-[#1a0533] m-2 rounded-xl overflow-hidden shadow-[4px_4px_0px_#1a0533]">
         <canvas
           ref={canvasRef}
-          className="w-full h-full touch-none cursor-crosshair absolute inset-0"
+          className="w-full h-full touch-none cursor-crosshair"
           style={{ touchAction: 'none', display: 'block' }}
           onMouseDown={handleStart}
           onMouseMove={handleMove}
