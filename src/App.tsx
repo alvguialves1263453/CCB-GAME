@@ -1272,13 +1272,19 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
       }
       const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, roundCount);
-      const q = selected.map((p: any) => ({
-        hinario: 0,
-        numero: p.id,
-        snippet: p.pergunta,
-        options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
-        correct: 0
-      }));
+      const q = selected.map((p: any) => {
+        // Primeiro cria as opções depois embaralha
+        const opts = [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5);
+        // Acha o índice da resposta correta
+        const correctIdx = opts.indexOf(p.correta);
+        return {
+          hinario: 0,
+          numero: p.id,
+          snippet: p.pergunta,
+          options: opts,
+          correct: correctIdx
+        };
+      });
       setIsLoading(false);
       return q;
     }
