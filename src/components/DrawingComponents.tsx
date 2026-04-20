@@ -1,15 +1,9 @@
 import React, { useRef, useState, useEffect } from "react";
-import { motion } from "motion/react";
 import { Pencil, Eraser, Undo2, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface Point { x: number; y: number; }
-
-interface Path {
-  points: Point[];
-  color: string;
-  width: number;
-}
+interface Path { points: Point[]; color: string; width: number; }
 
 interface DrawingCanvasViewProps {
   prompt: string;
@@ -29,112 +23,130 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
   const [brushSize, setBrushSize] = useState(6);
   const [tool, setTool] = useState<"pencil" | "eraser">("pencil");
 
-  // Initialize canvas on mount
+  // Initialize canvas size
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const initCanvas = () => {
+    const init = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
       
       const rect = parent.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-        
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+      const w = rect.width || 300;
+      const h = rect.height || 300;
+      
+      canvas.width = w;
+      canvas.height = h;
+      
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, w, h);
       }
     };
 
-    // Delay to ensure parent has size
-    const timer = setTimeout(initCanvas, 50);
-    
-    // Also try on resize
-    const handleResize = () => initCanvas();
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', handleResize);
-    };
+    init();
+    setTimeout(init, 100);
   }, []);
 
-  // Time up handler
+  // Time up
   useEffect(() => {
     if (timeLeft <= 0 && !isSubmitted) {
       onTimeUp();
     }
   }, [timeLeft, isSubmitted, onTimeUp]);
 
-  const getPoint = (e: React.MouseEvent | React.TouchEvent): Point | null => {
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isSubmitted) return;
+    
     const canvas = canvasRef.current;
-    if (!canvas) return null;
+    if (!canvas) return;
     
-    const rect = canvas.getBoundingClientRect();
-    let clientX: number, clientY: number;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     
-    if ('touches' in e && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = (e as React.MouseEvent).clientX;
-      clientY = (e as React.MouseEvent).clientY;
-    }
+    setIsDrawing(true);
     
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    const x = e.nativeEvent.offsetX;
+    const y = e.nativeEvent.offsetY;
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color;
+    ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
   };
 
-  const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || isSubmitted) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    const x = e.nativeEvent.offsetX;
+    const y = e.nativeEvent.offsetY;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    
+    // Save point
+    setPaths(prev => [...prev, { points: [{ x, y }], color: tool === "eraser" ? "#FFFFFF" : color, width: brushSize }]);
+  };
+
+  const handleMouseUp = () => {
+    setIsDrawing(false);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
     if (isSubmitted) return;
     e.preventDefault();
     
-    const point = getPoint(e);
-    if (point) {
-      setIsDrawing(true);
-      
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      
-      ctx.beginPath();
-      ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color;
-      ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.moveTo(point.x, point.y);
-    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    setIsDrawing(true);
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color;
+    ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
   };
 
-  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDrawing || isSubmitted) return;
     e.preventDefault();
     
-    const point = getPoint(e);
-    if (point) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      
-      ctx.lineTo(point.x, point.y);
-      ctx.stroke();
-      
-      // Also add to paths
-      setPaths(prev => [...prev, {
-        points: [point],
-        color: tool === "eraser" ? "#FFFFFF" : color,
-        width: tool === "eraser" ? brushSize * 2 : brushSize
-      }]);
-    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
   };
 
-  const handleEnd = () => {
+  const handleTouchEnd = () => {
     setIsDrawing(false);
   };
 
@@ -142,7 +154,6 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
     if (paths.length === 0) return;
     setPaths(prev => prev.slice(0, -1));
     
-    // Redraw canvas
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -169,12 +180,10 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
 
   const clear = () => {
     setPaths([]);
-    
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
@@ -188,19 +197,18 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Canvas */}
       <div className="flex-1 relative bg-white border-4 border-[#1a0533] m-2 rounded-xl overflow-hidden shadow-[4px_4px_0px_#1a0533]">
         <canvas
           ref={canvasRef}
           className="w-full h-full touch-none cursor-crosshair"
-          style={{ touchAction: 'none', display: 'block' }}
-          onMouseDown={handleStart}
-          onMouseMove={handleMove}
-          onMouseUp={handleEnd}
-          onMouseLeave={handleEnd}
-          onTouchStart={handleStart}
-          onTouchMove={handleMove}
-          onTouchEnd={handleEnd}
+          style={{ display: 'block' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
         
         {isSubmitted && (
@@ -212,9 +220,7 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
         )}
       </div>
 
-      {/* Toolbar */}
       <div className="bg-white border-4 border-[#1a0533] mx-2 mb-2 rounded-xl p-3 flex flex-col gap-2">
-        {/* Cores */}
         <div className="flex items-center justify-center gap-2">
           {COLORS.map(c => (
             <button
@@ -229,63 +235,28 @@ export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubm
           ))}
         </div>
 
-        {/* Ferramentas */}
         <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setTool("pencil")}
-            className={cn(
-              "p-2 rounded-lg border-2 border-[#1a0533]",
-              tool === "pencil" ? "bg-[#9B59F5] text-white" : "bg-gray-100"
-            )}
-          >
+          <button onClick={() => setTool("pencil")} className={cn("p-2 rounded-lg border-2 border-[#1a0533]", tool === "pencil" ? "bg-[#9B59F5] text-white" : "bg-gray-100")}>
             <Pencil className="w-5 h-5" />
           </button>
-          
-          <button
-            onClick={() => setTool("eraser")}
-            className={cn(
-              "p-2 rounded-lg border-2 border-[#1a0533]",
-              tool === "eraser" ? "bg-[#9B59F5] text-white" : "bg-gray-100"
-            )}
-          >
+          <button onClick={() => setTool("eraser")} className={cn("p-2 rounded-lg border-2 border-[#1a0533]", tool === "eraser" ? "bg-[#9B59F5] text-white" : "bg-gray-100")}>
             <Eraser className="w-5 h-5" />
           </button>
-
           <div className="w-px h-8 bg-gray-300" />
-
           <button onClick={undo} disabled={paths.length === 0} className="p-2 rounded-lg border-2 border-[#1a0533] bg-gray-100 disabled:opacity-30">
             <Undo2 className="w-5 h-5" />
           </button>
           <button onClick={clear} className="p-2 rounded-lg border-2 border-[#1a0533] bg-gray-100">
             <Trash2 className="w-5 h-5" />
           </button>
-
           <div className="w-px h-8 bg-gray-300" />
-
           <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-lg border-2 border-[#1a0533]">
             <div className="rounded-full bg-[#1a0533]" style={{ width: brushSize, height: brushSize }} />
-            <input
-              type="range"
-              min={2}
-              max={30}
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-16 accent-[#9B59F5]"
-            />
+            <input type="range" min={2} max={30} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} className="w-16 accent-[#9B59F5]" />
           </div>
         </div>
 
-        {/* Enviar */}
-        <button
-          onClick={submit}
-          disabled={isSubmitted}
-          className={cn(
-            "w-full py-3 rounded-lg border-4 border-[#1a0533] font-black text-lg tracking-widest",
-            isSubmitted 
-              ? "bg-gray-400 text-gray-200" 
-              : "bg-[#4ECB71] text-white shadow-[3px_3px_0px_#1a0533]"
-          )}
-        >
+        <button onClick={submit} disabled={isSubmitted} className={cn("w-full py-3 rounded-lg border-4 border-[#1a0533] font-black text-lg tracking-widest", isSubmitted ? "bg-gray-400 text-gray-200" : "bg-[#4ECB71] text-white shadow-[3px_3px_0px_#1a0533]")}>
           {isSubmitted ? "ENVIADO!" : "ENVIAR"}
         </button>
       </div>
