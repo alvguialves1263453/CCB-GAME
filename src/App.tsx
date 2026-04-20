@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil } from "lucide-react";
 
 const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -54,10 +54,11 @@ import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
+import { drawingService, type DrawingPlayer, type DrawingRoom, type DrawingSubmission, type DrawingVote } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
 import { Edit2 } from "lucide-react";
-type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection";
+type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection" | "drawing_setup" | "drawing_lobby" | "drawing_game" | "drawing_voting" | "drawing_ranking";
 
 interface Player {
   id: string;
@@ -299,6 +300,27 @@ export default function App() {
     hymns: 'idle',
     multiplayer: 'idle'
   });
+
+  // Drawing game states
+  const [drawingGameMode, setDrawingGameMode] = useState(false);
+  const [drawingRoomId, setDrawingRoomId] = useState<string | null>(null);
+  const [drawingLocalPlayerId, setDrawingLocalPlayerId] = useState<string | null>(null);
+  const [drawingPlayers, setDrawingPlayers] = useState<any[]>([]);
+  const [drawingRound, setDrawingRound] = useState(1);
+  const [drawingRoundCount, setDrawingRoundCount] = useState(3);
+  const [drawingCurrentPrompt, setDrawingCurrentPrompt] = useState<string>('');
+  const [drawingTimeLeft, setDrawingTimeLeft] = useState<number>(60);
+  const [drawingSubmissions, setDrawingSubmissions] = useState<any[]>([]);
+  const [currentDrawingIndex, setCurrentDrawingIndex] = useState(0);
+  const [hasSubmittedDrawing, setHasSubmittedDrawing] = useState(false);
+  const [drawingVotes, setDrawingVotes] = useState<any[]>([]);
+  const [currentVoteStars, setCurrentVoteStars] = useState(0);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [showDrawingAuthor, setShowDrawingAuthor] = useState(false);
+  const [drawingFinalRanking, setDrawingFinalRanking] = useState<any[]>([]);
+  const [isDrawingHost, setIsDrawingHost] = useState(false);
+  const drawingStartTimeRef = useRef<number>(0);
+  const drawingVotingStartTimeRef = useRef<number>(0);
   
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
@@ -1984,7 +2006,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-4 space-y-3">
-                {/* Mode 1 - Unlocked */}
+                {/* Mode 1 - Qual é o Hino? (Quiz) */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -2006,6 +2028,32 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   </div>
                   <div className="bg-white text-[#1a0533] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-1 md:mt-0 z-10">
                     JOGAR AGORA
+                  </div>
+                </motion.button>
+
+                {/* Mode 2 - Desenho Musical (Multiplayer Drawing) */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    soundService.playClick();
+                    setDrawingGameMode(true);
+                    setView("drawing_setup");
+                  }}
+                  className="w-full bg-[#9B59F5] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                >
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <Pencil className="w-24 h-24 md:w-32 md:h-32" />
+                  </div>
+                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
+                    <Pencil className="w-6 h-6 md:w-10 md:h-10 text-[#9B59F5]" />
+                  </div>
+                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Desenho Musical</h3>
+                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Desenhe o prompt e vote nos desenhos dos outros jogadores!</p>
+                  </div>
+                  <div className="bg-white text-[#9B59F5] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] transition-colors mt-1 md:mt-0 z-10">
+                    MULTIPLAYER
                   </div>
                 </motion.button>
 
@@ -2035,6 +2083,246 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     </div>
                   </div>
                 ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Drawing Setup */}
+          {(view === "drawing_setup") && (
+            <motion.div
+              key="drawing_setup"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              className="w-full max-w-md cartoon-panel p-5 flex flex-col gap-3 mx-auto"
+            >
+              <div className="flex items-center gap-3 shrink-0">
+                <button onClick={() => { setDrawingGameMode(false); setView("mode_selection"); }} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                  <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                </button>
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter text-[#9B59F5]">Desenho Musical</h2>
+              </div>
+
+              <div className="bg-purple-50 rounded-2xl p-4 border-2 border-dashed border-[#9B59F5]/30 flex flex-col items-center gap-3">
+                <div className="relative">
+                  <Avatar url={profile?.avatarUrl || "1.png"} size={80} />
+                  <button onClick={() => setIsEditingProfile(true)} className="absolute -bottom-1 -right-1 bg-[#FFD700] p-1.5 rounded-lg border-2 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]">
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <input 
+                  type="text" 
+                  maxLength={15}
+                  placeholder="Seu Nome"
+                  value={profile?.nickname}
+                  onChange={(e) => {
+                    const newNick = e.target.value;
+                    setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
+                    localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
+                  }}
+                  className="bg-white border-2 border-[#190c33] px-3 py-1.5 rounded-xl font-black text-center text-sm w-full focus:outline-none focus:border-[#9B59F5] shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Rodadas (1-5)</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => { soundService.playClick(); setDrawingRoundCount(n); }}
+                      className={cn(
+                        "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
+                        drawingRoundCount === n
+                          ? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
+                          : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <motion.button
+                whileHover={!profile || isLoading ? {} : { scale: 1.03 }}
+                whileTap={!profile || isLoading ? {} : { scale: 0.97 }}
+                disabled={!profile || isLoading}
+                onClick={async () => {
+                  soundService.playClick();
+                  setIsLoading(true);
+                  const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingRoundCount);
+                  if (result) {
+                    setDrawingRoomId(result.roomId);
+                    setDrawingLocalPlayerId(result.playerId);
+                    setIsDrawingHost(true);
+                    setDrawingPlayers([{ id: result.playerId, nickname: profile.nickname, avatar: profile.avatarUrl, isHost: true, isReady: false, totalScore: 0 }]);
+                    setView("drawing_lobby");
+                  } else {
+                    alert("Erro ao criar sala. Verifique sua conexão.");
+                  }
+                  setIsLoading(false);
+                }}
+                className="btn-cartoon btn-green w-full p-3 text-lg tracking-widest gap-2 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
+              >
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                CRIAR SALA
+              </motion.button>
+
+              <div className="text-center">
+                <p className="text-xs font-black uppercase text-[#1a0533]/50">ou entre em uma sala existente</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Código da Sala</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="ABC123"
+                  value={joinRoomCode}
+                  onChange={(e) => {
+                    const code = e.target.value.toUpperCase();
+                    setJoinRoomCode(code);
+                  }}
+                  className="input-cartoon text-center tracking-[0.5em] text-xl uppercase !py-2.5"
+                />
+              </div>
+
+              <motion.button
+                whileHover={!profile || !joinRoomCode || isLoading ? {} : { scale: 1.03 }}
+                whileTap={!profile || !joinRoomCode || isLoading ? {} : { scale: 0.97 }}
+                disabled={!profile || !joinRoomCode || isLoading}
+                onClick={async () => {
+                  soundService.playClick();
+                  setIsLoading(true);
+                  const playerId = await drawingService.joinRoom(joinRoomCode, profile.nickname, profile.avatarUrl);
+                  if (playerId) {
+                    setDrawingRoomId(joinRoomCode);
+                    setDrawingLocalPlayerId(playerId);
+                    setIsDrawingHost(false);
+                    setView("drawing_lobby");
+                  } else {
+                    alert("Sala não encontrada.");
+                  }
+                  setIsLoading(false);
+                }}
+                className="btn-cartoon btn-purple w-full p-3 text-lg tracking-widest gap-2 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
+              >
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Users className="w-5 h-5" />}
+                ENTRAR
+              </motion.button>
+            </motion.div>
+          )}
+
+          {/* Drawing Lobby */}
+          {(view === "drawing_lobby") && (
+            <motion.div
+              key="drawing_lobby"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full flex-1 min-h-0 max-w-5xl flex flex-col gap-2 pb-20 md:pb-3"
+            >
+              <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2 shrink-0">
+                <div className="flex items-center gap-3">
+                  <button onClick={async () => { soundService.playClick(); await drawingService.leaveRoom(); setDrawingGameMode(false); setDrawingRoomId(null); setView("mode_selection"); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                    <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                  </button>
+                  <div className="bg-white border-4 border-[#1a0533] px-4 py-1.5 rounded-xl game-shadow">
+                    <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#9B59F5]">{drawingRoomId}</span></span>
+                  </div>
+                </div>
+                {isDrawingHost && (
+                  <div className="bg-gray-100 border-4 border-[#1a0533] px-3 py-1 rounded-lg">
+                    <span className="text-xs font-black uppercase text-[#1a0533]">HOST</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 min-h-0 cartoon-panel p-4 flex flex-col md:flex-row gap-4 overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div className="flex items-center gap-2 mb-3 shrink-0">
+                    <div className="w-9 h-9 bg-[#9B59F5] border-4 border-[#1a0533] rounded-lg flex items-center justify-center text-white game-shadow">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-lg font-black uppercase italic tracking-tighter cartoon-text text-[#1a0533]">Jogadores ({drawingPlayers.length})</h3>
+                  </div>
+
+                  <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                      {drawingPlayers.map((p) => (
+                        <div key={p.id} className={cn(
+                          "relative p-2.5 border-4 border-[#1a0533] rounded-xl flex flex-col items-center gap-1.5 transition-all",
+                          p.isReady ? "bg-[#d1fae5] shadow-[3px_3px_0px_#1a0533]" : "bg-gray-100 opacity-80"
+                        )}>
+                          {p.isHost && <div className="absolute -top-2 -right-2 w-6 h-6 bg-[#FFD700] border-2 border-[#1a0533] rounded-full flex items-center justify-center text-[8px] font-black z-10">👑</div>}
+                          {p.avatar ? (
+                            <div className="mb-2 pointer-events-none">
+                              <Avatar url={p.avatar} size={100} className="rounded-2xl" />
+                            </div>
+                          ) : (
+                            <div className={cn(
+                              "w-20 h-20 rounded-2xl border-4 border-[#1a0533] flex items-center justify-center text-3xl font-black",
+                              p.isReady ? "bg-[#4ECB71] text-white" : "bg-white text-[#1a0533]"
+                            )}>
+                              {p.nickname.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <p className="font-black text-xs truncate w-full text-center text-[#1a0533]">{p.nickname}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full md:w-64 flex flex-col gap-2.5 shrink-0">
+                  <div className="bg-gray-100 border-4 border-[#1a0533] rounded-xl p-3 space-y-2">
+                    <h4 className="font-black uppercase text-[9px] tracking-widest text-center border-b-2 border-gray-300 pb-1.5 text-[#1a0533]">Configurações</h4>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
+                        <span>RODADAS:</span>
+                        <span className="bg-[#9B59F5] text-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingRoundCount}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {isDrawingHost ? (
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={async () => {
+                        const allReady = drawingPlayers.every(p => p.isReady);
+                        if (!allReady) {
+                          await drawingService.toggleReady(drawingRoomId!, true);
+                          setDrawingPlayers(prev => prev.map(p => p.id === drawingLocalPlayerId ? { ...p, isReady: true } : p));
+                          return;
+                        }
+                        soundService.playClick();
+                        await drawingService.startDrawingGame(drawingRoomId!, drawingRoundCount);
+                        setView("drawing_game");
+                      }}
+                      className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest"
+                    >
+                      {drawingPlayers.every(p => p.isReady) ? "COMEÇAR!" : "PRONTO!"}
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={async () => {
+                        const me = drawingPlayers.find(p => p.id === drawingLocalPlayerId);
+                        await drawingService.toggleReady(drawingRoomId!, !me?.isReady);
+                        setDrawingPlayers(prev => prev.map(p => p.id === drawingLocalPlayerId ? { ...p, isReady: !p.isReady } : p));
+                      }}
+                      className={cn(
+                        "btn-cartoon w-full py-3 text-lg tracking-widest",
+                        drawingPlayers.find(p => p.id === drawingLocalPlayerId)?.isReady ? "btn-green" : "btn-purple"
+                      )}
+                    >
+                      {drawingPlayers.find(p => p.id === drawingLocalPlayerId)?.isReady ? "PRONTO!" : "ESTOU PRONTO"}
+                    </motion.button>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
