@@ -489,9 +489,10 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get("room");
     const drawingParam = params.get("drawing");
+    const bibliaParam = params.get("biblia");
     
-    if (roomParam) {
-      setRoomId(roomParam.toUpperCase());
+    if (roomParam || bibliaParam) {
+      setRoomId((roomParam || bibliaParam).toUpperCase());
       setIsSolo(false);
       setIsManualJoin(false);
       setView("multiplayer_join");
@@ -2722,14 +2723,14 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     }
                     soundService.playClick();
                     setIsLoading(true);
-                    const result = await bibliaService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount);
+                    const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount);
                     setIsLoading(false);
                     if (result) {
-                      setBibliaRoomId(result.room.id);
-                      setBibliaLocalPlayerId(result.player.id);
-                      setBibliaIsHost(true);
-                      setBibliaPlayers([result.player]);
-                      setView("biblia_lobby");
+                      setRoomId(result.room.id);
+                      setLocalPlayerId(result.player.id);
+                      setIsHost(true);
+                      setPlayers([result.player]);
+                      setView("lobby");
                     }
                   }}
                   disabled={isLoading}
@@ -2823,21 +2824,27 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     </button>
                   )}
 
-                  {bibliaIsHost && (
+{bibliaIsHost && (
                     <>
                       <button
                         onClick={async () => {
-const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
-                          console.log('allPerguntas:', allPerguntas?.length);
+                          const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
                           if (!allPerguntas || allPerguntas.length === 0) {
                             alert('Nenhuma pergunta encontrada!');
                             return;
                           }
+                          // Transformar em formato de perguntas igual ao hino
                           const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
                           const selected = shuffled.slice(0, bibliaRoundCount);
-                          console.log('selected:', selected.length);
-                          await bibliaService.startGame(bibliaRoomId!, selected, bibliaRoundCount, difficulty);
-                          setView('biblia_game');
+                          const bibliaQuestions = selected.map((p: any) => ({
+                            hinario: 0,
+                            numero: p.id,
+                            options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
+                            correct: 0,
+                            tipo: 'biblia'
+                          }));
+                          // Usar multiplayerService.startGame igual ao hino
+                          await multiplayerService.startGame(bibliaRoomId!, bibliaQuestions, bibliaRoundCount, difficulty);
                         }}
                         disabled={bibliaPlayers.length < 1}
                         className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
