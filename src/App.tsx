@@ -1934,7 +1934,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                               "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
                               roundCount === n
                                 ? "bg-[#FFD700] text-[#1a0533] shadow-[3px_3px_0px_#1a0533] scale-105"
-                                : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+                                : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                             )}
                           >
                             {n}
@@ -1959,7 +1959,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                               "py-1.5 px-2 flex flex-col items-center justify-center rounded-lg border-4 border-[#1a0533] transition-all",
                               difficulty === d.value
                                 ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-[1.02]`
-                                : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+                                : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                             )}
                           >
                             <span className="font-black text-sm uppercase tracking-wider leading-none">{d.label}</span>
@@ -2162,7 +2162,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                           "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
                           drawingRoundCount === n
                             ? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
-                            : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                         )}
                       >
                         {n}
@@ -2182,7 +2182,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                           "py-2 rounded-lg border-4 border-[#1a0533] font-black text-xs transition-all",
                           drawingCategory === cat
                             ? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
-                            : "bg-gray-100 text-[#1a0533]/50 hover:bg-gray-200"
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                         )}
                       >
                         {cat}
