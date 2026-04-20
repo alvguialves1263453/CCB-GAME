@@ -3305,30 +3305,30 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 </div>
               </div>
 
-              <div className="flex-grow cartoon-panel p-2 md:p-4 flex flex-col gap-1 md:gap-3 relative overflow-hidden min-h-0">
+              <div className="flex-grow cartoon-panel p-4 md:p-6 flex flex-col items-center gap-3 md:gap-4 relative overflow-hidden min-h-0">
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
-                <div className="flex flex-col items-center text-center gap-0 max-w-4xl w-full flex-shrink">
+                <div className="flex flex-col items-center text-center gap-2 max-w-2xl w-full">
                   {questions[currentRound]?.pergunta ? (
                     <>
-                      <div className="w-8 h-8 md:w-12 md:h-12 bg-[#8B5CF6] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
-                        <BookOpen className="w-4 h-4 md:w-6 md:h-6" />
+                      <div className="w-12 h-12 md:w-16 md:h-16 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533]">
+                        <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
-                      <h2 className="text-lg md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#8B5CF6] shrink-0">Quiz da Bíblia</h2>
-                      <div className="bg-gray-50 border-3 md:border-4 border-[#1a0533] p-2 md:p-5 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] relative my-0.5 w-full shrink">
-                        <p className="text-sm md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-0.5 line-clamp-2">
-                          "{questions[currentRound].pergunta || questions[currentRound].snippet}"
+                      <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#8B5CF6]">Quiz da Bíblia</h2>
+                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full">
+                        <p className="text-lg md:text-2xl font-black text-[#1a0533] text-center leading-tight">
+                          {questions[currentRound].pergunta}
                         </p>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="w-8 h-8 md:w-12 md:h-12 bg-[#9B59F5] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
-                        <Music className="w-4 h-4 md:w-6 md:h-6" />
+                      <div className="w-12 h-12 md:w-16 md:h-16 bg-[#9B59F5] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533]">
+                        <Music className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
-                      <h2 className="text-lg md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#FFD700] shrink-0">Qual é o hino?</h2>
-                      <div className="bg-gray-50 border-3 md:border-4 border-[#1a0533] p-2 md:p-5 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] relative my-0.5 w-full shrink">
-                        <p className="text-sm md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-0.5 line-clamp-2">
+                      <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#FFD700]">Qual é o hino?</h2>
+                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full">
+                        <p className="text-lg md:text-2xl font-black text-[#1a0533] italic text-center leading-tight">
                           "{questions[currentRound].snippet}"
                         </p>
                       </div>
@@ -3336,16 +3336,16 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   )}
                 </div>
 
-                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-3 max-w-4xl px-1 md:px-2 shrink-0 mt-auto">
+                <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 shrink-0 mt-auto">
                   {questions[currentRound].options.map((option, idx) => (
                     <button
                       key={idx}
                       disabled={!isGameActive || !!selectedOption}
                       onClick={() => handleAnswer(option)}
                       className={cn(
-                        "btn-cartoon py-2 md:py-2 px-2 md:px-4 text-left flex items-center gap-1.5 md:gap-2 relative overflow-hidden",
+                        "w-full py-3 md:py-4 px-3 md:px-4 border-4 border-[#1a0533] rounded-xl font-black text-base md:text-lg text-center flex items-center justify-center gap-2 relative transition-all shadow-[3px_3px_0px_#1a0533]",
                         // Default state (no answer yet)
-                        !selectedOption ? "bg-white text-[#1a0533]" : "",
+                        !selectedOption ? "bg-white text-[#1a0533] hover:bg-gray-50" : "",
                         // Waiting for others (answered, but no result yet)
                         selectedOption === option && !showResult ? "bg-[#9B59F5] text-white" : "",
                         selectedOption && selectedOption !== option && !showResult ? "bg-white text-[#1a0533] opacity-50 grayscale" : "",
@@ -3355,7 +3355,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         showResult && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-white text-[#1a0533] opacity-30 grayscale" : ""
                       )}
                     >
-                      <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-sm md:text-xl">
+                      <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-xs md:text-sm font-black">
                         {idx + 1}
                       </div>
                       <span className="truncate text-sm md:text-xl leading-none">{option}</span>
