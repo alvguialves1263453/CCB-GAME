@@ -22,6 +22,7 @@ export interface Room {
   difficulty: string;
   deadlineAt: number | null;
   questions?: any[];
+  gameType?: string;
 }
 
 let channel: RealtimeChannel | null = null;
@@ -46,6 +47,7 @@ const mapRoom = (row: any): Room => ({
   difficulty: row.difficulty,
   deadlineAt: row.deadline_at ? Number(row.deadline_at) : null,
   questions: row.questions,
+  gameType: row.game_type || 'hino',
 });
 
 const mapPlayer = (row: any): Player => ({

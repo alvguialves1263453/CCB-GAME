@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil, Share2 } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil, Share2, BookOpen } from "lucide-react";
 
 const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -343,6 +343,7 @@ export default function App() {
   const [bibliaSubmissions, setBibliaSubmissions] = useState<any[]>([]);
   const [bibliaFinalRanking, setBibliaFinalRanking] = useState<BibliaPlayer[]>([]);
   const [bibliaIsHost, setBibliaIsHost] = useState(false);
+  const [gameType, setGameType] = useState<string>('hino');
   const bibliaStartTimeRef = useRef<number>(0);
   
   const startTimeRef = useRef<number>(0);
@@ -631,8 +632,9 @@ export default function App() {
         
         setRoundCount(room.roundCount);
         setDifficulty(room.difficulty as Difficulty);
-        difficultyRef.current = room.difficulty as Difficulty; // Update ref immediately, not waiting for next render
+        difficultyRef.current = room.difficulty as Difficulty;
         if (room.questions) setQuestions(room.questions);
+        setGameType(room.gameType || 'hino');
 
         // State Machine based on Phase
         if (room.phase === 'lobby') {
@@ -3217,15 +3219,31 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
                 <div className="flex flex-col items-center text-center gap-0 max-w-4xl w-full flex-shrink">
-                  <div className="w-8 h-8 md:w-12 md:h-12 bg-[#9B59F5] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
-                    <Music className="w-4 h-4 md:w-6 md:h-6" />
-                  </div>
-                  <h2 className="text-lg md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#FFD700] shrink-0">Qual é o hino?</h2>
-                  <div className="bg-gray-50 border-3 md:border-4 border-[#1a0533] p-2 md:p-5 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] relative my-0.5 w-full shrink">
-                    <p className="text-sm md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-0.5 line-clamp-2">
-                      "{questions[currentRound].snippet}"
-                    </p>
-                  </div>
+                  {gameType === 'biblia' ? (
+                    <>
+                      <div className="w-8 h-8 md:w-12 md:h-12 bg-[#8B5CF6] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
+                        <BookOpen className="w-4 h-4 md:w-6 md:h-6" />
+                      </div>
+                      <h2 className="text-lg md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#8B5CF6] shrink-0">Quiz da Bíblia</h2>
+                      <div className="bg-gray-50 border-3 md:border-4 border-[#1a0533] p-2 md:p-5 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] relative my-0.5 w-full shrink">
+                        <p className="text-sm md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-0.5 line-clamp-2">
+                          "{questions[currentRound].pergunta || questions[currentRound].snippet}"
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-8 h-8 md:w-12 md:h-12 bg-[#9B59F5] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
+                        <Music className="w-4 h-4 md:w-6 md:h-6" />
+                      </div>
+                      <h2 className="text-lg md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#FFD700] shrink-0">Qual é o hino?</h2>
+                      <div className="bg-gray-50 border-3 md:border-4 border-[#1a0533] p-2 md:p-5 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] relative my-0.5 w-full shrink">
+                        <p className="text-sm md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-0.5 line-clamp-2">
+                          "{questions[currentRound].snippet}"
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-3 max-w-4xl px-1 md:px-2 shrink-0 mt-auto">
