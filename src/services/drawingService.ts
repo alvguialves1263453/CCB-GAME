@@ -281,18 +281,19 @@ export const drawingService = {
     // Fetch prompts by category
     let prompts;
     if (category === 'Todos') {
-      const result = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
+      const result = await supabase.from('drawing_prompts').select('prompt');
       prompts = result.data;
     } else {
-      const result = await supabase.from('drawing_prompts').select('prompt').eq('category', category).limit(1);
+      const result = await supabase.from('drawing_prompts').select('prompt').eq('category', category);
       prompts = result.data;
       // If no prompts in category, get any prompt
       if (!prompts || prompts.length === 0) {
-        const fallback = await supabase.from('drawing_prompts').select('prompt').limit(1);
+        const fallback = await supabase.from('drawing_prompts').select('prompt');
         prompts = fallback.data;
       }
     }
-    const prompt = prompts?.[0]?.prompt || 'Desenhe algo';
+    // Pick random prompt client-side
+    const prompt = prompts?.length ? prompts[Math.floor(Math.random() * prompts.length)]?.prompt : 'Desenhe algo';
 
     await supabase.from('drawing_rooms').update({
       phase: 'drawing',
@@ -359,8 +360,8 @@ export const drawingService = {
         deadline_at: null
       }).eq('id', roomId);
     } else {
-      const { data: prompts } = await supabase.from('drawing_prompts').select('prompt').order('random()').limit(1);
-      const prompt = prompts?.[0]?.prompt || 'Desenhe algo';
+      const { data: prompts } = await supabase.from('drawing_prompts').select('prompt');
+      const prompt = prompts?.length ? prompts[Math.floor(Math.random() * prompts.length)]?.prompt : 'Desenhe algo';
 
       await supabase.from('drawing_rooms').update({
         phase: 'drawing',
