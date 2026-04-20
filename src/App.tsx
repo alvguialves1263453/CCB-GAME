@@ -3309,7 +3309,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
                 <div className="flex flex-col items-center text-center gap-0 max-w-4xl w-full flex-shrink">
-                  {(gameType === 'biblia' || questions[currentRound]?.pergunta) ? (
+                  {questions[currentRound]?.pergunta ? (
                     <>
                       <div className="w-8 h-8 md:w-12 md:h-12 bg-[#8B5CF6] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
                         <BookOpen className="w-4 h-4 md:w-6 md:h-6" />
