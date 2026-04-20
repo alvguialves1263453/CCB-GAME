@@ -2799,7 +2799,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       setBibliaPlayers(prev => prev.map(p => p.id === bibliaLocalPlayerId ? { ...p, isReady: true } : p));
                     } else {
                       // Start game - fetch perguntas from biblia_perguntas
-                      const { data: perguntas } = await supabase.from('biblia_perguntas').select('*').order('RANDOM()').limit(bibliaRoundCount);
+                      const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+                      const perguntas = allPerguntas ? allPerguntas.sort(() => Math.random() - 0.5).slice(0, bibliaRoundCount) : [];
                       if (perguntas && perguntas.length > 0) {
                         await bibliaService.startGame(bibliaRoomId!, perguntas, bibliaRoundCount, difficulty);
                         setView('biblia_game');
