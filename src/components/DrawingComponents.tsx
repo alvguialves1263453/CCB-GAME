@@ -21,6 +21,7 @@ interface DrawingCanvasViewProps {
   onSubmit: (drawingData: string) => void;
   onTimeUp: () => void;
   isSubmitted: boolean;
+  simple?: boolean;
 }
 
 const COLORS = [
@@ -29,7 +30,7 @@ const COLORS = [
   "#FF5A95", "#8B4513", "#00CED1", "#FF69B4"
 ];
 
-export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubmitted }: DrawingCanvasViewProps) {
+export function DrawingCanvasView({ prompt, timeLeft, onSubmit, onTimeUp, isSubmitted, simple = false }: DrawingCanvasViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [paths, setPaths] = useState<Path[]>([]);

@@ -313,6 +313,9 @@ export default function App() {
   const [drawingCurrentPrompt, setDrawingCurrentPrompt] = useState<string>('');
   const [drawingTimeLeft, setDrawingTimeLeft] = useState<number>(60);
   const [drawingCountdown, setDrawingCountdown] = useState<number | null>(null);
+  const [drawingColor, setDrawingColor] = useState("#000000");
+  const [drawingTool, setDrawingTool] = useState<"pencil" | "eraser">("pencil");
+  const [drawingBrushSize, setDrawingBrushSize] = useState(5);
   const [drawingSubmissions, setDrawingSubmissions] = useState<any[]>([]);
   const [currentDrawingIndex, setCurrentDrawingIndex] = useState(0);
   const [hasSubmittedDrawing, setHasSubmittedDrawing] = useState(false);
@@ -2527,6 +2530,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   prompt={drawingCurrentPrompt}
                   timeLeft={drawingTimeLeft}
                   isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
+                  simple={true}
                   onSubmit={async (drawingData) => {
                     await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, drawingData);
                     setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
@@ -2538,6 +2542,32 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   }}
                 />
               </div>
+
+              {/* Toolbar de Cores */}
+              <div className="flex items-center justify-center gap-2 bg-white border-4 border-[#1a0533] px-4 py-3 rounded-xl">
+                <div className="flex gap-2">
+                  {["#000000", "#FF4757", "#FFD700", "#4ECB71", "#9B59F5", "#38bdf8", "#f97316", "#FF5A95"].map(color => (
+                    <button
+                      key={color}
+                      onClick={() => { soundService.playClick(); }}
+                      className={cn(
+                        "w-8 h-8 rounded-full border-3 border-[#1a0533] shadow-[2px_2px_0px_#1a0533] hover:scale-110 transition-transform"
+                      )}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Botão Enviar */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { soundService.playClick(); }}
+                className="btn-cartoon btn-green py-3 text-lg tracking-widest"
+              >
+                ENVIAR ✓
+              </motion.button>
 
               {/* Status Bar */}
               <div className="flex items-center justify-center gap-3 bg-white border-4 border-[#1a0533] px-6 py-2 rounded-xl">
