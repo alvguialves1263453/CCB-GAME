@@ -580,6 +580,13 @@ export default function App() {
           }
         }
         
+        // If room was deleted (empty players list for non-host), go home
+        if (dbPlayers.length === 0 && !isSolo && !isHost && roomId) {
+          alert('A sala foi encerrada pelo host!');
+          setView('home');
+          setRoomId(null);
+        }
+        
         prevPlayersRef.current = dbPlayers;
         
         // ONLY update if we have players in DB and not going to ranking
