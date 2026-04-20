@@ -2723,7 +2723,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     }
                     soundService.playClick();
                     setIsLoading(true);
-                    const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount);
+                    const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, bibliaRoundCount, 'biblia');
                     setIsLoading(false);
                     if (result) {
                       setRoomId(result.room.id);
@@ -2752,13 +2752,13 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               className="w-full flex-1 min-h-0 max-w-5xl flex flex-col gap-2 mx-auto"
             >
               <div className="flex items-center justify-between px-2 shrink-0">
-                <button onClick={async () => { soundService.playClick(); await bibliaService.leaveRoom(); setBibliaGameMode(false); setBibliaRoomId(null); setView("mode_selection"); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                <button onClick={async () => { soundService.playClick(); await multiplayerService.leaveRoom(); setRoomId(null); setView("mode_selection"); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                 </button>
                 <div className="bg-white border-4 border-[#1a0533] px-4 py-1.5 rounded-xl game-shadow">
-                  <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#8B5CF6]">{bibliaRoomId}</span></span>
+                  <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#8B5CF6]">{roomId}</span></span>
                 </div>
-                <button onClick={() => { soundService.playClick(); navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?biblia=' + bibliaRoomId); alert('Link copiado!'); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                <button onClick={() => { soundService.playClick(); navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?room=' + roomId); alert('Link copiado!'); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <Share2 className="w-5 h-5 text-[#1a0533]" />
                 </button>
               </div>
@@ -2769,10 +2769,10 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   <div className="flex items-center gap-2 mb-3 shrink-0">
                     <Users className="w-5 h-5 text-[#1a0533]" />
                     <span className="text-lg font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">Jogadores</span>
-                    <span className="bg-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">{bibliaPlayers.length}</span>
+                    <span className="bg-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">{players.length}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-2">
-                    {bibliaPlayers.map((p) => (
+                    {players.map((p) => (
                       <motion.div
                         key={p.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -2830,23 +2830,22 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         onClick={async () => {
                           const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
                           if (!allPerguntas || allPerguntas.length === 0) {
-                            alert('Nenhuma pergunta encontrada!');
+                            alert('Nenhuma pergunta da Biblia encontrada!');
                             return;
                           }
-                          // Transformar em formato de perguntas igual ao hino
                           const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
                           const selected = shuffled.slice(0, bibliaRoundCount);
                           const bibliaQuestions = selected.map((p: any) => ({
                             hinario: 0,
                             numero: p.id,
+                            pergunta: p.pergunta,
                             options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
                             correct: 0,
                             tipo: 'biblia'
                           }));
-                          // Usar multiplayerService.startGame igual ao hino
-                          await multiplayerService.startGame(bibliaRoomId!, bibliaQuestions, bibliaRoundCount, difficulty);
+                          await multiplayerService.startGame(roomId!, bibliaQuestions, bibliaRoundCount, difficulty);
                         }}
-                        disabled={bibliaPlayers.length < 1}
+                        disabled={players.length < 1}
                         className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"
                       >
                         COMEÇAR!
