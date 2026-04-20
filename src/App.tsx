@@ -57,6 +57,7 @@ import { multiplayerService, type Room, type Player as DBPlayer } from "./servic
 import { drawingService, type DrawingPlayer, type DrawingRoom, type DrawingSubmission, type DrawingVote } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
+import { DrawingCanvasView } from "./components/DrawingComponents";
 import { Edit2 } from "lucide-react";
 type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection" | "drawing_setup" | "drawing_lobby" | "drawing_game" | "drawing_voting" | "drawing_ranking";
 
@@ -693,6 +694,40 @@ export default function App() {
 
     return () => unsubscribe();
   }, [roomId, isSolo, view]);
+
+  // Handle Drawing Game Subscriptions
+  useEffect(() => {
+    if (!drawingRoomId || !drawingGameMode) return;
+
+    const unsubscribe = drawingService.subscribeToRoom(
+      drawingRoomId,
+      (dbPlayers) => setDrawingPlayers(dbPlayers),
+      (room) => {
+        if (!room) return;
+        
+        setDrawingCurrentPrompt(room.currentPrompt || '');
+        
+        // State Machine for Drawing Game
+        if (room.phase === 'lobby') {
+          if (viewRef.current !== 'drawing_lobby') setView('drawing_lobby');
+        } else if (room.phase === 'drawing') {
+          if (viewRef.current !== 'drawing_game') setView('drawing_game');
+          setDrawingRound(room.currentRound);
+          // Update time if deadline exists
+          if (room.deadline_at) {
+            const remaining = Math.max(0, Math.ceil((room.deadline_at - Date.now()) / 1000));
+            setDrawingTimeLeft(remaining);
+          }
+        } else if (room.phase === 'voting') {
+          setView('drawing_voting');
+        } else if (room.phase === 'ranking') {
+          setView('drawing_ranking');
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [drawingRoomId, drawingGameMode]);
 
   // Cleanup room when host leaves or reloads
   useEffect(() => {
@@ -2417,6 +2452,54 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     </motion.button>
                   )}
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Drawing Game */}
+          {view === "drawing_game" && (
+            <motion.div
+              key="drawing_game"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full flex-1 flex flex-col gap-2 pb-20 md:pb-3"
+            >
+              <div className="flex items-center justify-between gap-2 px-2">
+                <button onClick={() => setView("drawing_lobby")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
+                  <X className="w-5 h-5 text-[#1a0533]" />
+                </button>
+                <div className="flex-1 bg-white border-4 border-[#1a0533] px-4 py-2 rounded-xl game-shadow text-center">
+                  <span className="text-sm font-black italic uppercase cartoon-text text-[#1a0533]">{drawingCurrentPrompt}</span>
+                </div>
+                <div className={cn(
+                  "w-16 h-11 flex items-center justify-center border-4 border-[#1a0533] rounded-xl font-black text-xl",
+                  drawingTimeLeft <= 10 ? "bg-[#FF4757] text-white animate-pulse" :
+                  drawingTimeLeft <= 20 ? "bg-[#FFD700] text-[#1a0533]" :
+                  "bg-white text-[#1a0533]"
+                )}>
+                  {drawingTimeLeft}
+                </div>
+              </div>
+
+              <DrawingCanvasView
+                prompt={drawingCurrentPrompt}
+                timeLeft={drawingTimeLeft}
+                isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
+                onSubmit={async (drawingData) => {
+                  await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, drawingData);
+                  setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
+                }}
+                onTimeUp={async () => {
+                  if (!drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)) {
+                    await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, JSON.stringify([]));
+                  }
+                }}
+              />
+
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                <span className="font-bold">{drawingSubmissions.length}/{drawingPlayers.length}</span>
+                <span>enviaram</span>
               </div>
             </motion.div>
           )}
