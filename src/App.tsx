@@ -795,10 +795,12 @@ export default function App() {
           if (viewRef.current !== 'biblia_game') setView('biblia_game');
           setBibliaCountdown(3);
         } else if (room.phase === 'answering') {
+          console.log('[BIBLIA] answering phase, room:', room);
           if (viewRef.current !== 'biblia_game') setView('biblia_game');
           bibliaStartTimeRef.current = Date.now();
           
           if (room.questions && room.questions.length > 0) {
+            console.log('[BIBLIA] questions:', room.questions);
             const pergunta = room.questions[room.currentRound - 1];
             if (pergunta) {
               setBibliaCurrentPergunta(pergunta.pergunta);
