@@ -345,5 +345,9 @@ canvas { pointer-events: none; }
   html, body {
     padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
   }
+
+  .game-answer-btn {
+    min-height: 44px;
+  }
 }
 

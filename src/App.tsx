@@ -2254,7 +2254,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-2 overflow-hidden relative pb-4 md:pb-2"
+              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-1 md:gap-2 overflow-hidden relative pb-24 md:pb-2"
             >
               {/* Overlay de Countdown */}
               <AnimatePresence>
@@ -2317,29 +2317,29 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 </div>
               </div>
 
-              <div className="flex-grow cartoon-panel p-3 md:p-4 flex flex-col items-center justify-between gap-2 md:gap-3 relative overflow-hidden min-h-0">
+              <div className="flex-grow cartoon-panel p-2 md:p-4 flex flex-col gap-1 md:gap-3 relative overflow-hidden min-h-0">
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
-                <div className="flex flex-col items-center text-center gap-1 max-w-4xl w-full flex-shrink">
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[#9B59F5] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533] mt-1 md:mt-2 animate-bounce-subtle shrink-0">
-                    <Music className="w-5 h-5 md:w-6 md:h-6" />
+                <div className="flex flex-col items-center text-center gap-0 max-w-4xl w-full flex-shrink">
+                  <div className="w-8 h-8 md:w-12 md:h-12 bg-[#9B59F5] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533] shrink-0">
+                    <Music className="w-4 h-4 md:w-6 md:h-6" />
                   </div>
-                  <h2 className="text-xl md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#FFD700] shrink-0">Qual é o hino?</h2>
-                  <div className="bg-gray-50 border-4 border-[#1a0533] p-3 md:p-5 rounded-2xl shadow-[4px_4px_0px_#1a0533] relative my-1 w-full shrink">
-                    <p className="text-base md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-1 line-clamp-3">
+                  <h2 className="text-lg md:text-3xl font-black italic uppercase leading-none cartoon-text text-[#FFD700] shrink-0">Qual é o hino?</h2>
+                  <div className="bg-gray-50 border-3 md:border-4 border-[#1a0533] p-2 md:p-5 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] relative my-0.5 w-full shrink">
+                    <p className="text-sm md:text-2xl font-black text-[#1a0533] italic leading-tight px-2 py-0.5 line-clamp-2">
                       "{questions[currentRound].snippet}"
                     </p>
                   </div>
                 </div>
 
-                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 max-w-4xl px-2 shrink-0">
+                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-3 max-w-4xl px-1 md:px-2 shrink-0 mt-auto">
                   {questions[currentRound].options.map((option, idx) => (
                     <button
                       key={idx}
                       disabled={!isGameActive || !!selectedOption}
                       onClick={() => handleAnswer(option)}
                       className={cn(
-                        "btn-cartoon py-3 md:py-2 px-3 md:px-4 text-left flex items-center gap-2 relative overflow-hidden",
+                        "btn-cartoon py-2 md:py-2 px-2 md:px-4 text-left flex items-center gap-1.5 md:gap-2 relative overflow-hidden",
                         // Default state (no answer yet)
                         !selectedOption ? "bg-white text-[#1a0533]" : "",
                         // Waiting for others (answered, but no result yet)
@@ -2351,11 +2351,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         showResult && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-white text-[#1a0533] opacity-30 grayscale" : ""
                       )}
                     >
-                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-lg md:text-xl">
+                      <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-sm md:text-xl">
                         {idx + 1}
                       </div>
-                      <span className="truncate text-base md:text-xl leading-none">{option}</span>
-                      {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-4 w-6 h-6 drop-shadow-md" />}
+                      <span className="truncate text-sm md:text-xl leading-none">{option}</span>
+                      {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-3 w-5 h-5 md:w-6 md:h-6 drop-shadow-md" />}
                     </button>
                   ))}
                 </div>
