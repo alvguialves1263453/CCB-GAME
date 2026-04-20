@@ -633,8 +633,11 @@ export default function App() {
         setRoundCount(room.roundCount);
         setDifficulty(room.difficulty as Difficulty);
         difficultyRef.current = room.difficulty as Difficulty;
-        if (room.questions) setQuestions(room.questions);
-        setGameType(room.gameType || 'hino');
+        if (room.questions) {
+          console.log('[GAME] Questions received:', room.questions.length, room.questions[0]?.pergunta || room.questions[0]?.snippet);
+          setQuestions(room.questions);
+        }
+        setGameType(room.gameType || (room.questions?.[0]?.pergunta ? 'biblia' : 'hino'));
 
         // State Machine based on Phase
         if (room.phase === 'lobby') {
@@ -2830,22 +2833,29 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <>
                       <button
                         onClick={async () => {
-                          const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
+                          // Buscar perguntas do banco biblia_perguntas
+                          const { data: allPerguntas, error: err } = await supabase.from('biblia_perguntas').select('id, pergunta, correta, opcao1, opcao2, opcao3');
+                          console.log('[BIBLIA] Perguntas from DB:', allPerguntas?.length, err);
                           if (!allPerguntas || allPerguntas.length === 0) {
-                            alert('Nenhuma pergunta da Biblia encontrada!');
+                            alert('Nenhuma pergunta da Biblia encontrada no banco!');
+                            console.log('[BIBLIA] Error:', err);
                             return;
                           }
+                          // Embaralhar e selecionar
                           const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
                           const selected = shuffled.slice(0, bibliaRoundCount);
-                          const bibliaQuestions = selected.map((p: any) => ({
-                            hinario: 0,
-                            numero: p.id,
+                          console.log('[BIBLIA] Selected:', selected.length, selected[0]);
+                          // Criar formato de perguntas
+                          const bibliaQuestions = selected.map((p: any, idx: number) => ({
+                            id: p.id,
                             pergunta: p.pergunta,
                             options: [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5),
                             correct: 0,
                             tipo: 'biblia'
                           }));
+                          console.log('[BIBLIA] Questions to start:', bibliaQuestions);
                           await multiplayerService.startGame(roomId!, bibliaQuestions, bibliaRoundCount, difficulty);
+                          console.log('[BIBLIA] Game started!');
                         }}
                         disabled={players.length < 1}
                         className="w-full py-4 border-4 border-[#1a0533] rounded-xl font-black text-xl uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] bg-[#8B5CF6] text-white"

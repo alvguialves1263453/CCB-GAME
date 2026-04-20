@@ -223,6 +223,7 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
 
   // Host Actions
   async startGame(roomId: string, questions: any[], roundCount: number, difficulty: string) {
+    console.log('[Service] startGame called with:', questions.length, questions[0]?.pergunta);
     await supabase.from('rooms').update({
       phase: 'preparing',
       questions: questions,
@@ -231,6 +232,7 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
       current_round: 0,
       deadline_at: Date.now() + 3000 // 3 seconds preparing
     }).eq('id', roomId);
+    console.log('[Service] Room updated to preparing phase');
   },
 
   async touchRoom(roomId: string) {
