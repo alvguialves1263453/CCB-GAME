@@ -775,11 +775,15 @@ export default function App() {
 
   // Handle biblia Game Subscriptions
   useEffect(() => {
+    console.log('[BIBLIA] useEffect:', { bibliaRoomId, bibliaGameMode });
     if (!bibliaRoomId || !bibliaGameMode) return;
 
     const unsubscribe = bibliaService.subscribeToRoom(
       bibliaRoomId,
-      (dbPlayers) => setBibliaPlayers(dbPlayers),
+      (dbPlayers) => {
+        console.log('[BIBLIA] Players updated:', dbPlayers);
+        setBibliaPlayers(dbPlayers);
+      },
       (room) => {
         if (!room) return;
         
@@ -2769,13 +2773,13 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               className="w-full flex-1 min-h-0 max-w-5xl flex flex-col gap-2 mx-auto"
             >
               <div className="flex items-center justify-between px-2 shrink-0">
-                <button onClick={async () => { soundService.playClick(); await multiplayerService.leaveRoom(); setRoomId(null); setView("mode_selection"); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                <button onClick={async () => { soundService.playClick(); await bibliaService.leaveRoom(); setBibliaGameMode(false); setBibliaRoomId(null); setView("mode_selection"); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                 </button>
                 <div className="bg-white border-4 border-[#1a0533] px-4 py-1.5 rounded-xl game-shadow">
-                  <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#8B5CF6]">{roomId}</span></span>
+                  <span className="text-base font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">SALA: <span className="text-[#8B5CF6]">{bibliaRoomId}</span></span>
                 </div>
-                <button onClick={() => { soundService.playClick(); navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?room=' + roomId); alert('Link copiado!'); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                <button onClick={() => { soundService.playClick(); navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?biblia=' + bibliaRoomId); alert('Link copiado!'); }} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                   <Share2 className="w-5 h-5 text-[#1a0533]" />
                 </button>
               </div>
@@ -2786,10 +2790,10 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   <div className="flex items-center gap-2 mb-3 shrink-0">
                     <Users className="w-5 h-5 text-[#1a0533]" />
                     <span className="text-lg font-black italic uppercase tracking-tighter cartoon-text text-[#1a0533]">Jogadores</span>
-                    <span className="bg-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">{players.length}</span>
+                    <span className="bg-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-xs font-black">{bibliaPlayers.length}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-2">
-                    {players.map((p) => (
+                    {bibliaPlayers.map((p) => (
                       <motion.div
                         key={p.id}
                         initial={{ opacity: 0, x: -20 }}
