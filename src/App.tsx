@@ -2500,37 +2500,37 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
             </motion.div>
           )}
 
-          {/* Drawing Game */}
+          {/* Drawing Game - Gartic Phone Style */}
           {view === "drawing_game" && (
             <motion.div
               key="drawing_game"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 flex flex-col gap-3 pb-20 md:pb-3"
+              className="w-full h-full flex flex-col"
             >
-              {/* Header - Prompt + Timer */}
-              <div className="flex items-center gap-3 px-2">
-                <div className="bg-[#9B59F5] border-4 border-[#1a0533] px-4 py-2 rounded-xl shadow-[3px_3px_0px_#1a0533]">
-                  <span className="text-lg font-black italic uppercase tracking-tighter text-white">{drawingCurrentPrompt}</span>
+              {/* Header - Prompt */}
+              <div className="bg-[#1a1a2e] px-4 py-3 flex items-center justify-between shrink-0">
+                <div className="flex-1">
+                  <span className="text-sm text-gray-400 uppercase tracking-wider">Desenhe:</span>
+                  <p className="text-2xl font-black text-white">{drawingCurrentPrompt}</p>
                 </div>
                 <div className={cn(
-                  "w-14 h-14 flex items-center justify-center border-4 border-[#1a0533] rounded-xl font-black text-2xl shadow-[3px_3px_0px_#1a0533]",
+                  "w-16 h-16 flex items-center justify-center rounded-2xl font-black text-3xl",
                   drawingTimeLeft <= 10 ? "bg-[#FF4757] text-white animate-pulse" :
                   drawingTimeLeft <= 20 ? "bg-[#FFD700] text-[#1a0533]" :
                   "bg-white text-[#1a0533]"
                 )}>
-                  {drawingTimeLeft}s
+                  {drawingTimeLeft}
                 </div>
               </div>
 
               {/* Canvas Area */}
-              <div className="flex-1 bg-white border-4 border-[#1a0533] rounded-2xl overflow-hidden shadow-[4px_4px_0px_#1a0533]">
+              <div className="flex-1 min-h-0">
                 <DrawingCanvasView
                   prompt={drawingCurrentPrompt}
                   timeLeft={drawingTimeLeft}
                   isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
-                  simple={true}
                   onSubmit={async (drawingData) => {
                     await drawingService.submitDrawing(drawingRoomId!, drawingLocalPlayerId!, drawingData);
                     setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
@@ -2543,38 +2543,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 />
               </div>
 
-              {/* Toolbar de Cores */}
-              <div className="flex items-center justify-center gap-2 bg-white border-4 border-[#1a0533] px-4 py-3 rounded-xl">
-                <div className="flex gap-2">
-                  {["#000000", "#FF4757", "#FFD700", "#4ECB71", "#9B59F5", "#38bdf8", "#f97316", "#FF5A95"].map(color => (
-                    <button
-                      key={color}
-                      onClick={() => { soundService.playClick(); }}
-                      className={cn(
-                        "w-8 h-8 rounded-full border-3 border-[#1a0533] shadow-[2px_2px_0px_#1a0533] hover:scale-110 transition-transform"
-                      )}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Botão Enviar */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => { soundService.playClick(); }}
-                className="btn-cartoon btn-green py-3 text-lg tracking-widest"
-              >
-                ENVIAR ✓
-              </motion.button>
-
               {/* Status Bar */}
-              <div className="flex items-center justify-center gap-3 bg-white border-4 border-[#1a0533] px-6 py-2 rounded-xl">
-                <span className="font-black text-[#9B59F5]">{drawingSubmissions.length}</span>
+              <div className="bg-[#1a1a2e] px-4 py-2 flex items-center justify-center gap-2 shrink-0">
+                <span className="text-[#FFD700] font-black">{drawingSubmissions.length}</span>
                 <span className="text-gray-500">/</span>
-                <span className="font-black text-[#1a0533]">{drawingPlayers.length}</span>
-                <span className="text-xs text-gray-500 uppercase">enviaram</span>
+                <span className="text-white font-black">{drawingPlayers.length}</span>
+                <span className="text-gray-400 text-sm uppercase">enviaram</span>
               </div>
             </motion.div>
           )}
