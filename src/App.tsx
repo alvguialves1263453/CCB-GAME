@@ -3063,7 +3063,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2 shrink-0">
                 <div className="flex items-center gap-3">
                   {isSolo ? (
-                    <button onClick={() => setView("home")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
+                    <button onClick={() => setView("mode_selection")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                       <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                     </button>
                   ) : (
