@@ -278,9 +278,6 @@ export default function App() {
   const [roundCount, setRoundCount] = useState(5);
   const [difficulty, setDifficulty] = useState<Difficulty>('facil');
   const [hinoDifficulty, setHinoDifficulty] = useState<HinoDifficulty>('sem_tempo');
-  
-  // Get effective difficulty based on game mode
-  const effectiveDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -342,6 +339,8 @@ export default function App() {
   
   // Biblia game states
   const [bibliaGameMode, setBibliaGameMode] = useState(false);
+  // Get effective difficulty based on game mode
+  const effectiveDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
   const [bibliaRoomId, setBibliaRoomId] = useState<string | null>(null);
   const [bibliaLocalPlayerId, setBibliaLocalPlayerId] = useState<string | null>(null);
   const [bibliaPlayers, setBibliaPlayers] = useState<BibliaPlayer[]>([]);
