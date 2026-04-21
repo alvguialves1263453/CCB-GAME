@@ -2258,6 +2258,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     soundService.playClick();
+                    setIsSolo(true);
+                    setRoomId(null);
                     setView("multiplayer_setup");
                   }}
                   className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
@@ -2283,6 +2285,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     soundService.playClick();
+                    setIsSolo(true);
+                    setRoomId(null);
                     setBibliaGameMode(true);  // Ativar modo biblia
                     setView("multiplayer_setup");
                   }}
