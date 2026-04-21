@@ -248,13 +248,20 @@ const MusicalNotesBackground = ({ reducedMotion }: { reducedMotion?: boolean }) 
 };
 
 
-type Difficulty = 'sem_tempo' | 'medio' | 'rapido';
+type Difficulty = 'facil' | 'medio' | 'dificil' | 'aleatorio';
+type HinoDifficulty = 'sem_tempo' | 'medio' | 'rapido';
 
 const TIME_LIMITS = {
   sem_tempo: Infinity,
   medio: 20,
   rapido: 10,
+  facil: Infinity,
+  medio: 20,
+  dificil: 10,
+  aleatorio: 20,
 };
+
+
 
 export default function App() {
   const [view, setView] = useState<ViewState>("home");
@@ -269,7 +276,11 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
   const [roundCount, setRoundCount] = useState(5);
-  const [difficulty, setDifficulty] = useState<Difficulty>('sem_tempo');
+  const [difficulty, setDifficulty] = useState<Difficulty>('facil');
+  const [hinoDifficulty, setHinoDifficulty] = useState<HinoDifficulty>('sem_tempo');
+  
+  // Get effective difficulty based on game mode
+  const effectiveDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -357,6 +368,7 @@ export default function App() {
   const showResultRef = useRef(showResult);
   const currentRoundRef = useRef(currentRound);
   const difficultyRef = useRef(difficulty);
+  const hinoDifficultyRef = useRef(hinoDifficulty);
   const roomDeadlineRef = useRef<number | null>(null);
   const questionsRef = useRef(questions);
   const feedbackRef = useRef(feedback);
@@ -368,12 +380,13 @@ export default function App() {
     isGameActiveRef.current = isGameActive;
     showResultRef.current = showResult;
     currentRoundRef.current = currentRound;
-    difficultyRef.current = difficulty;
+    difficultyRef.current = bibliaGameMode ? difficulty : hinoDifficulty;
+    hinoDifficultyRef.current = hinoDifficulty;
     questionsRef.current = questions;
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
-  }, [isGameActive, showResult, currentRound, difficulty, questions, feedback, selectedOption, players]);
+  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players]);
 
   useEffect(() => {
     if (bgMusicOn && (view === "game" || view === "lobby" || view === "multiplayer_menu" || view === "mode_selection")) {
@@ -2149,11 +2162,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 {([
                             { value: 'sem_tempo' as Difficulty, label: 'SEM TEMPO', desc: 'Sem limite de tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
                             { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20 segundos por pergunta', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                            { value: 'rapido' as Difficulty, label: 'RÁPIDO', desc: '10 segundos por pergunta', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
-                          ]).map(d => (
+                            { value: 'rapido' as HinoDifficulty, label: 'RÁPIDO', desc: '10 segundos por pergunta', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                          ]);
+                        }).map(d => (
                           <button
                             key={d.value}
-                            onClick={() => { soundService.playClick(); setDifficulty(d.value); }}
+onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
                             className={cn(
                               "py-1.5 px-2 flex flex-col items-center justify-center rounded-lg border-4 border-[#1a0533] transition-all",
                               difficulty === d.value
@@ -2774,7 +2788,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Dificuldade</label>
                   <div className="grid grid-cols-4 gap-1.5">
-                    {([
+{bibliaGameMode ? ([
+                          { value: 'facil' as Difficulty, label: 'FÁCIL', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                          { value: 'dificil' as Difficulty, label: 'DIFÍCIL', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                          { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
+                        ]) : ([
                       { value: 'sem_tempo' as Difficulty, label: 'Fácil', color: 'bg-[#22C55E]', textColor: 'text-white' },
                       { value: 'medio' as Difficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
                       { value: 'dificil' as Difficulty, label: 'Difícil', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
