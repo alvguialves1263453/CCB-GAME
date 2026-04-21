@@ -1355,7 +1355,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     setFeedback(null);
     setLastPoints(null);
     hasRungBellRef.current = false;
-    setTimeLeft(difficulty === 'sem_tempo' ? null : TIME_LIMITS[difficulty]);
+    const currentDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
+    setTimeLeft(currentDifficulty === 'sem_tempo' ? null : TIME_LIMITS[currentDifficulty]);
     startTimeRef.current = Date.now();
 
     // Reset players for the round
@@ -3219,7 +3220,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
                         <span>NÍVEL:</span>
-                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md uppercase text-[9px] shadow-[1px_1px_0px_#1a0533]">{difficulty}</span>
+                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md uppercase text-[9px] shadow-[1px_1px_0px_#1a0533]">{effectiveDifficulty}</span>
                       </div>
                     </div>
                   </div>
@@ -3306,7 +3307,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <div className="flex-grow max-w-md h-7 md:h-8 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[3px_3px_0px_#1a0533]">
                   <motion.div
                     initial={false}
-                    animate={{ width: `${Math.max(0, (timeLeft || 0) / (TIME_LIMITS[difficulty] || 1)) * 100}%` }}
+                    animate={{ width: `${Math.max(0, (timeLeft || 0) / (TIME_LIMITS[effectiveDifficulty] || 1)) * 100}%` }}
                     className={cn(
                       "h-full transition-colors duration-300",
                       (timeLeft === null || timeLeft === Infinity) ? "bg-[#4ECB71]" :
