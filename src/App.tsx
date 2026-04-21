@@ -2241,7 +2241,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <button 
                   onClick={() => {
                     soundService.playClick();
-                    setView(isSolo ? "home" : "multiplayer_menu");
+                    setView(!isSolo && roomId ? "multiplayer_menu" : "home");
                   }} 
                   className="w-9 h-9 md:w-12 md:h-12 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0"
                 >
@@ -3066,7 +3066,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <button onClick={() => setView("mode_selection")} className="w-11 h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                       <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
                     </button>
-                  ) : (
+) : (
                     <button onClick={() => { soundService.playClick(); setShowExitConfirm(true); }} className="w-11 h-11 bg-red-500 border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform shrink-0">
                       <X className="w-5 h-5 text-white" />
                     </button>
