@@ -2169,18 +2169,18 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                             { value: 'medio' as HinoDifficulty, label: 'MÉDIO', desc: '20 segundos por pergunta', color: 'bg-[#F59E0B]', textColor: 'text-white' },
                             { value: 'rapido' as HinoDifficulty, label: 'RÁPIDO', desc: '10 segundos por pergunta', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
                           ]).map(d => (
-                          <button
+<button
                             key={d.value}
-onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
+                            onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
                             className={cn(
                               "py-1.5 px-2 flex flex-col items-center justify-center rounded-lg border-4 border-[#1a0533] transition-all",
-                              difficulty === d.value
-                                ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-[1.02]`
-                                : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
+                              bibliaGameMode
+                                ? (difficulty === d.value ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-[1.02]` : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200")
+                                : (hinoDifficulty === d.value ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-[1.02]` : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200")
                             )}
                           >
                             <span className="font-black text-sm uppercase tracking-wider leading-none">{d.label}</span>
-                            <span className={cn("text-[9px] font-bold uppercase mt-0.5", difficulty === d.value ? "opacity-90" : "opacity-60")}>{d.desc}</span>
+                            <span className={cn("text-[9px] font-bold uppercase mt-0.5", bibliaGameMode ? (difficulty === d.value ? "opacity-90" : "opacity-60") : (hinoDifficulty === d.value ? "opacity-90" : "opacity-60"))}>{d.desc}</span>
                           </button>
                         ))}
                       </div>
@@ -2798,19 +2798,20 @@ onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.valu
                           { value: 'dificil' as Difficulty, label: 'DIFÍCIL', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
                           { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
                         ]) : ([
-                      { value: 'sem_tempo' as Difficulty, label: 'Fácil', color: 'bg-[#22C55E]', textColor: 'text-white' },
-                      { value: 'medio' as Difficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                      { value: 'dificil' as Difficulty, label: 'Difícil', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
-                      { value: 'aleatorio' as Difficulty, label: 'Misto', color: 'bg-[#EC4899]', textColor: 'text-white' }
+                      { value: 'sem_tempo' as HinoDifficulty, label: 'Sem Tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                      { value: 'medio' as HinoDifficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                      { value: 'rapido' as HinoDifficulty, label: 'Rápido', color: 'bg-[#8B5CF6]', textColor: 'text-white' }
                     ] as const).map(d => (
                       <button
                         key={d.value}
-                        onClick={() => { soundService.playClick(); setDifficulty(d.value); }}
+                        onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
                         className={cn(
                           "py-2 rounded-lg border-4 border-[#1a0533] font-black text-xs transition-all capitalize",
-                          difficulty === d.value
+                          bibliaGameMode ? (difficulty === d.value
                             ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-105`
-                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200") : (hinoDifficulty === d.value
+                            ? `${d.color} ${d.textColor} shadow-[3px_3px_0px_#1a0533] scale-105`
+                            : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200")
                         )}
                       >
                         {d.label}
