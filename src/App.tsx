@@ -1296,7 +1296,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
       }
       const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, roundCount);
-      const q = selected.map((p: any) => {
+const q = selected.map((p: any) => {
         // Primeiro cria as opções depois embaralha
         const opts = [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5);
         // Acha o índice da resposta correta
@@ -1304,9 +1304,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
         return {
           hinario: 0,
           numero: p.id,
+          pergunta: p.pergunta,
           snippet: p.pergunta,
           options: opts,
-          correct: correctIdx
+          correct: correctIdx,
+          isBiblia: true,
+          perguntaDifficulty: p.dificuldade || difficulty
         };
       });
       setIsLoading(false);
@@ -3329,12 +3332,17 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
               <div className="flex-grow cartoon-panel flex flex-col items-center gap-2 md:gap-3 relative overflow-y-auto min-h-0 p-3 md:p-4">
                 <div className="flex flex-col items-center text-center gap-1 md:gap-2 w-full max-w-2xl">
-                  {questions[currentRound]?.pergunta ? (
+                  {questions[currentRound]?.isBiblia ? (
                     <>
                       <div className="w-10 h-10 md:w-12 md:h-12 bg-[#8B5CF6] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533]">
                         <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
                       </div>
                       <h2 className="text-lg md:text-2xl font-black italic uppercase cartoon-text text-[#8B5CF6]">Quiz da Bíblia</h2>
+                      {questions[currentRound]?.perguntaDifficulty && questions[currentRound].perguntaDifficulty !== 'aleatorio' && (
+                        <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded", questions[currentRound].perguntaDifficulty === 'facil' ? "bg-[#22C55E] text-white" : questions[currentRound].perguntaDifficulty === 'medio' ? "bg-[#F59E0B] text-white" : "bg-[#8B5CF6] text-white")}>
+                        PERGUNTA {questions[currentRound].perguntaDifficulty === 'facil' ? 'FÁCIL' : questions[currentRound].perguntaDifficulty === 'medio' ? 'MÉDIA' : 'DIFÍCIL'}
+                      </span>
+                      )}
                       <div className="bg-white border-3 md:border-4 border-[#1a0533] p-3 md:p-4 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] w-full">
                         <p className="text-sm md:text-lg font-black text-[#1a0533] text-center leading-tight">
                           {questions[currentRound].pergunta}
