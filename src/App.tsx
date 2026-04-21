@@ -2159,12 +2159,16 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Nível</label>
                       <div className="flex flex-col gap-1.5">
-{([
-                            { value: 'sem_tempo' as Difficulty, label: 'SEM TEMPO', desc: 'Sem limite de tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
-                            { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20 segundos por pergunta', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+{(bibliaGameMode ? [
+                            { value: 'facil' as Difficulty, label: 'FÁCIL', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                            { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                            { value: 'dificil' as Difficulty, label: 'DIFÍCIL', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                            { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
+                          ] : [
+                            { value: 'sem_tempo' as HinoDifficulty, label: 'SEM TEMPO', desc: 'Sem limite de tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                            { value: 'medio' as HinoDifficulty, label: 'MÉDIO', desc: '20 segundos por pergunta', color: 'bg-[#F59E0B]', textColor: 'text-white' },
                             { value: 'rapido' as HinoDifficulty, label: 'RÁPIDO', desc: '10 segundos por pergunta', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
-                          ]);
-                        }).map(d => (
+                          ]).map(d => (
                           <button
                             key={d.value}
 onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
