@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   round_count integer DEFAULT 5,
   difficulty text DEFAULT 'facil',
   deadline_at bigint, -- Unix timestamp in ms
+  game_type text DEFAULT 'hino', -- 'hino' ou 'biblia'
   questions jsonb,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );

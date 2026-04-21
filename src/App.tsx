@@ -653,7 +653,7 @@ export default function App() {
           console.log('[GAME] Questions received:', room.questions.length, room.questions[0]?.pergunta || room.questions[0]?.snippet);
           setQuestions(room.questions);
         }
-        setGameType(room.gameType || (room.questions?.[0]?.pergunta ? 'biblia' : 'hino'));
+        setGameType(room.gameType || 'hino');
 
         // State Machine based on Phase
         if (room.phase === 'lobby') {
