@@ -2039,7 +2039,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                             game.difficulty === 'medio' ? "bg-[#F59E0B] text-white" :
                             "bg-[#8B5CF6] text-white"
                           )}>
-                            {game.difficulty === 'sem_tempo' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
+                            {game.difficulty === 'sem_tempo' ? 'SEM TEMPO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
                           </span>
                           <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
                           <span className="text-[9px] font-black text-[#1a0533]">{game.gameType === 'biblia' ? 'Quiz da Biblia' : 'Qual é o Hino?'}</span>
@@ -2146,12 +2146,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Nível</label>
                       <div className="flex flex-col gap-1.5">
-                        {([
-                          { value: 'sem_tempo' as Difficulty, label: 'LENTO', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
-                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                          { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
-                          { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
-                        ]).map(d => (
+{([
+                            { value: 'sem_tempo' as Difficulty, label: 'SEM TEMPO', desc: 'Sem limite de tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                            { value: 'medio' as Difficulty, label: 'MÉDIO', desc: '20 segundos por pergunta', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                            { value: 'rapido' as Difficulty, label: 'RÁPIDO', desc: '10 segundos por pergunta', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                          ]).map(d => (
                           <button
                             key={d.value}
                             onClick={() => { soundService.playClick(); setDifficulty(d.value); }}
