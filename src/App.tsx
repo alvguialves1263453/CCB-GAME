@@ -248,13 +248,12 @@ const MusicalNotesBackground = ({ reducedMotion }: { reducedMotion?: boolean }) 
 };
 
 
-type Difficulty = 'facil' | 'medio' | 'dificil' | 'aleatorio';
+type Difficulty = 'sem_tempo' | 'medio' | 'rapido';
 
 const TIME_LIMITS = {
-  facil: Infinity,
+  sem_tempo: Infinity,
   medio: 20,
-  dificil: 10,
-  aleatorio: 20  // Misto usa 20 segundos
+  rapido: 10,
 };
 
 export default function App() {
@@ -270,7 +269,7 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
   const [roundCount, setRoundCount] = useState(5);
-  const [difficulty, setDifficulty] = useState<Difficulty>('facil');
+  const [difficulty, setDifficulty] = useState<Difficulty>('sem_tempo');
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -688,12 +687,12 @@ export default function App() {
                
              // Reset timer state for new round
              const diff = difficultyRef.current;
-             if (diff !== 'facil') {
+             if (diff !== 'sem_tempo') {
                roomDeadlineRef.current = Date.now() + TIME_LIMITS[diff] * 1000;
              } else {
                roomDeadlineRef.current = null;
              }
-             setTimeLeft(diff === 'facil' ? null : TIME_LIMITS[diff]);
+             setTimeLeft(diff === 'sem_tempo' ? null : TIME_LIMITS[diff]);
            }
         } else if (room.phase === 'result') {
           setIsGameActive(false);
@@ -960,7 +959,7 @@ export default function App() {
               if (isCorrect) {
                 const timeSpentBot = delay / 1000;
                 const limit = TIME_LIMITS[difficultyRef.current] || 999;
-                if (difficultyRef.current === 'facil') points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
+                if (difficultyRef.current === 'sem_tempo') points = Math.max(100, Math.floor(1000 - (timeSpentBot * 20)));
                 else points = Math.max(100, Math.floor(((limit - timeSpentBot) / limit) * 1000));
               }
               return { ...p, hasAnswered: true, score: p.score + points };
@@ -1343,7 +1342,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     setFeedback(null);
     setLastPoints(null);
     hasRungBellRef.current = false;
-    setTimeLeft(difficulty === 'facil' ? null : TIME_LIMITS[difficulty]);
+    setTimeLeft(difficulty === 'sem_tempo' ? null : TIME_LIMITS[difficulty]);
     startTimeRef.current = Date.now();
 
     // Reset players for the round
@@ -1372,7 +1371,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
     let pointsToAdd = 0;
     if (isUserCorrect) {
-      if (difficultyRef.current === 'facil') {
+      if (difficultyRef.current === 'sem_tempo') {
         pointsToAdd = Math.max(100, Math.floor(1000 - (timeSpent * 20)));
       } else if (difficultyRef.current === 'medio') {
         pointsToAdd = Math.max(100, Math.floor(((20 - timeSpent) / 20) * 1000));
@@ -1416,7 +1415,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
       if (!isGameActive || showResult || isPreparing) return;
       
       const currentDifficulty = difficultyRef.current;
-      if (currentDifficulty === 'facil') return;
+      if (currentDifficulty === 'sem_tempo') return;
       
       const timeLimit = TIME_LIMITS[currentDifficulty];
       const startTime = startTimeRef.current;
@@ -1555,7 +1554,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
       <div
         className={cn(
           "fixed inset-0 pointer-events-none z-[1] transition-colors duration-1000 mix-blend-multiply",
-          view === "game" && isGameActive && difficulty !== 'facil' && timeLeft !== null
+          view === "game" && isGameActive && difficulty !== 'sem_tempo' && timeLeft !== null
             ? (timeLeft <= 3 && timeLeft > 0 ? "bg-[#FF4757]/40" : timeLeft <= 5 && timeLeft > 0 ? "bg-[#FF9F43]/40" : "bg-transparent")
             : "bg-transparent"
         )}
@@ -2036,11 +2035,11 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                         <div className="flex items-center justify-between">
                           <span className={cn(
                             "text-[9px] font-black px-2 py-0.5 rounded",
-                            game.difficulty === 'facil' ? "bg-[#22C55E] text-white" :
+                            game.difficulty === 'sem_tempo' ? "bg-[#22C55E] text-white" :
                             game.difficulty === 'medio' ? "bg-[#F59E0B] text-white" :
                             "bg-[#8B5CF6] text-white"
                           )}>
-                            {game.difficulty === 'facil' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
+                            {game.difficulty === 'sem_tempo' ? 'LENTO' : game.difficulty === 'medio' ? 'MÉDIO' : 'RÁPIDO'}
                           </span>
                           <span className="text-[9px] font-bold text-gray-600">{game.roundCount} RODADAS</span>
                           <span className="text-[9px] font-black text-[#1a0533]">{game.gameType === 'biblia' ? 'Quiz da Biblia' : 'Qual é o Hino?'}</span>
@@ -2148,7 +2147,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block ml-1 text-[#1a0533] opacity-70">Nível</label>
                       <div className="flex flex-col gap-1.5">
                         {([
-                          { value: 'facil' as Difficulty, label: 'LENTO', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                          { value: 'sem_tempo' as Difficulty, label: 'LENTO', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
                           { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
                           { value: 'dificil' as Difficulty, label: 'RÁPIDO', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
                           { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
@@ -2777,7 +2776,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Dificuldade</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {([
-                      { value: 'facil' as Difficulty, label: 'Fácil', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                      { value: 'sem_tempo' as Difficulty, label: 'Fácil', color: 'bg-[#22C55E]', textColor: 'text-white' },
                       { value: 'medio' as Difficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
                       { value: 'dificil' as Difficulty, label: 'Difícil', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
                       { value: 'aleatorio' as Difficulty, label: 'Misto', color: 'bg-[#EC4899]', textColor: 'text-white' }
@@ -2889,7 +2888,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   <div className="bg-white border-4 border-[#1a0533] rounded-xl p-4 flex flex-col gap-2 shadow-[3px_3px_0px_#1a0533]">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black uppercase text-[#1a0533]/70">Dificuldade</span>
-                      <span className={cn("text-xs font-black uppercase px-2 py-0.5 rounded", difficulty === 'facil' ? "bg-[#22C55E] text-white" : difficulty === 'medio' ? "bg-[#F59E0B] text-white" : difficulty === 'dificil' ? "bg-[#8B5CF6] text-white" : "bg-[#EC4899] text-white")}>{difficulty === 'aleatorio' ? 'Misto' : difficulty}</span>
+                      <span className={cn("text-xs font-black uppercase px-2 py-0.5 rounded", difficulty === 'sem_tempo' ? "bg-[#22C55E] text-white" : difficulty === 'medio' ? "bg-[#F59E0B] text-white" : difficulty === 'dificil' ? "bg-[#8B5CF6] text-white" : "bg-[#EC4899] text-white")}>{difficulty === 'aleatorio' ? 'Misto' : difficulty}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black uppercase text-[#1a0533]/70">Rodadas</span>
