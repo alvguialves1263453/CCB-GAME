@@ -12,6 +12,8 @@ export interface Question {
   snippet: string;
   options: string[];
   correct: number;
+  isBiblia?: boolean;
+  perguntaDifficulty?: string;
 }
 
 export async function fetchHymns(): Promise<Hymn[]> {
