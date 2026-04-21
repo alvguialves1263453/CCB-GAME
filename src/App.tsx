@@ -3264,7 +3264,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-1 md:gap-2 overflow-hidden relative pb-24 md:pb-2"
+              className="w-full flex-1 min-h-0 max-w-4xl mx-auto flex flex-col gap-1 md:gap-2 overflow-hidden relative"
             >
               {/* Overlay de Countdown */}
               <AnimatePresence>
@@ -3288,22 +3288,22 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 )}
               </AnimatePresence>
 
-              <div className="flex items-center justify-between px-2 md:px-4 gap-2 md:gap-3 h-14 shrink-0 pt-1">
+              <div className="flex items-center justify-between px-1 md:px-2 gap-1 md:gap-2 h-10 md:h-12 shrink-0">
                 <motion.button
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => { soundService.playClick(); setShowExitConfirm(true); }}
-                  className="w-10 h-10 md:w-11 md:h-11 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:bg-red-50 transition-colors shrink-0"
+                  className="w-8 h-8 md:w-9 md:h-9 bg-white border-3 md:border-4 border-[#1a0533] rounded-lg md:rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:bg-red-50 transition-colors shrink-0"
                 >
-                  <X className="w-5 h-5 md:w-6 md:h-6 text-[#1a0533]" />
+                  <X className="w-4 h-4 md:w-5 md:h-5 text-[#1a0533]" />
                 </motion.button>
 
-                <div className="cartoon-panel bg-white px-3 md:px-5 py-1 md:py-2 flex items-center gap-1 md:gap-2">
-                  <span className="hidden md:block text-[10px] font-black opacity-40 uppercase tracking-widest text-[#1a0533]">Round</span>
-                  <span className="text-lg md:text-2xl font-black italic text-[#9B59F5]">{currentRound + 1}<span className="text-sm md:text-lg opacity-50">/{roundCount}</span></span>
+                <div className="cartoon-panel bg-white px-2 md:px-3 py-0.5 md:py-1 flex items-center gap-1">
+                  <span className="hidden md:block text-[9px] font-black opacity-40 uppercase tracking-widest text-[#1a0533]">Round</span>
+                  <span className="text-sm md:text-lg font-black italic text-[#9B59F5]">{currentRound + 1}<span className="text-xs md:text-sm opacity-50">/{roundCount}</span></span>
                 </div>
 
-                <div className="flex-grow max-w-md h-7 md:h-8 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[3px_3px_0px_#1a0533]">
+                <div className="flex-grow max-w-xs md:max-w-md h-5 md:h-6 bg-white border-2 md:border-3 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[2px_2px_0px_#1a0533]">
                   <motion.div
                     initial={false}
                     animate={{ width: `${Math.max(0, (timeLeft || 0) / (TIME_LIMITS[currentDifficulty] || 1)) * 100}%` }}
@@ -3327,30 +3327,28 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 </div>
               </div>
 
-              <div className="flex-grow cartoon-panel p-4 md:p-6 flex flex-col items-center gap-3 md:gap-4 relative overflow-hidden min-h-0">
-                <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
-
-                <div className="flex flex-col items-center text-center gap-2 max-w-2xl w-full">
+              <div className="flex-grow cartoon-panel flex flex-col items-center gap-2 md:gap-3 relative overflow-y-auto min-h-0 p-3 md:p-4">
+                <div className="flex flex-col items-center text-center gap-1 md:gap-2 w-full max-w-2xl">
                   {questions[currentRound]?.pergunta ? (
                     <>
-                      <div className="w-12 h-12 md:w-16 md:h-16 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533]">
-                        <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 bg-[#8B5CF6] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533]">
+                        <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
                       </div>
-                      <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#8B5CF6]">Quiz da Bíblia</h2>
-                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full">
-                        <p className="text-lg md:text-2xl font-black text-[#1a0533] text-center leading-tight">
+                      <h2 className="text-lg md:text-2xl font-black italic uppercase cartoon-text text-[#8B5CF6]">Quiz da Bíblia</h2>
+                      <div className="bg-white border-3 md:border-4 border-[#1a0533] p-3 md:p-4 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] w-full">
+                        <p className="text-sm md:text-lg font-black text-[#1a0533] text-center leading-tight">
                           {questions[currentRound].pergunta}
                         </p>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="w-12 h-12 md:w-16 md:h-16 bg-[#9B59F5] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533]">
-                        <Music className="w-6 h-6 md:w-8 md:h-8" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 bg-[#9B59F5] border-3 md:border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[2px_2px_0px_#1a0533]">
+                        <Music className="w-5 h-5 md:w-6 md:h-6" />
                       </div>
-                      <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#FFD700]">Qual é o hino?</h2>
-                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full">
-                        <p className="text-lg md:text-2xl font-black text-[#1a0533] italic text-center leading-tight">
+                      <h2 className="text-lg md:text-2xl font-black italic uppercase cartoon-text text-[#FFD700]">Qual é o hino?</h2>
+                      <div className="bg-white border-3 md:border-4 border-[#1a0533] p-3 md:p-4 rounded-xl md:rounded-2xl shadow-[3px_3px_0px_#1a0533] w-full">
+                        <p className="text-sm md:text-lg font-black text-[#1a0533] italic text-center leading-tight">
                           "{questions[currentRound].snippet}"
                         </p>
                       </div>
@@ -3358,30 +3356,30 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   )}
                 </div>
 
-                <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 shrink-0 mt-auto">
+                <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 shrink-0">
                   {questions[currentRound].options.map((option, idx) => (
                     <button
                       key={idx}
                       disabled={!isGameActive || !!selectedOption}
                       onClick={() => handleAnswer(option)}
                       className={cn(
-                        "w-full py-3 md:py-4 px-3 md:px-4 border-4 border-[#1a0533] rounded-xl font-black text-base md:text-lg text-center flex items-center justify-center gap-2 relative transition-all shadow-[3px_3px_0px_#1a0533]",
+                        "w-full py-2 md:py-3 px-2 md:px-3 border-3 md:border-4 border-[#1a0533] rounded-lg md:rounded-xl font-black text-sm md:text-base text-center flex items-center justify-center gap-1 md:gap-2 relative transition-all shadow-[2px_2px_0px_#1a0533]",
                         // Default state (no answer yet)
                         !selectedOption ? "bg-white text-[#1a0533] hover:bg-gray-50" : "",
                         // Waiting for others (answered, but no result yet)
                         selectedOption === option && !showResult ? "bg-[#9B59F5] text-white" : "",
                         selectedOption && selectedOption !== option && !showResult ? "bg-white text-[#1a0533] opacity-50 grayscale" : "",
                         // Result revealed
-                        showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "bg-[#4ECB71] text-white scale-105 z-10 animate-pop-in shadow-[8px_8px_0px_#1a0533]" : "",
+                        showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "bg-[#4ECB71] text-white scale-105 z-10 animate-pop-in shadow-[4px_4px_0px_#1a0533]" : "",
                         showResult && selectedOption === option && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-[#FF4757] text-white animate-shake" : "",
                         showResult && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-white text-[#1a0533] opacity-30 grayscale" : ""
                       )}
                     >
-                      <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-xs md:text-sm font-black">
+                      <div className="w-5 h-5 md:w-6 md:h-6 rounded bg-black/10 border border-[#1a0533]/20 flex items-center justify-center shrink-0 text-[10px] md:text-xs font-black">
                         {idx + 1}
                       </div>
-                      <span className="truncate text-sm md:text-xl leading-none">{option}</span>
-                      {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-3 w-5 h-5 md:w-6 md:h-6 drop-shadow-md" />}
+                      <span className="truncate text-xs md:text-base leading-none">{option}</span>
+                      {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-2 w-4 h-4 md:w-5 md:h-5 drop-shadow-md" />}
                     </button>
                   ))}
                 </div>
@@ -3392,9 +3390,9 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     animate={{ opacity: 1, scale: 1 }}
                     className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
                   >
-                    <div className="bg-[#9B59F5] border-4 border-[#1a0533] px-8 py-4 rounded-[2rem] shadow-[8px_8px_0px_#1a0533] flex flex-col items-center gap-4 animate-pulse backdrop-blur-sm">
-                      <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span className="text-white font-black uppercase italic tracking-widest text-base md:text-xl cartoon-text-white">Aguardando jogadores...</span>
+                    <div className="bg-[#9B59F5] border-3 md:border-4 border-[#1a0533] px-4 md:px-6 py-2 md:py-3 rounded-xl md:rounded-2xl shadow-[4px_4px_0px_#1a0533] flex flex-col items-center gap-2 animate-pulse backdrop-blur-sm">
+                      <div className="w-8 h-8 md:w-10 md:h-10 border-3 md:border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className="text-white font-black uppercase italic tracking-widest text-xs md:text-base cartoon-text-white">Aguardando...</span>
                     </div>
                   </motion.div>
                 )}
@@ -3404,18 +3402,18 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     initial={{ y: 50, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     className={cn(
-                      "absolute inset-0 flex flex-col items-center justify-center z-50 p-4 md:p-10 text-center glass-panel",
+                      "absolute inset-0 flex flex-col items-center justify-center z-50 p-2 md:p-4 text-center glass-panel",
                       feedback?.correct ? "bg-[#4ECB71]/40" : "bg-[#FF4757]/40"
                     )}
                   >
-                    <div className="bg-white border-4 md:border-8 border-[#1a0533] p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-[8px_8px_0px_#1a0533] md:shadow-[12px_12px_0px_#1a0533] flex flex-col items-center gap-4 md:gap-6 animate-pop-in max-w-[90%]">
-                      <h3 className={cn("text-5xl md:text-9xl font-black italic uppercase cartoon-text", feedback?.correct ? "text-[#4ECB71]" : "text-[#FF4757]")}>
+                    <div className="bg-white border-3 md:border-6 border-[#1a0533] p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533] flex flex-col items-center gap-2 md:gap-4 animate-pop-in max-w-[90%]">
+                      <h3 className={cn("text-3xl md:text-5xl font-black italic uppercase cartoon-text", feedback?.correct ? "text-[#4ECB71]" : "text-[#FF4757]")}>
                         {feedback?.correct ? "BOA!" : "QUASE!"}
                       </h3>
                       {lastPoints !== null && lastPoints > 0 && (
                         <AnimatedPoints points={lastPoints} />
                       )}
-                      <div className="bg-[#1a0533] text-white px-5 py-2 rounded-full font-black text-xs md:text-base uppercase tracking-[0.3em] md:tracking-[0.5em] animate-pulse">
+                      <div className="bg-[#1a0533] text-white px-3 md:px-4 py-1 md:py-2 rounded-full font-black text-[10px] md:text-xs uppercase tracking-[0.2em] animate-pulse">
                         Próximo em {resultCountdown !== null ? resultCountdown : 3}s...
                       </div>
                     </div>
@@ -3424,12 +3422,12 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
               </div>
 
               {/* Mini Placar fixo no rodapé para desktop, escondido no mobile */}
-              <div className="hidden md:flex w-full h-16 shrink-0 bg-white border-4 border-[#1a0533] rounded-[2rem] p-3 items-center justify-center gap-4 overflow-x-auto no-scrollbar shadow-[0px_4px_0px_rgba(26,5,51,0.2)]">
+              <div className="hidden md:flex w-full h-12 shrink-0 bg-white border-3 border-[#1a0533] rounded-2xl p-2 items-center justify-center gap-2 md:gap-3 overflow-x-auto no-scrollbar shadow-[0px_3px_0px_rgba(26,5,51,0.2)]">
                 {players.sort((a, b) => b.score - a.score).map((p, i) => (
-                  <div key={p.id} className="flex items-center gap-2 shrink-0 bg-gray-100 px-4 py-2 rounded-2xl border-2 border-[#1a0533]">
-                    <div className={cn("w-3 h-3 rounded-full border-2 border-[#1a0533]", p.hasAnswered ? "bg-[#4ECB71]" : "bg-white")} />
-                    <span className="text-xs font-black uppercase italic text-[#1a0533]">{i + 1}. {p.nickname}</span>
-                    <span className="bg-[#9B59F5] text-white text-xs font-black px-3 py-1 rounded-xl border-2 border-[#1a0533]">{p.score}</span>
+                  <div key={p.id} className="flex items-center gap-1 md:gap-2 shrink-0 bg-gray-100 px-2 md:px-3 py-1 md:py-2 rounded-xl border-2 border-[#1a0533]">
+                    <div className={cn("w-2 h-2 rounded-full border border-[#1a0533]", p.hasAnswered ? "bg-[#4ECB71]" : "bg-white")} />
+                    <span className="text-[10px] md:text-xs font-black uppercase italic text-[#1a0533]">{i + 1}. {p.nickname}</span>
+                    <span className="bg-[#9B59F5] text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-0.5 md:py-1 rounded-lg md:rounded-xl border-2 border-[#1a0533]">{p.score}</span>
                   </div>
                 ))}
               </div>
