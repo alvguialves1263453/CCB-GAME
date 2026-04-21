@@ -278,9 +278,6 @@ export default function App() {
   const [roundCount, setRoundCount] = useState(5);
   const [difficulty, setDifficulty] = useState<Difficulty>('facil');
   const [hinoDifficulty, setHinoDifficulty] = useState<HinoDifficulty>('sem_tempo');
-  
-  // Get effective difficulty based on game mode
-  const effectiveDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -342,6 +339,8 @@ export default function App() {
   
   // Biblia game states
   const [bibliaGameMode, setBibliaGameMode] = useState(false);
+  // Get effective difficulty based on game mode
+  const currentDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
   const [bibliaRoomId, setBibliaRoomId] = useState<string | null>(null);
   const [bibliaLocalPlayerId, setBibliaLocalPlayerId] = useState<string | null>(null);
   const [bibliaPlayers, setBibliaPlayers] = useState<BibliaPlayer[]>([]);
@@ -1355,8 +1354,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     setFeedback(null);
     setLastPoints(null);
     hasRungBellRef.current = false;
-    const currentDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
-    setTimeLeft(currentDifficulty === 'sem_tempo' ? null : TIME_LIMITS[currentDifficulty]);
+    const roundDifficulty = bibliaGameMode ? difficulty : hinoDifficulty;
+    setTimeLeft(roundDifficulty === 'sem_tempo' ? null : TIME_LIMITS[roundDifficulty]);
     startTimeRef.current = Date.now();
 
     // Reset players for the round
@@ -3220,7 +3219,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
                         <span>NÍVEL:</span>
-                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md uppercase text-[9px] shadow-[1px_1px_0px_#1a0533]">{effectiveDifficulty}</span>
+                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md uppercase text-[9px] shadow-[1px_1px_0px_#1a0533]">{currentDifficulty}</span>
                       </div>
                     </div>
                   </div>
@@ -3307,7 +3306,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                 <div className="flex-grow max-w-md h-7 md:h-8 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-full overflow-hidden relative game-shadow shadow-[3px_3px_0px_#1a0533]">
                   <motion.div
                     initial={false}
-                    animate={{ width: `${Math.max(0, (timeLeft || 0) / (TIME_LIMITS[effectiveDifficulty] || 1)) * 100}%` }}
+                    animate={{ width: `${Math.max(0, (timeLeft || 0) / (TIME_LIMITS[currentDifficulty] || 1)) * 100}%` }}
                     className={cn(
                       "h-full transition-colors duration-300",
                       (timeLeft === null || timeLeft === Infinity) ? "bg-[#4ECB71]" :
