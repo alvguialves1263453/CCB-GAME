@@ -300,6 +300,7 @@ export default function App() {
   const [isManualJoin, setIsManualJoin] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
+  const isHost = players.find(p => p.id === localPlayerId)?.isHost || false;
   const [showSettings, setShowSettings] = useState(false);
   const [bgMusicOn, setBgMusicOn] = useState(true);
   const [leftPlayerName, setLeftPlayerName] = useState<string | null>(null);
@@ -1098,6 +1099,7 @@ export default function App() {
   const handlePlayClick = () => {
     soundService.playClick();
     setIsSolo(true);
+    setRoomId(null); // Reset room ID for solo path
     setBibliaGameMode(false); // Default to hino
     setView("mode_selection");
   };
@@ -1205,7 +1207,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
         } else {
           // Create new
           setIsSolo(false);
-const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount);
+const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
           if (result) {
             setRoomId(result.room.id);
             setLocalPlayerId(result.player.id);
@@ -1256,7 +1258,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
   const handleStartGameClick = async (forceStart: boolean = false) => {
     soundService.playClick();
     if (isSolo) {
-      const q = await prepareQuestions();
+      const q = await prepareQuestions(bibliaGameMode);
       if (q) {
         setQuestions(q);
         setCurrentRound(0);
@@ -2271,9 +2273,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     soundService.playClick();
-                    setIsSolo(true);
                     setRoomId(null);
-                    setBibliaGameMode(false); // Assegurar que modo biblia está desligado
+                    setBibliaGameMode(false); // Assegurar que modo hino está ligado
                     setView("multiplayer_setup");
                   }}
                   className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
@@ -2299,7 +2300,6 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     soundService.playClick();
-                    setIsSolo(true);
                     setRoomId(null);
                     setBibliaGameMode(true);  // Ativar modo biblia
                     setView("multiplayer_setup");
