@@ -252,11 +252,12 @@ type Difficulty = 'facil' | 'medio' | 'dificil' | 'aleatorio';
 type HinoDifficulty = 'sem_tempo' | 'medio' | 'rapido';
 
 const TIME_LIMITS = {
+  // Hino Mode
   sem_tempo: Infinity,
   medio: 20,
   rapido: 10,
+  // Biblia Mode
   facil: Infinity,
-  medio: 20,
   dificil: 10,
   aleatorio: 20,
 };
@@ -658,8 +659,19 @@ export default function App() {
         if (!room) return;
         
         setRoundCount(room.roundCount);
-        setDifficulty(room.difficulty as Difficulty);
-        difficultyRef.current = room.difficulty as Difficulty;
+        const roomDifficulty = room.difficulty;
+        
+        // Sync the correct state based on gameType
+        if (room.gameType === 'biblia') {
+          setBibliaGameMode(true);
+          setDifficulty(roomDifficulty as Difficulty);
+        } else {
+          setBibliaGameMode(false);
+          setHinoDifficulty(roomDifficulty as HinoDifficulty);
+        }
+        
+        difficultyRef.current = roomDifficulty as any;
+
         if (room.questions) {
           console.log('[GAME] Questions received:', room.questions.length, room.questions[0]?.pergunta || room.questions[0]?.snippet);
           setQuestions(room.questions);
@@ -1086,6 +1098,7 @@ export default function App() {
   const handlePlayClick = () => {
     soundService.playClick();
     setIsSolo(true);
+    setBibliaGameMode(false); // Default to hino
     setView("mode_selection");
   };
 
@@ -1271,8 +1284,8 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
       const q = await prepareQuestions(bibliaGameMode);
       if (q && roomId) {
         setIsLoading(true);
-        // Start game in DB
-        await multiplayerService.startGame(roomId, q, roundCount, difficulty);
+        // Start game in DB using effectiveDifficulty
+        await multiplayerService.startGame(roomId, q, roundCount, effectiveDifficulty);
         setIsLoading(false);
       }
     }
@@ -2260,6 +2273,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                     soundService.playClick();
                     setIsSolo(true);
                     setRoomId(null);
+                    setBibliaGameMode(false); // Assegurar que modo biblia está desligado
                     setView("multiplayer_setup");
                   }}
                   className="w-full bg-[#4ECB71] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
