@@ -3294,7 +3294,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-1 md:gap-2 overflow-hidden relative pb-24 md:pb-2"
+              className="w-full flex-1 min-h-0 max-w-6xl flex flex-col gap-1 md:gap-1.5 overflow-hidden relative pb-24 md:pb-2"
             >
               {/* Overlay de Countdown */}
               <AnimatePresence>
@@ -3318,7 +3318,7 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              <div className="flex items-center justify-between px-2 md:px-4 gap-2 md:gap-3 h-14 shrink-0 pt-1">
+              <div className="flex items-center justify-between px-2 md:px-4 gap-2 md:gap-3 h-12 md:h-14 shrink-0 pt-1">
                 <motion.button
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
@@ -3357,22 +3357,22 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-grow cartoon-panel p-4 md:p-6 flex flex-col items-center gap-3 md:gap-4 relative overflow-hidden min-h-0">
+              <div className="flex-grow cartoon-panel p-3 md:p-5 flex flex-col items-center gap-2 md:gap-3 relative overflow-y-auto no-scrollbar min-h-0">
                 <div className="absolute top-0 left-0 w-full h-3 bg-[#FFD700] opacity-40" />
 
                 <div className="flex flex-col items-center text-center gap-2 max-w-2xl w-full">
                   {questions[currentRound]?.pergunta ? (
                     <>
-                      <div className="w-12 h-12 md:w-16 md:h-16 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533]">
-                        <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-full flex items-center justify-center text-white shadow-[3px_3px_0px_#1a0533]">
+                        <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
                       </div>
-                      <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#8B5CF6]">Quiz da Bíblia</h2>
+                      <h2 className="text-xl md:text-3xl font-black italic uppercase cartoon-text text-[#8B5CF6]">Quiz da Bíblia</h2>
                       {questions[currentRound]?.perguntaDifficulty && questions[currentRound].perguntaDifficulty !== 'aleatorio' && (
                         <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded", questions[currentRound].perguntaDifficulty === 'facil' ? "bg-[#22C55E] text-white" : questions[currentRound].perguntaDifficulty === 'medio' ? "bg-[#F59E0B] text-white" : "bg-[#8B5CF6] text-white")}>
                           PERGUNTA {questions[currentRound].perguntaDifficulty === 'facil' ? 'FÁCIL' : questions[currentRound].perguntaDifficulty === 'medio' ? 'MÉDIA' : 'DIFÍCIL'}
                         </span>
                       )}
-                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[30vh] md:max-h-[40vh] overflow-y-auto no-scrollbar">
+                      <div className="bg-white border-4 border-[#1a0533] p-3 md:p-4 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[25vh] md:max-h-[30vh] overflow-y-auto no-scrollbar">
                         <p className={cn(
                           "font-black text-[#1a0533] text-center leading-tight",
                           questions[currentRound].pergunta.length > 100 ? "text-base md:text-xl" : "text-lg md:text-2xl"
