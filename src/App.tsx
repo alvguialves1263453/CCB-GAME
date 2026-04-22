@@ -59,7 +59,7 @@ import { drawingService, type DrawingPlayer, type DrawingRoom, type DrawingSubmi
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
 import { DrawingCanvasView } from "./components/DrawingComponents";
-import { Edit2, BookOpen } from "lucide-react";
+import { Edit2 } from "lucide-react";
 type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection" | "biblia_setup" | "biblia_lobby" | "biblia_game" | "biblia_ranking" | "drawing_setup" | "drawing_lobby" | "drawing_game" | "drawing_voting" | "drawing_ranking";
 
 interface Player {
@@ -1112,7 +1112,7 @@ export default function App() {
     setIsLoading(true);
     soundService.playClick();
     try {
-const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
+      const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, effectiveDifficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
       if (result) {
         setRoomId(result.room.id);
         setLocalPlayerId(result.player.id);
@@ -1207,7 +1207,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
         } else {
           // Create new
           setIsSolo(false);
-const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, difficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
+          const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, effectiveDifficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
           if (result) {
             setRoomId(result.room.id);
             setLocalPlayerId(result.player.id);
@@ -3242,7 +3242,14 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
                         <span>NÍVEL:</span>
-                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md uppercase text-[9px] shadow-[1px_1px_0px_#1a0533]">{effectiveDifficulty}</span>
+                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md uppercase text-[9px] shadow-[1px_1px_0px_#1a0533]">
+                          {effectiveDifficulty === 'sem_tempo' ? 'Sem Tempo' : 
+                           effectiveDifficulty === 'medio' ? 'Médio' : 
+                           effectiveDifficulty === 'rapido' ? 'Rápido' : 
+                           effectiveDifficulty === 'facil' ? 'Fácil' : 
+                           effectiveDifficulty === 'dificil' ? 'Difícil' : 
+                           effectiveDifficulty === 'aleatorio' ? 'Misto' : effectiveDifficulty}
+                        </span>
                       </div>
                     </div>
                   </div>
