@@ -3372,8 +3372,11 @@ export default function App() {
                           PERGUNTA {questions[currentRound].perguntaDifficulty === 'facil' ? 'FÁCIL' : questions[currentRound].perguntaDifficulty === 'medio' ? 'MÉDIA' : 'DIFÍCIL'}
                         </span>
                       )}
-                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full">
-                        <p className="text-lg md:text-2xl font-black text-[#1a0533] text-center leading-tight">
+                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[30vh] md:max-h-[40vh] overflow-y-auto no-scrollbar">
+                        <p className={cn(
+                          "font-black text-[#1a0533] text-center leading-tight",
+                          questions[currentRound].pergunta.length > 100 ? "text-base md:text-xl" : "text-lg md:text-2xl"
+                        )}>
                           {questions[currentRound].pergunta}
                         </p>
                       </div>
@@ -3384,8 +3387,11 @@ export default function App() {
                         <Music className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#FFD700]">Qual é o hino?</h2>
-                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full">
-                        <p className="text-lg md:text-2xl font-black text-[#1a0533] italic text-center leading-tight">
+                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[30vh] md:max-h-[40vh] overflow-y-auto no-scrollbar">
+                        <p className={cn(
+                          "font-black text-[#1a0533] italic text-center leading-tight",
+                          questions[currentRound].snippet?.length > 100 ? "text-lg md:text-xl" : "text-xl md:text-3xl"
+                        )}>
                           "{questions[currentRound].snippet}"
                         </p>
                       </div>
@@ -3415,7 +3421,10 @@ export default function App() {
                       <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-xs md:text-sm font-black">
                         {idx + 1}
                       </div>
-                      <span className="truncate text-sm md:text-xl leading-none">{option}</span>
+                      <span className={cn(
+                        "text-sm md:text-xl leading-snug",
+                        option.length > 30 ? "text-xs md:text-lg" : ""
+                      )}>{option}</span>
                       {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-3 w-5 h-5 md:w-6 md:h-6 drop-shadow-md" />}
                     </button>
                   ))}
