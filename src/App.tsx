@@ -387,7 +387,7 @@ export default function App() {
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
-  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players]);
+  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode]);
 
   useEffect(() => {
     if (bgMusicOn && (view === "game" || view === "lobby" || view === "multiplayer_menu" || view === "mode_selection")) {
@@ -1402,12 +1402,14 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
 
     let pointsToAdd = 0;
     if (isUserCorrect) {
-      if (difficultyRef.current === 'sem_tempo') {
+      const currentDifficulty = difficultyRef.current;
+      const timeLimit = TIME_LIMITS[currentDifficulty];
+      
+      if (currentDifficulty === 'sem_tempo' || timeLimit === Infinity) {
         pointsToAdd = Math.max(100, Math.floor(1000 - (timeSpent * 20)));
-      } else if (difficultyRef.current === 'medio') {
-        pointsToAdd = Math.max(100, Math.floor(((20 - timeSpent) / 20) * 1000));
       } else {
-        pointsToAdd = Math.max(100, Math.floor(((10 - timeSpent) / 10) * 1000));
+        // Dynamic points based on percentage of time remaining
+        pointsToAdd = Math.max(100, Math.floor(((timeLimit - timeSpent) / timeLimit) * 1000));
       }
     }
 
@@ -1493,7 +1495,7 @@ const result = await multiplayerService.createRoom(profile.nickname, profile.ava
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isGameActive, showResult, isPreparing, difficulty, roomDeadlineRef.current, startTimeRef.current, selectedOptionRef.current]);
+  }, [isGameActive, showResult, isPreparing, difficulty, hinoDifficulty, bibliaGameMode, roomDeadlineRef.current, startTimeRef.current, selectedOptionRef.current]);
 
   const handleRoundEnd = () => {
     if (!isGameActiveRef.current || lastHandledRoundRef.current === currentRoundRef.current) return;
