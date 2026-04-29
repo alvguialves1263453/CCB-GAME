@@ -265,6 +265,14 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
     }).eq('id', roomId);
   },
 
+  async nextRound(roomId: string, roundIndex: number) {
+    await supabase.from('rooms').update({
+      phase: 'preparing',
+      current_round: roundIndex,
+      deadline_at: Date.now() + 3000
+    }).eq('id', roomId);
+  },
+
   async resetRoom(roomId: string) {
     // Reset players
     await supabase.from('players').update({

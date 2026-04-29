@@ -434,6 +434,14 @@ export default function App() {
   const [showPodium, setShowPodium] = useState(false);
   const [podiumStep, setPodiumStep] = useState(0); // 0: initial, 1: 3rd, 2: 2nd, 3: 1st
 
+  // Force showResult to false when podium is active
+  useEffect(() => {
+    if (showPodium) {
+      setShowResult(false);
+      showResultRef.current = false;
+    }
+  }, [showPodium]);
+
   useEffect(() => {
     if (bgMusicOn && (view === "game" || view === "lobby" || view === "multiplayer_menu" || view === "mode_selection")) {
       soundService.startBgMusic();
@@ -1232,9 +1240,9 @@ export default function App() {
           const num = Math.floor(Math.random() * 40) + 1;
           avatarPath = `irmaos/${num}.png`;
         } else {
-          // Sorteia entre 1 e 40
-          const num = Math.floor(Math.random() * 40) + 1;
-          avatarPath = `irmas/${num}.png`;
+          // Sorteia entre 1 e 15 para irmãs, usando o prefixo irma_
+          const num = Math.floor(Math.random() * 15) + 1;
+          avatarPath = `irmas/irma_${num}.png`;
         }
 
         return {
@@ -1694,6 +1702,7 @@ export default function App() {
     } else {
       // Game ended! Show Cinematic Podium
       setFrozenPlayers([...playersRef.current]);
+      showResultRef.current = false;
       setShowResult(false); // Clear the Correct/Wrong overlay
       setShowPodium(true);
       setPodiumStep(0);
@@ -1893,7 +1902,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 min-h-0 w-full max-w-7xl mx-auto px-4 py-4 md:py-6 flex flex-col items-center justify-center relative z-10 overflow-y-auto no-scrollbar">
+      <div className="flex-1 min-h-0 w-full max-w-6xl mx-auto px-4 py-4 md:py-6 flex flex-col items-center justify-center relative z-10 overflow-y-auto no-scrollbar">
 
         <AnimatePresence mode="wait">
           {view === "home" && (
@@ -1962,7 +1971,7 @@ export default function App() {
                     </div>
 
                     <div className="relative mb-2 md:mb-4 group flex flex-col items-center">
-                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 90 : 140} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
+                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 90 : 180} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
 
                       <div className="text-center transition-transform mt-2 md:mt-3">
                         <div className="relative">
@@ -3751,111 +3760,6 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.8 }}
               className="w-full flex-1 min-h-0 max-w-4xl flex flex-col items-center gap-[1.5vh] overflow-hidden px-4 py-2 pb-6 md:pb-2"
             >
-
-          {/* GLOBAL PODIUM CINEMATIC OVERLAY */}
-          <AnimatePresence>
-            {showPodium && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center overflow-hidden"
-              >
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1a0533] to-transparent" />
-                  <div className="flex flex-wrap justify-around gap-20 p-20">
-                     {Array.from({length: 20}).map((_, i) => (
-                       <Trophy key={i} className="w-20 h-20 text-white/10 rotate-12" />
-                     ))}
-                  </div>
-                </div>
-
-                <AnimatePresence mode="wait">
-                  {podiumStep === 0 && (
-                    <motion.h2
-                      key="wait"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 2, opacity: 0 }}
-                      className="text-4xl md:text-7xl font-black italic text-white cartoon-text-white uppercase tracking-tighter"
-                    >
-                      Quem foi o vencedor?
-                    </motion.h2>
-                  )}
-
-                  {podiumStep >= 1 && (
-                    <div className="flex flex-col md:flex-row items-end justify-center gap-4 md:gap-8 w-full max-w-5xl h-full pb-10">
-                      {/* 3rd Place */}
-                      <motion.div
-                        initial={{ y: 200, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0, type: "spring" }}
-                        className="flex flex-col items-center gap-3 order-3 md:order-1"
-                      >
-                        <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={120} />
-                           <div className="absolute -top-4 -left-4 w-12 h-12 bg-[#CD7F32] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-[#CD7F32]/20">3º</div>
-                        </div>
-                        <span className="text-white font-black uppercase italic tracking-wide text-lg md:text-xl truncate max-w-[150px]">
-                           {frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.nickname || "---"}
-                        </span>
-                        <div className="w-28 md:w-36 h-24 md:h-32 bg-[#CD7F32] border-4 border-white/30 rounded-t-3xl flex items-center justify-center flex-col gap-1 shadow-[0_0_50px_rgba(205,127,50,0.3)]">
-                           <span className="text-white/60 font-black text-sm uppercase">Pontos</span>
-                           <span className="text-white font-black text-2xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.score || 0}</span>
-                        </div>
-                      </motion.div>
-
-                      {/* 1st Place */}
-                      <motion.div
-                        initial={{ y: 300, opacity: 0 }}
-                        animate={podiumStep >= 3 ? { y: 0, opacity: 1 } : { opacity: 0 }}
-                        transition={{ type: "spring", stiffness: 100 }}
-                        className="flex flex-col items-center gap-4 order-1 md:order-2 mb-10"
-                      >
-                        <div className="relative group">
-                           <motion.div
-                             animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
-                             transition={{ repeat: Infinity, duration: 4 }}
-                           >
-                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={220} className="ring-[12px] ring-[#FFD700] ring-offset-4 ring-offset-black/50" />
-                           </motion.div>
-                           <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-24 bg-[#FFD700] rounded-full border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-4xl shadow-2xl animate-bounce">1º</div>
-                        </div>
-                        <h3 className="text-4xl md:text-6xl font-black text-white italic uppercase cartoon-text-white drop-shadow-[0_10px_20px_rgba(255,215,0,0.4)]">
-                           {frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.nickname || "---"}
-                        </h3>
-                        <div className="w-40 md:w-56 h-40 md:h-56 bg-gradient-to-b from-[#FFD700] to-[#B8860B] border-[6px] border-white/40 rounded-t-[3rem] flex items-center justify-center flex-col gap-2 shadow-[0_0_100px_rgba(255,215,0,0.4)] relative">
-                           <Trophy className="w-16 h-16 text-white/50 absolute top-4 opacity-30" />
-                           <span className="text-white/70 font-black text-lg uppercase tracking-widest mt-10">Campeão</span>
-                           <span className="text-white font-black text-4xl md:text-5xl drop-shadow-md">{frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.score || 0}</span>
-                        </div>
-                      </motion.div>
-
-                      {/* 2nd Place */}
-                      <motion.div
-                        initial={{ y: 250, opacity: 0 }}
-                        animate={podiumStep >= 2 ? { y: 0, opacity: 1 } : { opacity: 0 }}
-                        transition={{ type: "spring" }}
-                        className="flex flex-col items-center gap-3 order-2 md:order-3"
-                      >
-                        <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={150} className="ring-8 ring-[#C0C0C0]" />
-                           <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#C0C0C0] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-2xl shadow-xl">2º</div>
-                        </div>
-                        <span className="text-white font-black uppercase italic tracking-wide text-xl md:text-2xl">
-                           {frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.nickname || "---"}
-                        </span>
-                        <div className="w-32 md:w-44 h-32 md:h-44 bg-[#C0C0C0] border-4 border-white/30 rounded-t-3xl flex items-center justify-center flex-col gap-1 shadow-[0_0_60px_rgba(192,192,192,0.3)]">
-                           <span className="text-white/60 font-black text-base uppercase">Vice</span>
-                           <span className="text-white font-black text-3xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.score || 0}</span>
-                        </div>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )}
-          </AnimatePresence>
               {/* X button for host in ranking - only show for host, guests see VOLTAR button below */}
               {!isSolo && localPlayerId && players.find(p => p.id === localPlayerId)?.isHost && (
                 <motion.button
@@ -3974,6 +3878,111 @@ SAIR
                 )}
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* GLOBAL PODIUM CINEMATIC OVERLAY - Moved outside AnimatePresence wait */}
+        <AnimatePresence>
+          {showPodium && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center overflow-hidden"
+              >
+                <div className="absolute inset-0 opacity-20 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1a0533] to-transparent" />
+                  <div className="flex flex-wrap justify-around gap-20 p-20">
+                     {Array.from({length: 20}).map((_, i) => (
+                       <Trophy key={i} className="w-20 h-20 text-white/10 rotate-12" />
+                     ))}
+                  </div>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  {podiumStep === 0 && (
+                    <motion.h2
+                      key="wait"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 2, opacity: 0 }}
+                      className="text-4xl md:text-7xl font-black italic text-white cartoon-text-white uppercase tracking-tighter"
+                    >
+                      Quem foi o vencedor?
+                    </motion.h2>
+                  )}
+
+                  {podiumStep >= 1 && (
+                    <div className="flex flex-col md:flex-row items-end justify-center gap-4 md:gap-8 w-full max-w-5xl h-full pb-10">
+                      {/* 3rd Place */}
+                      <motion.div
+                        initial={{ y: 200, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0, type: "spring" }}
+                        className="flex flex-col items-center gap-3 order-3 md:order-1"
+                      >
+                        <div className="relative group">
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={120} />
+                           <div className="absolute -top-4 -left-4 w-12 h-12 bg-[#CD7F32] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-[#CD7F32]/20">3º</div>
+                        </div>
+                        <span className="text-white font-black uppercase italic tracking-wide text-lg md:text-xl truncate max-w-[150px]">
+                           {frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.nickname || "---"}
+                        </span>
+                        <div className="w-28 md:w-36 h-24 md:h-32 bg-[#CD7F32] border-4 border-white/30 rounded-t-3xl flex items-center justify-center flex-col gap-1 shadow-[0_0_50px_rgba(205,127,50,0.3)]">
+                           <span className="text-white/60 font-black text-sm uppercase">Pontos</span>
+                           <span className="text-white font-black text-2xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.score || 0}</span>
+                        </div>
+                      </motion.div>
+
+                      {/* 1st Place */}
+                      <motion.div
+                        initial={{ y: 300, opacity: 0 }}
+                        animate={podiumStep >= 3 ? { y: 0, opacity: 1 } : { opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 100 }}
+                        className="flex flex-col items-center gap-4 order-1 md:order-2 mb-10"
+                      >
+                        <div className="relative group">
+                           <motion.div
+                             animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
+                             transition={{ repeat: Infinity, duration: 4 }}
+                           >
+                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={220} className="ring-[12px] ring-[#FFD700] ring-offset-4 ring-offset-black/50" />
+                           </motion.div>
+                           <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-24 bg-[#FFD700] rounded-full border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-4xl shadow-2xl animate-bounce">1º</div>
+                        </div>
+                        <h3 className="text-4xl md:text-6xl font-black text-white italic uppercase cartoon-text-white drop-shadow-[0_10px_20px_rgba(255,215,0,0.4)]">
+                           {frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.nickname || "---"}
+                        </h3>
+                        <div className="w-40 md:w-56 h-40 md:h-56 bg-gradient-to-b from-[#FFD700] to-[#B8860B] border-[6px] border-white/40 rounded-t-[3rem] flex items-center justify-center flex-col gap-2 shadow-[0_0_100px_rgba(255,215,0,0.4)] relative">
+                           <Trophy className="w-16 h-16 text-white/50 absolute top-4 opacity-30" />
+                           <span className="text-white/70 font-black text-lg uppercase tracking-widest mt-10">Campeão</span>
+                           <span className="text-white font-black text-4xl md:text-5xl drop-shadow-md">{frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.score || 0}</span>
+                        </div>
+                      </motion.div>
+
+                      {/* 2nd Place */}
+                      <motion.div
+                        initial={{ y: 250, opacity: 0 }}
+                        animate={podiumStep >= 2 ? { y: 0, opacity: 1 } : { opacity: 0 }}
+                        transition={{ type: "spring" }}
+                        className="flex flex-col items-center gap-3 order-2 md:order-3"
+                      >
+                        <div className="relative group">
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={150} className="ring-8 ring-[#C0C0C0]" />
+                           <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#C0C0C0] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-2xl shadow-xl">2º</div>
+                        </div>
+                        <span className="text-white font-black uppercase italic tracking-wide text-xl md:text-2xl">
+                           {frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.nickname || "---"}
+                        </span>
+                        <div className="w-32 md:w-44 h-32 md:h-44 bg-[#C0C0C0] border-4 border-white/30 rounded-t-3xl flex items-center justify-center flex-col gap-1 shadow-[0_0_60px_rgba(192,192,192,0.3)]">
+                           <span className="text-white/60 font-black text-base uppercase">Vice</span>
+                           <span className="text-white font-black text-3xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.score || 0}</span>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
           )}
         </AnimatePresence>
       </div>

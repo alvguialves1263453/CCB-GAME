@@ -13,7 +13,7 @@ const AVATAR_BASE_URL = LOCAL_BASE;
 
 // Gerar listas dinâmicas
 const IRMAOS_LIST = Array.from({ length: 40 }, (_, i) => `irmaos/${i + 1}.png`);
-const IRMAS_LIST = Array.from({ length: 40 }, (_, i) => `irmas/${i + 1}.png`);
+const IRMAS_LIST = Array.from({ length: 15 }, (_, i) => `irmas/irma_${i + 1}.png`);
 const LEGACY_AVATAR_LIST = Array.from({ length: 24 }, (_, i) => `${i + 1}.png`);
 
 interface AvatarProps {
@@ -39,7 +39,7 @@ export const Avatar: React.FC<AvatarProps> = ({ url, size = 120, className, sele
       <img 
         src={fullUrl} 
         alt="Avatar" 
-        className="w-full h-full object-cover scale-[1.03]"
+        className="w-full h-full object-cover scale-[1.1]"
         loading="lazy"
         onError={(e) => {
           // Fallback if image fails
@@ -70,7 +70,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({ onSave, initialN
     <motion.div 
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className="bg-white border-[6px] md:border-8 border-[#1a0533] p-6 md:p-8 rounded-[2.5rem] md:rounded-[3.5rem] shadow-[12px_12px_0px_#1a0533] max-w-xl w-full mx-auto relative max-h-[90vh] flex flex-col"
+      className="bg-white border-[6px] md:border-8 border-[#1a0533] p-6 md:p-12 rounded-[2.5rem] md:rounded-[4rem] shadow-[12px_12px_0px_#1a0533] max-w-xl md:max-w-4xl w-full mx-auto relative max-h-[92vh] flex flex-col"
     >
       {onCancel && (
         <button 
@@ -160,7 +160,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({ onSave, initialN
                 >
                   ← Voltar para Gênero
                 </button>
-                <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 gap-4 no-scrollbar pb-6">
+                <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 gap-4 pb-6 custom-scrollbar">
                   {currentAvatarList.map((url) => (
                     <button
                       key={url}
@@ -170,7 +170,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({ onSave, initialN
                       }}
                       className="flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
                     >
-                      <Avatar url={url} size={90} selected={selectedAvatar === url} className="rounded-2xl shrink-0" />
+                      <Avatar url={url} size={window.innerWidth < 768 ? 90 : 160} selected={selectedAvatar === url} className="rounded-[2.5rem] shrink-0" />
                     </button>
                   ))}
                 </div>
