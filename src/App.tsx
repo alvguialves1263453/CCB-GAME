@@ -1914,8 +1914,8 @@ export default function App() {
       </AnimatePresence>
 
       <div className={cn(
-        "flex-1 min-h-0 w-full max-w-6xl mx-auto px-4 py-2 md:py-4 flex flex-col items-center relative z-10 overflow-y-auto no-scrollbar",
-        view === "game" ? "justify-start" : "justify-center"
+        "flex-1 min-h-0 w-full max-w-6xl mx-auto px-2 md:px-4 py-1 md:py-4 flex flex-col items-center relative z-10 overflow-y-auto no-scrollbar",
+        (view === "game" || view === "home") ? "justify-start md:justify-center" : "justify-center"
       )}>
 
         <AnimatePresence mode="wait">
@@ -1930,14 +1930,14 @@ export default function App() {
             >
               {/* GAME TITLE - CCB QUIZ */}
               <motion.div
-                className="relative mb-2 md:mb-4 flex flex-col items-center shrink-0"
+                className="relative mb-0 md:mb-4 flex flex-col items-center shrink-0 scale-90 md:scale-100"
                 initial={{ y: -40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1, type: 'spring', stiffness: 120 }}
               >
                 <div className="relative z-10 text-center">
                   <motion.h1
-                    className="text-[32px] sm:text-[50px] md:text-[70px] font-black italic uppercase tracking-tighter leading-none m-0 p-0"
+                    className="text-[28px] sm:text-[50px] md:text-[70px] font-black italic uppercase tracking-tighter leading-none m-0 p-0"
                     style={{
                       color: '#FFD700',
                       WebkitTextStroke: '3px #1a0533',
@@ -1977,7 +1977,7 @@ export default function App() {
 
                 {/* LEFT SIDE: AVATAR PANEL */}
                 <div className="flex flex-col items-center shrink-0">
-                  <div className="relative group p-4 md:p-8 bg-white/10 rounded-[3rem] md:rounded-[4rem] border-4 border-[#1a0533]/20 shadow-2xl backdrop-blur-md relative transition-transform hover:scale-105">
+                  <div className="relative group p-2 md:p-8 bg-white/10 rounded-[2rem] md:rounded-[4rem] border-4 border-[#1a0533]/20 shadow-2xl backdrop-blur-md relative transition-transform hover:scale-105">
 
                     {/* Floating Sparkles decoration */}
                     <div className="absolute -top-3 -left-3 animate-pulse">
@@ -1985,7 +1985,7 @@ export default function App() {
                     </div>
 
                     <div className="relative mb-2 md:mb-4 group flex flex-col items-center">
-                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 90 : 180} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
+                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 70 : 180} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
 
                       <div className="text-center transition-transform mt-2 md:mt-3">
                         <div className="relative">
@@ -2019,29 +2019,29 @@ export default function App() {
                 </div>
 
                 {/* RIGHT SIDE: MAIN BUTTONS PANEL */}
-                <div className="w-full md:w-[400px] flex flex-col gap-3 md:gap-5 py-2 md:py-4">
+                <div className="w-full md:w-[400px] flex flex-col gap-2 md:gap-5 py-1 md:py-4">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handlePlayClick}
-                    className="btn-cartoon btn-purple w-full py-2 md:py-5 gap-2"
+                    className="btn-cartoon btn-purple w-full py-1.5 md:py-5 gap-2"
                   >
-                    <div className="w-8 h-8 md:w-12 md:h-12 bg-white/20 border-2 border-white/40 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
-                      <Play className="w-5 h-5 md:w-7 md:h-7 fill-white text-white translate-x-1" />
+                    <div className="w-7 h-7 md:w-12 md:h-12 bg-white/20 border-2 border-white/40 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                      <Play className="w-4 h-4 md:w-7 md:h-7 fill-white text-white translate-x-0.5" />
                     </div>
-                    <span className="font-black uppercase italic tracking-wide cartoon-text-white drop-shadow-xl text-lg md:text-2xl">JOGAR</span>
+                    <span className="font-black uppercase italic tracking-wide cartoon-text-white drop-shadow-xl text-base md:text-2xl">JOGAR</span>
                   </motion.button>
 
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => { soundService.playClick(); setIsSolo(false); setView("multiplayer_menu"); }}
-                    className="btn-cartoon btn-yellow w-full py-2 md:py-5 gap-2"
+                    className="btn-cartoon btn-yellow w-full py-1.5 md:py-5 gap-2"
                   >
-                    <div className="w-8 h-8 md:w-12 md:h-12 bg-black/10 border-2 border-[#1a0533]/30 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
-                      <Users className="w-5 h-5 md:w-8 md:h-8 text-[#1a0533]" />
+                    <div className="w-7 h-7 md:w-12 md:h-12 bg-black/10 border-2 border-[#1a0533]/30 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                      <Users className="w-4 h-4 md:w-8 md:h-8 text-[#1a0533]" />
                     </div>
-                    <span className="font-black uppercase italic tracking-wide text-lg md:text-2xl" style={{ WebkitTextStroke: '2px #1a0533', paintOrder: 'stroke fill', color: '#1a0533' }}>GRUPO</span>
+                    <span className="font-black uppercase italic tracking-wide text-base md:text-2xl" style={{ WebkitTextStroke: '1.5px #1a0533', paintOrder: 'stroke fill', color: '#1a0533' }}>GRUPO</span>
                   </motion.button>
 
                   {/* BOTTOM ROW ICONS */}
@@ -2051,25 +2051,25 @@ export default function App() {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setView("hymn_list"); }}
-                        className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
+                        className="w-10 h-10 md:w-16 md:h-16 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
                       >
-                        <Music className="w-6 h-6 md:w-8 md:h-8 text-[#9B59F5]" />
+                        <Music className="w-5 h-5 md:w-8 md:h-8 text-[#9B59F5]" />
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setShowHelp(true); }}
-                        className="w-12 h-12 md:w-16 md:h-16 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-[#7c4dff] transition-colors"
+                        className="w-10 h-10 md:w-16 md:h-16 bg-[#8B5CF6] border-[3px] md:border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:bg-[#7c4dff] transition-colors"
                       >
-                        <Info className="w-6 h-6 md:w-8 md:h-8 text-white" />
+                        <Info className="w-5 h-5 md:w-8 md:h-8 text-white" />
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setShowSettings(true); }}
-                        className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
+                        className="w-10 h-10 md:w-16 md:h-16 bg-white border-[3px] md:border-4 border-[#1a0533] rounded-xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
                       >
-                        <Settings className="w-6 h-6 md:w-8 md:h-8 text-[#9B59F5]" />
+                        <Settings className="w-5 h-5 md:w-8 md:h-8 text-[#9B59F5]" />
                       </motion.button>
                     </div>
 
@@ -2083,7 +2083,7 @@ export default function App() {
               </div>
 
               {/* Instrument decoration strip */}
-              <div className="flex gap-3 md:gap-4 opacity-30 md:opacity-40">
+              <div className="hidden md:flex gap-3 md:gap-4 opacity-30 md:opacity-40 mt-auto md:mt-0">
                 <ViolinSVG size={22} />
                 <SaxophoneSVG size={22} />
                 <TubaSVG size={22} />
