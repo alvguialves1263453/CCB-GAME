@@ -1902,7 +1902,10 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 min-h-0 w-full max-w-6xl mx-auto px-4 py-4 md:py-6 flex flex-col items-center justify-center relative z-10 overflow-y-auto no-scrollbar">
+      <div className={cn(
+        "flex-1 min-h-0 w-full max-w-6xl mx-auto px-4 py-2 md:py-4 flex flex-col items-center relative z-10 overflow-y-auto no-scrollbar",
+        view === "game" ? "justify-start" : "justify-center"
+      )}>
 
         <AnimatePresence mode="wait">
           {view === "home" && (
@@ -3631,7 +3634,7 @@ export default function App() {
                           PERGUNTA {questions[currentRound].perguntaDifficulty === 'facil' ? 'FÁCIL' : questions[currentRound].perguntaDifficulty === 'medio' ? 'MÉDIA' : 'DIFÍCIL'}
                         </span>
                       )}
-                      <div className="bg-white border-4 border-[#1a0533] p-3 md:p-4 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[25vh] md:max-h-[30vh] overflow-y-auto no-scrollbar">
+                      <div className="bg-white border-4 border-[#1a0533] p-3 md:p-4 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[20vh] overflow-y-auto no-scrollbar">
                         <p className={cn(
                           "font-black text-[#1a0533] text-center leading-tight",
                           questions[currentRound].pergunta.length > 100 ? "text-base md:text-xl" : "text-lg md:text-2xl"
@@ -3646,7 +3649,7 @@ export default function App() {
                         <Music className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <h2 className="text-xl md:text-4xl font-black italic uppercase cartoon-text text-[#FFD700]">Qual é o hino?</h2>
-                      <div className="bg-white border-4 border-[#1a0533] p-4 md:p-6 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[30vh] md:max-h-[40vh] overflow-y-auto no-scrollbar">
+                      <div className="bg-white border-4 border-[#1a0533] p-3 md:p-4 rounded-2xl shadow-[4px_4px_0px_#1a0533] w-full max-h-[25vh] md:max-h-[30vh] overflow-y-auto no-scrollbar">
                         <p className={cn(
                           "font-black text-[#1a0533] italic text-center leading-tight",
                           questions[currentRound].snippet?.length > 100 ? "text-lg md:text-xl" : "text-xl md:text-3xl"
@@ -3658,7 +3661,7 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 shrink-0 mt-auto">
+                <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 shrink-0 py-2">
                     {questions[currentRound].options.map((option, idx) => {
                       // Extract hymn number and title for "Qual é o hino?" mode
                       const isHymnMode = !questions[currentRound]?.pergunta;
@@ -3740,7 +3743,7 @@ export default function App() {
               </div>
 
               {/* Mini Placar fixo no rodapé para desktop, escondido no mobile */}
-              <div className="hidden md:flex w-full h-16 shrink-0 bg-white border-4 border-[#1a0533] rounded-[2rem] p-3 items-center justify-center gap-4 overflow-x-auto no-scrollbar shadow-[0px_4px_0px_rgba(26,5,51,0.2)]">
+              <div className="hidden md:flex w-full h-14 shrink-0 bg-white border-4 border-[#1a0533] rounded-2xl p-2 items-center justify-center gap-3 overflow-x-auto no-scrollbar shadow-[0px_4px_0px_rgba(26,5,51,0.2)] mt-2">
                 {players.sort((a, b) => b.score - a.score).map((p, i) => (
                   <div key={p.id} className="flex items-center gap-2 shrink-0 bg-gray-100 px-4 py-2 rounded-2xl border-2 border-[#1a0533]">
                     <div className={cn("w-3 h-3 rounded-full border-2 border-[#1a0533]", p.hasAnswered ? "bg-[#4ECB71]" : "bg-white")} />
@@ -3919,18 +3922,18 @@ SAIR
                         initial={{ y: 200, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0, type: "spring" }}
-                        className="flex flex-col items-center gap-3 order-3 md:order-1"
+                        className="flex-grow md:flex-grow-0 flex flex-col items-center gap-2 md:gap-3 order-3 md:order-1"
                       >
                         <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={120} />
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={window.innerWidth < 768 ? 70 : 120} />
                            <div className="absolute -top-4 -left-4 w-12 h-12 bg-[#CD7F32] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-[#CD7F32]/20">3º</div>
                         </div>
                         <span className="text-white font-black uppercase italic tracking-wide text-lg md:text-xl truncate max-w-[150px]">
                            {frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.nickname || "---"}
                         </span>
-                        <div className="w-28 md:w-36 h-24 md:h-32 bg-[#CD7F32] border-4 border-white/30 rounded-t-3xl flex items-center justify-center flex-col gap-1 shadow-[0_0_50px_rgba(205,127,50,0.3)]">
-                           <span className="text-white/60 font-black text-sm uppercase">Pontos</span>
-                           <span className="text-white font-black text-2xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.score || 0}</span>
+                        <div className="w-24 md:w-36 h-16 md:h-32 bg-[#CD7F32] border-2 md:border-4 border-white/30 rounded-t-2xl md:rounded-t-3xl flex items-center justify-center flex-col gap-0 md:gap-1 shadow-[0_0_50px_rgba(205,127,50,0.3)]">
+                           <span className="text-white/60 font-black text-[8px] md:text-sm uppercase">Pontos</span>
+                           <span className="text-white font-black text-lg md:text-2xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.score || 0}</span>
                         </div>
                       </motion.div>
 
@@ -3939,24 +3942,24 @@ SAIR
                         initial={{ y: 300, opacity: 0 }}
                         animate={podiumStep >= 3 ? { y: 0, opacity: 1 } : { opacity: 0 }}
                         transition={{ type: "spring", stiffness: 100 }}
-                        className="flex flex-col items-center gap-4 order-1 md:order-2 mb-10"
+                        className="flex-grow md:flex-grow-0 flex flex-col items-center gap-2 md:gap-4 order-1 md:order-2 mb-4 md:mb-10 scale-90 md:scale-100"
                       >
                         <div className="relative group">
                            <motion.div
                              animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
                              transition={{ repeat: Infinity, duration: 4 }}
                            >
-                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={220} className="ring-[12px] ring-[#FFD700] ring-offset-4 ring-offset-black/50" />
+                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={window.innerWidth < 768 ? 120 : 220} className="ring-8 md:ring-[12px] ring-[#FFD700] ring-offset-4 ring-offset-black/50" />
                            </motion.div>
-                           <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-24 bg-[#FFD700] rounded-full border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-4xl shadow-2xl animate-bounce">1º</div>
+                           <div className="absolute -top-6 md:-top-10 left-1/2 -translate-x-1/2 w-14 h-14 md:w-24 md:h-24 bg-[#FFD700] rounded-full border-4 md:border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-2xl md:text-4xl shadow-2xl animate-bounce">1º</div>
                         </div>
-                        <h3 className="text-4xl md:text-6xl font-black text-white italic uppercase cartoon-text-white drop-shadow-[0_10px_20px_rgba(255,215,0,0.4)]">
+                        <h3 className="text-2xl md:text-6xl font-black text-white italic uppercase cartoon-text-white drop-shadow-[0_10px_20px_rgba(255,215,0,0.4)]">
                            {frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.nickname || "---"}
                         </h3>
-                        <div className="w-40 md:w-56 h-40 md:h-56 bg-gradient-to-b from-[#FFD700] to-[#B8860B] border-[6px] border-white/40 rounded-t-[3rem] flex items-center justify-center flex-col gap-2 shadow-[0_0_100px_rgba(255,215,0,0.4)] relative">
-                           <Trophy className="w-16 h-16 text-white/50 absolute top-4 opacity-30" />
-                           <span className="text-white/70 font-black text-lg uppercase tracking-widest mt-10">Campeão</span>
-                           <span className="text-white font-black text-4xl md:text-5xl drop-shadow-md">{frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.score || 0}</span>
+                        <div className="w-32 md:w-56 h-24 md:h-56 bg-gradient-to-b from-[#FFD700] to-[#B8860B] border-4 md:border-[6px] border-white/40 rounded-t-[2rem] md:rounded-t-[3rem] flex items-center justify-center flex-col gap-1 md:gap-2 shadow-[0_0_100px_rgba(255,215,0,0.4)] relative">
+                           <Trophy className="hidden md:block w-16 h-16 text-white/50 absolute top-4 opacity-30" />
+                           <span className="text-white/70 font-black text-xs md:text-lg uppercase tracking-widest mt-0 md:mt-10">Campeão</span>
+                           <span className="text-white font-black text-2xl md:text-5xl drop-shadow-md">{frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.score || 0}</span>
                         </div>
                       </motion.div>
 
@@ -3965,18 +3968,18 @@ SAIR
                         initial={{ y: 250, opacity: 0 }}
                         animate={podiumStep >= 2 ? { y: 0, opacity: 1 } : { opacity: 0 }}
                         transition={{ type: "spring" }}
-                        className="flex flex-col items-center gap-3 order-2 md:order-3"
+                        className="flex-grow md:flex-grow-0 flex flex-col items-center gap-2 md:gap-3 order-2 md:order-3"
                       >
                         <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={150} className="ring-8 ring-[#C0C0C0]" />
-                           <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#C0C0C0] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-2xl shadow-xl">2º</div>
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={window.innerWidth < 768 ? 90 : 150} className="ring-4 md:ring-8 ring-[#C0C0C0]" />
+                           <div className="absolute -top-4 -right-4 w-10 h-10 md:w-16 md:h-16 bg-[#C0C0C0] rounded-full border-2 md:border-4 border-white flex items-center justify-center text-white font-black text-lg md:text-2xl shadow-xl">2º</div>
                         </div>
-                        <span className="text-white font-black uppercase italic tracking-wide text-xl md:text-2xl">
+                        <span className="text-white font-black uppercase italic tracking-wide text-base md:text-2xl">
                            {frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.nickname || "---"}
                         </span>
-                        <div className="w-32 md:w-44 h-32 md:h-44 bg-[#C0C0C0] border-4 border-white/30 rounded-t-3xl flex items-center justify-center flex-col gap-1 shadow-[0_0_60px_rgba(192,192,192,0.3)]">
-                           <span className="text-white/60 font-black text-base uppercase">Vice</span>
-                           <span className="text-white font-black text-3xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.score || 0}</span>
+                        <div className="w-28 md:w-44 h-20 md:h-44 bg-[#C0C0C0] border-2 md:border-4 border-white/30 rounded-t-2xl md:rounded-t-3xl flex items-center justify-center flex-col gap-0 md:gap-1 shadow-[0_0_60px_rgba(192,192,192,0.3)]">
+                           <span className="text-white/60 font-black text-[10px] md:text-base uppercase">Vice</span>
+                           <span className="text-white font-black text-xl md:text-3xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.score || 0}</span>
                         </div>
                       </motion.div>
                     </div>
