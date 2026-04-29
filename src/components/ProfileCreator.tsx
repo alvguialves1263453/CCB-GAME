@@ -7,14 +7,14 @@ import { cn } from "../lib/utils";
 // Se suas imagens estão na REDE (Cloudinary):
 const CLOUDINARY_BASE = "https://res.cloudinary.com/dhhims97u/image/upload/";
 
-// Se suas imagens estão no COMPUTADOR (pasta public/ccb):
+// Configuração de Avatares (Cloudinary ou Local)
 const LOCAL_BASE = "/ccb/";
-
-// ESCOLHA AQUI: Mude para CLOUDINARY_BASE ou LOCAL_BASE
 const AVATAR_BASE_URL = LOCAL_BASE; 
 
-// Lista de 24 avatares (1.png até 24.png)
-const AVATAR_LIST = Array.from({ length: 24 }, (_, i) => `${i + 1}.png`);
+// Gerar listas dinâmicas
+const IRMAOS_LIST = Array.from({ length: 40 }, (_, i) => `irmaos/${i + 1}.png`);
+const IRMAS_LIST = Array.from({ length: 40 }, (_, i) => `irmas/${i + 1}.png`);
+const LEGACY_AVATAR_LIST = Array.from({ length: 24 }, (_, i) => `${i + 1}.png`);
 
 interface AvatarProps {
   url: string;
@@ -24,6 +24,9 @@ interface AvatarProps {
 }
 
 export const Avatar: React.FC<AvatarProps> = ({ url, size = 120, className, selected }) => {
+  // Se a URL já contiver o caminho da pasta, não adicionamos base duplicada
+  const fullUrl = url.includes('/') ? `${AVATAR_BASE_URL}${url}` : `${AVATAR_BASE_URL}${url}`;
+  
   return (
     <div 
       className={cn(
@@ -34,10 +37,14 @@ export const Avatar: React.FC<AvatarProps> = ({ url, size = 120, className, sele
       style={{ width: size, height: size }}
     >
       <img 
-        src={`${AVATAR_BASE_URL}${url}`} 
+        src={fullUrl} 
         alt="Avatar" 
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover scale-[1.03]"
         loading="lazy"
+        onError={(e) => {
+          // Fallback if image fails
+          (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${url}`;
+        }}
       />
     </div>
   );
@@ -52,8 +59,12 @@ interface ProfileCreatorProps {
 
 export const ProfileCreator: React.FC<ProfileCreatorProps> = ({ onSave, initialNickname = "", initialAvatarUrl, onCancel }) => {
   const [nickname, setNickname] = useState(initialNickname);
-  const [selectedAvatar, setSelectedAvatar] = useState(initialAvatarUrl || AVATAR_LIST[0]);
+  const [selectedAvatar, setSelectedAvatar] = useState(initialAvatarUrl || IRMAOS_LIST[0]);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [selectedGender, setSelectedGender] = useState<"m" | "f" | null>(null);
+
+  // Determinar qual lista mostrar
+  const currentAvatarList = selectedGender === "m" ? IRMAOS_LIST : selectedGender === "f" ? IRMAS_LIST : [...LEGACY_AVATAR_LIST];
 
   return (
     <motion.div 
@@ -98,35 +109,73 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({ onSave, initialN
       <AnimatePresence>
         {isSelectorOpen && (
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[100] bg-white rounded-[3rem] p-4 flex flex-col"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="absolute inset-0 z-[100] bg-white rounded-[3rem] p-6 flex flex-col"
           >
-            <div className="flex justify-between items-center mb-4 px-2">
-              <h2 className="text-xl font-black text-[#1a0533] uppercase">Escolha seu Avatar</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-[#1a0533] uppercase italic">
+                {selectedGender === null ? "Escolha o Gênero" : selectedGender === "m" ? "Irmãos" : "Irmãs"}
+              </h2>
               <button 
-                onClick={() => setIsSelectorOpen(false)}
-                className="w-10 h-10 bg-[#F0F0F0] rounded-xl flex items-center justify-center border-4 border-[#1a0533]"
+                onClick={() => {
+                  setIsSelectorOpen(false);
+                  setSelectedGender(null);
+                }}
+                className="w-12 h-12 bg-[#F0F0F0] rounded-2xl flex items-center justify-center border-4 border-[#1a0533]"
               >
-                <X className="w-6 h-6 text-[#1a0533]" />
+                <X className="w-8 h-8 text-[#1a0533]" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 no-scrollbar pb-4 ml-1">
-              {AVATAR_LIST.map((url) => (
+            {selectedGender === null ? (
+              /* SELEÇÃO DE GÊNERO */
+              <div className="flex-1 flex flex-col gap-4 justify-center">
                 <button
-                  key={url}
-                  onClick={() => {
-                    setSelectedAvatar(url);
-                    setIsSelectorOpen(false);
-                  }}
-                  className="flex items-center justify-center transition-transform hover:scale-105 active:scale-95 p-1"
+                  onClick={() => setSelectedGender("m")}
+                  className="flex-1 bg-[#4EA8CB] border-4 border-[#1a0533] rounded-[2rem] flex items-center justify-between px-8 transition-transform hover:scale-[1.02] active:scale-95 shadow-[6px_6px_0px_#1a0533]"
                 >
-                  <Avatar url={url} size={84} selected={selectedAvatar === url} className="rounded-2xl" />
+                  <span className="text-3xl font-black text-white italic uppercase cartoon-text">IRMÃO</span>
+                  <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center">
+                     <Grid className="w-12 h-12 text-white" />
+                  </div>
                 </button>
-              ))}
-            </div>
+                <button
+                  onClick={() => setSelectedGender("f")}
+                  className="flex-1 bg-[#F59EBA] border-4 border-[#1a0533] rounded-[2rem] flex items-center justify-between px-8 transition-transform hover:scale-[1.02] active:scale-95 shadow-[6px_6px_0px_#1a0533]"
+                >
+                  <span className="text-3xl font-black text-white italic uppercase cartoon-text">IRMÃ</span>
+                  <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center">
+                     <Grid className="w-12 h-12 text-white" />
+                  </div>
+                </button>
+              </div>
+            ) : (
+              /* LISTA DE FOTOS */
+              <div className="flex-1 flex flex-col min-h-0">
+                <button 
+                  onClick={() => setSelectedGender(null)}
+                  className="mb-4 text-[#9B59F5] font-black uppercase text-sm flex items-center gap-2"
+                >
+                  ← Voltar para Gênero
+                </button>
+                <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 gap-4 no-scrollbar pb-6">
+                  {currentAvatarList.map((url) => (
+                    <button
+                      key={url}
+                      onClick={() => {
+                        setSelectedAvatar(url);
+                        setIsSelectorOpen(false);
+                      }}
+                      className="flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+                    >
+                      <Avatar url={url} size={90} selected={selectedAvatar === url} className="rounded-2xl shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
