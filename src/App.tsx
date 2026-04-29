@@ -3273,8 +3273,14 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-lg mx-auto flex flex-col gap-4 pb-20 md:pb-3"
+              className="w-full max-w-lg mx-auto flex flex-col gap-4 pb-20 md:pb-3 relative"
             >
+              <button 
+                onClick={() => { setView("mode_selection"); setBibliaGameMode(false); }}
+                className="absolute top-0 -right-4 z-10 w-10 h-10 bg-red-500 border-4 border-[#1a0533] rounded-xl flex items-center justify-center shadow-[3px_3px_0px_#1a0533] hover:scale-110 transition-transform"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
               <div className="text-center">
                 <h2 className="text-3xl md:text-4xl font-black italic uppercase cartoon-text text-[#FFD700] drop-shadow-[3px_3px_0px_#1a0533]">FIM DE JOGO!</h2>
                 <p className="text-[#1a0533] font-bold">Ranking Final</p>
@@ -3295,9 +3301,7 @@ export default function App() {
                 ))}
               </div>
 
-              <button onClick={() => { setView("mode_selection"); setBibliaGameMode(false); }} className="w-full py-4 bg-[#1a0533] border-4 border-[#1a0533] rounded-xl font-black text-xl text-white shadow-[3px_3px_0px_#1a0533]">
-                VOLTAR AO MENU
-              </button>
+
             </motion.div>
           )}
 
@@ -3785,19 +3789,17 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.8 }}
               className="w-full flex-1 min-h-0 max-w-4xl flex flex-col items-center gap-[1.5vh] overflow-hidden px-4 py-2 pb-6 md:pb-2"
             >
-              {/* X button for host in ranking - only show for host, guests see VOLTAR button below */}
-              {!isSolo && localPlayerId && players.find(p => p.id === localPlayerId)?.isHost && (
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setShowExitConfirm(true)}
-                  className="absolute top-4 right-2 z-30"
-                >
-                  <div className="w-10 h-10 bg-red-500 border-4 border-[#1a0533] rounded-xl flex items-center justify-center shadow-[3px_3px_0px_#1a0533]">
-                    <X className="w-5 h-5 text-white" />
-                  </div>
-                </motion.button>
-              )}
+              {/* Close button - visible for everyone in ranking */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => isSolo ? resetGame() : setShowExitConfirm(true)}
+                className="absolute top-4 right-2 z-30"
+              >
+                <div className="w-10 h-10 bg-red-500 border-4 border-[#1a0533] rounded-xl flex items-center justify-center shadow-[3px_3px_0px_#1a0533]">
+                  <X className="w-5 h-5 text-white" />
+                </div>
+              </motion.button>
               
               {/* Trophy + Title row */}
               <div className="flex flex-col items-center gap-[1vh] shrink-0">
@@ -3880,36 +3882,7 @@ export default function App() {
                 }} />
               )}
 
-              {/* Buttons - Host sees X to close, Guests see Sair */}
-              <div className="w-full shrink-0 mt-2">
-                {!isSolo && localPlayerId && players.find(p => p.id === localPlayerId)?.isHost ? (
-                  <p className="text-center text-[#1a0533]/50 text-xs font-bold">Aperte X para fechar a sala</p>
-                ) : !isSolo ? (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      if (roomId && localPlayerId) {
-                        multiplayerService.leaveRoom();
-                      }
-                      setView("home");
-                      setIsGameActive(false);
-                    }}
-                    className="btn-cartoon btn-white w-full py-3 text-lg italic tracking-widest"
-                  >
-SAIR
-                  </motion.button>
-                ) : (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={resetGame}
-                    className="btn-cartoon btn-purple w-full py-3 text-lg italic tracking-widest"
-                  >
-                    DE NOVO!
-                  </motion.button>
-                )}
-              </div>
+
             </motion.div>
           )}
         </AnimatePresence>
