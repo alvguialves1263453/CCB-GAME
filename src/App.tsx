@@ -312,6 +312,46 @@ export default function App() {
     hymns: 'idle',
     multiplayer: 'idle'
   });
+  const [showHelp, setShowHelp] = useState(false);
+  const [stats, setStats] = useState({
+    totalHymns: 0,
+    bibliaEasy: 0,
+    bibliaMedium: 0,
+    bibliaHard: 0,
+    bibliaTotal: 0
+  });
+
+  // Fetch Stats for Help Modal
+  useEffect(() => {
+    const fetchStats = async () => {
+      // Unique Hymns count (counting unique hymn_ids)
+      const { data: hData } = await supabase.from('hymn_snippets').select('hymn_id');
+      const uniqueHymnsCount = hData ? new Set(hData.map(h => h.hymn_id)).size : 0;
+      
+      // Biblia counts by difficulty
+      const { data: bData } = await supabase.from('biblia_perguntas').select('dificuldade');
+      
+      if (bData) {
+        const counts = bData.reduce((acc: any, curr: any) => {
+          const diff = curr.dificuldade || 'facil';
+          acc[diff] = (acc[diff] || 0) + 1;
+          acc.total++;
+          return acc;
+        }, { facil: 0, medio: 0, dificil: 0, total: 0 });
+
+        setStats({
+          totalHymns: uniqueHymnsCount,
+          bibliaEasy: counts.facil,
+          bibliaMedium: counts.medio,
+          bibliaHard: counts.dificil,
+          bibliaTotal: counts.total
+        });
+      } else {
+        setStats(prev => ({ ...prev, totalHymns: uniqueHymnsCount }));
+      }
+    };
+    fetchStats();
+  }, []);
 
   // Drawing game states
   const [drawingCategory, setDrawingCategory] = useState<string>('Todos');
@@ -357,6 +397,7 @@ export default function App() {
   const [bibliaIsHost, setBibliaIsHost] = useState(false);
   const [gameType, setGameType] = useState<string>('hino');
   const bibliaStartTimeRef = useRef<number>(0);
+  const [hymnSearchQuery, setHymnSearchQuery] = useState("");
   
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
@@ -1884,6 +1925,14 @@ export default function App() {
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
+                        onClick={() => { soundService.playClick(); setShowHelp(true); }}
+                        className="w-12 h-12 md:w-16 md:h-16 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-[#7c4dff] transition-colors"
+                      >
+                        <Info className="w-6 h-6 md:w-8 md:h-8 text-white" />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
                         onClick={() => { soundService.playClick(); setShowSettings(true); }}
                         className="w-12 h-12 md:w-16 md:h-16 bg-white border-4 border-[#1a0533] rounded-xl md:rounded-2xl flex items-center justify-center game-shadow cursor-pointer hover:bg-purple-50 transition-colors"
                       >
@@ -1934,6 +1983,28 @@ export default function App() {
                   <h2 className="text-3xl font-black text-[#1a0533] italic uppercase cartoon-text text-right drop-shadow-[3px_3px_0px_rgba(26,5,51,0.2)]">Hinos no Supabase</h2>
                 </div>
 
+                {/* SEARCH BAR */}
+                <div className="relative shrink-0">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <Search className="w-5 h-5 text-[#1a0533]/40" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Pesquisar por hino ou número..."
+                    value={hymnSearchQuery}
+                    onChange={(e) => setHymnSearchQuery(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-gray-100 border-4 border-[#1a0533] rounded-2xl font-black text-[#1a0533] focus:outline-none focus:bg-white transition-all shadow-[4px_4px_0px_#1a0533] placeholder:text-[#1a0533]/30"
+                  />
+                  {hymnSearchQuery && (
+                    <button 
+                      onClick={() => setHymnSearchQuery("")}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-gray-200 p-1 rounded-lg hover:bg-gray-300 transition-colors"
+                    >
+                      <X className="w-4 h-4 text-[#1a0533]" />
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto no-scrollbar pr-2 pb-4">
                   {hymns.length > 0 ? (
                     (() => {
@@ -1947,7 +2018,21 @@ export default function App() {
                       const uniqueHymns = Array.from(uniqueHymnsMap.values())
                         .sort((a, b) => a.id - b.id);
 
-                      return uniqueHymns.map((h) => (
+                      const filteredHymns = uniqueHymns.filter(h => 
+                        h.title.toLowerCase().includes(hymnSearchQuery.toLowerCase()) ||
+                        h.id.toString().includes(hymnSearchQuery)
+                      );
+
+                      if (filteredHymns.length === 0 && hymnSearchQuery) {
+                        return (
+                          <div className="col-span-full py-12 flex flex-col items-center justify-center gap-4 text-[#1a0533] opacity-30">
+                            <Search className="w-16 h-16" />
+                            <p className="font-black text-xl italic">Nenhum hino encontrado para sua busca.</p>
+                          </div>
+                        );
+                      }
+
+                      return filteredHymns.map((h) => (
                         <div key={h.id} className="p-4 bg-gray-50 border-4 border-[#1a0533] rounded-2xl flex items-center justify-between group hover:bg-[#FFD700]/20 transition-colors shadow-[4px_4px_0px_rgba(26,5,51,0.1)]">
                           <div className="flex flex-col">
                             <span className="text-[#1a0533] font-black text-xl italic">
@@ -3659,6 +3744,82 @@ SAIR
                    </button>
                 </div>
              </motion.div>
+          </div>
+        )}
+
+        {showHelp && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white border-4 border-[#1a0533] p-6 md:p-8 rounded-[2.5rem] w-full max-w-md flex flex-col gap-6 relative shadow-[8px_8px_0px_#1a0533]"
+            >
+              <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 w-10 h-10 bg-gray-100 border-4 border-[#1a0533] rounded-xl flex items-center justify-center hover:bg-gray-200 transition-colors shadow-[2px_2px_0px_#1a0533]">
+                <X className="w-6 h-6 text-[#1a0533]" />
+              </button>
+
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-16 h-16 bg-[#8B5CF6] border-4 border-[#1a0533] rounded-2xl flex items-center justify-center text-white shadow-[4px_4px_0px_#1a0533]">
+                  <Info className="w-10 h-10" />
+                </div>
+                <h2 className="text-3xl font-black italic uppercase text-[#1a0533] tracking-tighter cartoon-text">Ajuda & Stats</h2>
+              </div>
+
+              <div className="space-y-4">
+                {/* Hymns Stat */}
+                <div className="bg-[#4ECB71]/10 border-4 border-[#4ECB71] p-4 rounded-2xl flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#4ECB71] border-2 border-[#1a0533] rounded-xl flex items-center justify-center text-white shrink-0">
+                    <Music className="w-6 h-6" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-[#1a0533]/50">Hinos Disponíveis</span>
+                    <span className="text-2xl font-black text-[#1a0533] leading-none">{stats.totalHymns} Hinos</span>
+                  </div>
+                </div>
+
+                {/* Biblia Stats */}
+                <div className="bg-[#8B5CF6]/10 border-4 border-[#8B5CF6] p-4 rounded-2xl flex flex-col gap-3">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#8B5CF6] border-2 border-[#1a0533] rounded-xl flex items-center justify-center text-white shrink-0">
+                      <BookOpen className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase text-[#1a0533]/50">Quiz da Bíblia</span>
+                      <span className="text-2xl font-black text-[#1a0533] leading-none">{stats.bibliaTotal} Perguntas</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="bg-white border-2 border-[#22C55E] p-2 rounded-xl flex flex-col items-center">
+                      <span className="text-[8px] font-black uppercase text-[#22C55E]">Fácil</span>
+                      <span className="text-lg font-black text-[#1a0533]">{stats.bibliaEasy}</span>
+                    </div>
+                    <div className="bg-white border-2 border-[#F59E0B] p-2 rounded-xl flex flex-col items-center">
+                      <span className="text-[8px] font-black uppercase text-[#F59E0B]">Médio</span>
+                      <span className="text-lg font-black text-[#1a0533]">{stats.bibliaMedium}</span>
+                    </div>
+                    <div className="bg-white border-2 border-[#8B5CF6] p-2 rounded-xl flex flex-col items-center">
+                      <span className="text-[8px] font-black uppercase text-[#8B5CF6]">Difícil</span>
+                      <span className="text-lg font-black text-[#1a0533]">{stats.bibliaHard}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border-2 border-dashed border-[#F59E0B] p-4 rounded-xl">
+                <p className="text-[10px] font-bold text-[#F59E0B] text-center leading-tight uppercase font-black">
+                  Quer adicionar mais perguntas? <br/>Use o comando SQL no Supabase!
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setShowHelp(false)} 
+                className="btn-cartoon btn-purple w-full py-4 text-lg font-black uppercase"
+              >
+                ENTENDI!
+              </button>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

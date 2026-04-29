@@ -71,21 +71,16 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({ onSave, initialN
       )}
 
       <div className="flex flex-col items-center gap-6 mb-8 mt-2 md:mt-4 overflow-y-auto no-scrollbar pb-4 p-1">
-        {/* BIG AVATAR DISPLAY */}
-        <div className="relative group">
+        {/* BIG AVATAR DISPLAY (Clicável agora) */}
+        <button 
+          onClick={() => setIsSelectorOpen(true)}
+          className="relative group cursor-pointer hover:scale-105 transition-transform active:scale-95"
+        >
           <Avatar url={selectedAvatar} size={200} />
           
           <div className="absolute -bottom-2 -right-2 bg-[#FFD700] p-4 rounded-2xl border-4 border-[#1a0533] text-[#1a0533] shadow-[4px_4px_0px_#1a0533]">
             <Edit2 className="w-6 h-6 stroke-[3px]" />
           </div>
-        </div>
-
-        <button 
-          onClick={() => setIsSelectorOpen(true)}
-          className="flex items-center gap-2 bg-[#9B59F5] text-white px-8 py-4 rounded-2xl border-[4px] border-[#1a0533] shadow-[4px_4px_0px_#1a0533] font-black uppercase text-sm hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all active:scale-95"
-        >
-          <Grid className="w-5 h-5" />
-          MUDAR PERSONAGEM
         </button>
       </div>
 
