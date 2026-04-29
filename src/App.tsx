@@ -3485,34 +3485,47 @@ export default function App() {
                 </div>
 
                 <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 shrink-0 mt-auto">
-                  {questions[currentRound].options.map((option, idx) => (
-                    <button
-                      key={idx}
-                      disabled={!isGameActive || !!selectedOption}
-                      onClick={() => handleAnswer(option)}
-                      className={cn(
-                        "w-full py-3 md:py-4 px-3 md:px-4 border-4 border-[#1a0533] rounded-xl font-black text-base md:text-lg text-center flex items-center justify-center gap-2 relative transition-all shadow-[3px_3px_0px_#1a0533]",
-                        // Default state (no answer yet)
-                        !selectedOption ? "bg-white text-[#1a0533] hover:bg-gray-50" : "",
-                        // Waiting for others (answered, but no result yet)
-                        selectedOption === option && !showResult ? "bg-[#9B59F5] text-white" : "",
-                        selectedOption && selectedOption !== option && !showResult ? "bg-white text-[#1a0533] opacity-50 grayscale" : "",
-                        // Result revealed
-                        showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "bg-[#4ECB71] text-white scale-105 z-10 animate-pop-in shadow-[8px_8px_0px_#1a0533]" : "",
-                        showResult && selectedOption === option && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-[#FF4757] text-white animate-shake" : "",
-                        showResult && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-white text-[#1a0533] opacity-30 grayscale" : ""
-                      )}
-                    >
-                      <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-xs md:text-sm font-black">
-                        {idx + 1}
-                      </div>
-                      <span className={cn(
-                        "text-sm md:text-xl leading-snug",
-                        option.length > 30 ? "text-xs md:text-lg" : ""
-                      )}>{option}</span>
-                      {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-3 w-5 h-5 md:w-6 md:h-6 drop-shadow-md" />}
-                    </button>
-                  ))}
+                    {questions[currentRound].options.map((option, idx) => {
+                      // Extract hymn number and title for "Qual é o hino?" mode
+                      const isHymnMode = !questions[currentRound]?.pergunta;
+                      const hymnNumber = isHymnMode ? option.match(/^\d+/)?.[0] : null;
+                      const hymnTitle = isHymnMode ? option.replace(/^\d+[\s.-]*/, '') : option;
+
+                      return (
+                        <button
+                          key={idx}
+                          disabled={!isGameActive || !!selectedOption}
+                          onClick={() => handleAnswer(option)}
+                          className={cn(
+                            "w-full py-3 md:py-4 px-3 md:px-4 border-4 border-[#1a0533] rounded-xl font-black text-base md:text-lg text-center flex items-center justify-center gap-2 relative transition-all shadow-[3px_3px_0px_#1a0533]",
+                            // Default state (no answer yet)
+                            !selectedOption ? "bg-white text-[#1a0533] hover:bg-gray-50" : "",
+                            // Waiting for others (answered, but no result yet)
+                            selectedOption === option && !showResult ? "bg-[#9B59F5] text-white" : "",
+                            selectedOption && selectedOption !== option && !showResult ? "bg-white text-[#1a0533] opacity-50 grayscale" : "",
+                            // Result revealed
+                            showResult && option === questions[currentRound].options[questions[currentRound].correct] ? "bg-[#4ECB71] text-white scale-105 z-10 animate-pop-in shadow-[8px_8px_0px_#1a0533]" : "",
+                            showResult && selectedOption === option && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-[#FF4757] text-white animate-shake" : "",
+                            showResult && option !== questions[currentRound].options[questions[currentRound].correct] ? "bg-white text-[#1a0533] opacity-30 grayscale" : ""
+                          )}
+                        >
+                          {isHymnMode && hymnNumber ? (
+                            <div className="w-10 h-10 md:w-14 md:h-14 rounded-lg bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-lg md:text-2xl font-black text-[#1a0533]">
+                              {hymnNumber}
+                            </div>
+                          ) : !isHymnMode && (
+                            <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-black/10 border-2 border-[#1a0533]/20 flex items-center justify-center shrink-0 text-xs md:text-sm font-black">
+                              {idx + 1}
+                            </div>
+                          )}
+                          <span className={cn(
+                            "text-sm md:text-xl leading-snug flex-1",
+                            hymnTitle.length > 30 ? "text-xs md:text-lg" : ""
+                          )}>{hymnTitle}</span>
+                          {showResult && option === questions[currentRound].options[questions[currentRound].correct] && <Check className="absolute right-3 w-5 h-5 md:w-6 md:h-6 drop-shadow-md" />}
+                        </button>
+                      );
+                    })}
                 </div>
 
                 {!showResult && selectedOption && players.some(p => !p.hasAnswered) && (
