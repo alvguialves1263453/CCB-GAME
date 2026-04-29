@@ -1481,12 +1481,23 @@ export default function App() {
 
       setPlayers(current => current.map(p => {
         if (p.id.includes("bot") && !p.hasAnswered) {
-          const isHard = difficultyRef.current === 'dificil';
-          const isCorrect = Math.random() > (isHard ? 0.3 : 0.4); // Bots are smarter in hard mode
+          const currentDifficulty = difficultyRef.current;
+          const isHard = currentDifficulty === 'dificil';
+          
+          // Bots logic: Hard = 80% correct, Normal/Easy = 60% correct
+          const isCorrect = Math.random() > (isHard ? 0.2 : 0.4);
+          
           let points = 0;
           if (isCorrect) {
-            // Give them points based on when they "would" have answered
-            points = Math.max(100, Math.floor(Math.random() * 400) + 400); // Random points for bots when forced
+            const timeSpent = (Date.now() - startTimeRef.current) / 1000;
+            const timeLimit = TIME_LIMITS[currentDifficulty] || 20;
+
+            if (currentDifficulty === 'sem_tempo' || timeLimit === Infinity) {
+              points = Math.max(100, Math.floor(1000 - (timeSpent * 20)));
+            } else {
+              // Dynamic points based on percentage of time remaining
+              points = Math.max(100, Math.floor(((timeLimit - timeSpent) / timeLimit) * 1000));
+            }
           }
           return { ...p, hasAnswered: true, score: p.score + points };
         }
