@@ -1340,19 +1340,34 @@ export default function App() {
     
     // Se modo Biblia, buscar de biblia_perguntas
     if (isBiblia) {
-      let query = supabase.from('biblia_perguntas').select('*');
-      // Se não for aleatório, filtrar por dificuldade
-      if (difficulty !== 'aleatorio') {
-        query = query.eq('dificuldade', difficulty);
-      }
-      const { data: allPerguntas } = await query;
+      const { data: allPerguntas } = await supabase.from('biblia_perguntas').select('*');
       if (!allPerguntas || allPerguntas.length === 0) {
         alert("Nenhuma pergunta da Biblia!");
         setIsLoading(false);
         return null;
       }
-      const shuffled = allPerguntas.sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, roundCount);
+
+      let selected: any[] = [];
+
+      if (difficulty !== 'aleatorio') {
+        const filtered = allPerguntas.filter(p => p.dificuldade === difficulty);
+        selected = filtered.sort(() => Math.random() - 0.5).slice(0, roundCount);
+      } else {
+        // Mixed mode: distribute as equally as possible between difficulties
+        const easy = allPerguntas.filter(p => p.dificuldade === 'facil').sort(() => Math.random() - 0.5);
+        const medium = allPerguntas.filter(p => p.dificuldade === 'medio').sort(() => Math.random() - 0.5);
+        const hard = allPerguntas.filter(p => p.dificuldade === 'dificil').sort(() => Math.random() - 0.5);
+        
+        const perDiff = Math.ceil(roundCount / 3);
+        
+        // Pick from each, then shuffle the result
+        selected = [
+          ...easy.slice(0, perDiff),
+          ...medium.slice(0, perDiff),
+          ...hard.slice(0, perDiff)
+        ].slice(0, roundCount).sort(() => Math.random() - 0.5);
+      }
+
       const q = selected.map((p: any) => {
         // Primeiro cria as opções depois embaralha
         const opts = [p.correta, p.opcao1, p.opcao2, p.opcao3].sort(() => Math.random() - 0.5);
@@ -1366,7 +1381,7 @@ export default function App() {
           options: opts,
           correct: correctIdx,
           isBiblia: true,
-          perguntaDifficulty: p.dificuldade || difficulty
+          perguntaDifficulty: p.dificuldade || 'facil'
         };
       });
       setIsLoading(false);
