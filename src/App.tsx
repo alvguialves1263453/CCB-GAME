@@ -2074,7 +2074,7 @@ export default function App() {
                     </div>
 
                     <div className="flex flex-col items-end opacity-40">
-                      <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V0.3.0</p>
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V1.2.6</p>
                       <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest">BETA</p>
                     </div>
                   </div>
