@@ -3829,32 +3829,51 @@ export default function App() {
                       animate={{ x: 0, opacity: 1 }}
                       transition={{ delay: idx * 0.1 }}
                       className={cn(
-                        "p-3 border-4 border-[#1a0533] rounded-2xl flex items-center justify-between transition-all",
-                        idx === 0 ? "bg-[#FFD700] shadow-[5px_5px_0px_#1a0533] relative z-10" : 
-                        isMe ? "bg-[#9B59F5]/20 border-[#9B59F5] shadow-[3px_3px_0px_#1a0533] ring-4 ring-[#9B59F5]/10 animate-pulse-slow" :
-                        "bg-white/90 shadow-[3px_3px_0px_#1a0533] opacity-90"
+                        "p-3 border-4 border-[#1a0533] rounded-2xl flex items-center justify-between transition-all relative overflow-hidden",
+                        idx === 0 ? "bg-[#FFD700] shadow-[5px_5px_0px_#1a0533] z-10" : 
+                        isMe ? "bg-white/95 border-[#9B59F5] shadow-[4px_4px_0px_#9B59F5] ring-4 ring-[#9B59F5]/30 z-20 animate-pulse-slow" :
+                        "bg-white/80 shadow-[3px_3px_0px_rgba(26,5,51,0.4)] opacity-90"
                       )}
                     >
+                      {isMe && (
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-[#9B59F5]/10 rotate-45 translate-x-12 -translate-y-12 pointer-events-none" />
+                      )}
                       <div className="flex items-center gap-3">
-                        <div className={cn("w-9 h-9 flex items-center justify-center rounded-xl border-4 border-[#1a0533] font-black text-base shrink-0", idx === 0 ? "bg-white text-[#1a0533]" : "bg-gray-100 text-[#1a0533]")}>
+                        <div className={cn(
+                          "w-10 h-10 flex items-center justify-center rounded-xl border-4 border-[#1a0533] font-black text-lg shrink-0", 
+                          idx === 0 ? "bg-white text-[#1a0533]" : 
+                          isMe ? "bg-[#9B59F5] text-white" : "bg-gray-100 text-[#1a0533]"
+                        )}>
                           #{idx + 1}
                         </div>
                         
-                        <Avatar url={p.avatar || '1.png'} size={44} className="shrink-0" />
+                        <Avatar url={p.avatar || '1.png'} size={idx === 0 || isMe ? 52 : 44} className="shrink-0" />
 
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <span className="text-lg font-black italic uppercase tracking-tighter leading-none text-[#1a0533]">{p.nickname}</span>
+                            <span className={cn(
+                              "text-lg font-black italic uppercase tracking-tighter leading-none",
+                              isMe ? "text-[#9B59F5]" : "text-[#1a0533]"
+                            )}>
+                              {p.nickname}
+                            </span>
                             {isMe && (
-                               <span className="bg-[#9B59F5] text-white text-[8px] font-black px-1.5 py-0.5 rounded-lg border-2 border-[#1a0533] animate-bounce shrink-0">VOCÊ</span>
+                               <motion.span 
+                                 animate={{ scale: [1, 1.2, 1] }}
+                                 transition={{ repeat: Infinity, duration: 1.5 }}
+                                 className="bg-[#9B59F5] text-white text-[10px] font-black px-2 py-0.5 rounded-lg border-2 border-[#1a0533] shadow-[2px_2px_0px_#1a0533] shrink-0"
+                               >
+                                 VOCÊ
+                               </motion.span>
                             )}
                           </div>
                           <span className="text-[9px] font-black uppercase opacity-50 text-[#1a0533]">{p.id.startsWith("bot") ? "BOT" : "JOGADOR"}</span>
                         </div>
                       </div>
                       <div className={cn(
-                        "text-white border-4 border-[#1a0533] px-4 py-1.5 rounded-xl font-black text-xl italic shadow-[3px_3px_0px_#1a0533]",
-                        idx === 0 ? "bg-[#1a0533]" : "bg-[#9B59F5]"
+                        "text-white border-4 border-[#1a0533] px-5 py-2 rounded-xl font-black text-2xl italic shadow-[3px_3px_0px_#1a0533]",
+                        idx === 0 ? "bg-[#1a0533]" : 
+                        isMe ? "bg-[#9B59F5] scale-110" : "bg-[#9B59F5]"
                       )}>
                         {p.score}
                       </div>
