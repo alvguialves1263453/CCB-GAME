@@ -270,6 +270,17 @@ export default function App() {
   useEffect(() => { viewRef.current = view; }, [view]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty: string; roundCount: number; gameType: string }[]>([]);
+  const [isRefreshingRooms, setIsRefreshingRooms] = useState(false);
+
+  const refreshNearbyRooms = () => {
+    soundService.playClick();
+    setIsRefreshingRooms(true);
+    multiplayerService.stopDiscoveryListener();
+    multiplayerService.startDiscoveryListener((rooms) => {
+      setNearbyRooms(rooms);
+      setTimeout(() => setIsRefreshingRooms(false), 800);
+    });
+  };
   const [gameCountdown, setGameCountdown] = useState<number | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -2241,13 +2252,23 @@ export default function App() {
                 </motion.button>
               </div>
 
-              {/* Rooms Panel */}
               <div className="cartoon-panel bg-white p-4 flex flex-col overflow-hidden" style={{ maxHeight: '35vh' }}>
-                <div className="flex items-center gap-2 mb-3 shrink-0">
-                  <div className="w-8 h-8 bg-[#4ECB71] border-4 border-[#1a0533] rounded-lg flex items-center justify-center text-white game-shadow">
-                    <Wifi className="w-4 h-4" />
+                <div className="flex items-center justify-between mb-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-[#4ECB71] border-4 border-[#1a0533] rounded-lg flex items-center justify-center text-white game-shadow">
+                      <Wifi className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-black italic uppercase cartoon-text text-[#1a0533]">Salas Amigas</h3>
                   </div>
-                  <h3 className="text-base font-black italic uppercase cartoon-text text-[#1a0533]">Salas Amigas</h3>
+
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 180 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={refreshNearbyRooms}
+                    className="w-8 h-8 bg-white border-2 border-[#1a0533] rounded-lg flex items-center justify-center shadow-[2px_2px_0px_#1a0533] hover:bg-gray-50 transition-all shrink-0"
+                  >
+                    <RefreshCw className={cn("w-4 h-4 text-[#9B59F5]", isRefreshingRooms && "animate-spin")} />
+                  </motion.button>
                 </div>
 
                 <div className="flex-grow overflow-y-auto no-scrollbar space-y-2">
