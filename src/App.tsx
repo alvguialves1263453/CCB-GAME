@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil, Share2, BookOpen } from "lucide-react";
+import { Users, User, ChevronRight, ArrowLeft, ArrowRight, Play, Trophy, Loader2, RefreshCw, X, Wifi, Search, Globe, Signal, Music, Settings, Info, Check, AlertCircle, Star, Sparkles, Plus, Key, MonitorSpeaker, Pencil, Share2, BookOpen, Zap, Flame } from "lucide-react";
 
 const RankingCountdown = ({ onComplete }: { onComplete: () => void }) => {
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -398,6 +398,7 @@ export default function App() {
   const [gameType, setGameType] = useState<string>('hino');
   const bibliaStartTimeRef = useRef<number>(0);
   const [hymnSearchQuery, setHymnSearchQuery] = useState("");
+  const [showDifficultyAnnouncement, setShowDifficultyAnnouncement] = useState(false);
   
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
@@ -1419,6 +1420,18 @@ export default function App() {
 
     // Reset players for the round
     setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
+
+    // Biblia Mode: Show difficulty announcement before starting
+    if (bibliaGameMode && questions[roundIndex]) {
+      setShowDifficultyAnnouncement(true);
+      // Wait for animation before officially starting the "timer"
+      setTimeout(() => {
+        setShowDifficultyAnnouncement(false);
+        startTimeRef.current = Date.now();
+      }, 1500);
+    } else {
+      startTimeRef.current = Date.now();
+    }
 
     // Clear any pending bot timeouts
     botTimeoutsRef.current.forEach(clearTimeout);
@@ -3430,6 +3443,61 @@ export default function App() {
                       className="text-[150px] md:text-[300px] font-black text-white italic drop-shadow-[10px_10px_0px_#1A1A1A]"
                     >
                       {gameCountdown === 0 ? "VAI!" : gameCountdown}
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* DIFFICULTY ANNOUNCEMENT OVERLAY */}
+              <AnimatePresence>
+                {showDifficultyAnnouncement && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.5, y: 50, rotate: -10 }}
+                      animate={{ scale: 1, y: 0, rotate: 0 }}
+                      exit={{ scale: 1.5, opacity: 0, y: -50 }}
+                      className="flex flex-col items-center gap-6"
+                    >
+                      <div className="bg-white border-8 border-[#1a0533] p-8 md:p-12 rounded-[3.5rem] shadow-[15px_15px_0px_#1a0533] flex flex-col items-center gap-4 relative">
+                        <span className="text-[14px] md:text-xl font-black uppercase tracking-[0.4em] text-[#1a0533]/40">Dificuldade</span>
+                        
+                        {(() => {
+                          const diff = questions[currentRound]?.perguntaDifficulty || 'facil';
+                          const config = {
+                            facil: { label: 'FÁCIL', color: '#4ECB71', icon: <Star className="w-10 h-10 fill-[#4ECB71]" /> },
+                            medio: { label: 'MÉDIO', color: '#F59E0B', icon: <Zap className="w-10 h-10 fill-[#F59E0B]" /> },
+                            dificil: { label: 'DIFÍCIL', color: '#FF4757', icon: <Flame className="w-10 h-10 fill-[#FF4757]" /> }
+                          }[diff as keyof typeof config] || { label: diff.toUpperCase(), color: '#9B59F5', icon: <BookOpen className="w-10 h-10" /> };
+
+                          return (
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="animate-bounce mb-2">{config.icon}</div>
+                              <h2 
+                                className="text-6xl md:text-8xl font-black italic uppercase cartoon-text drop-shadow-[4px_4px_0px_rgba(26,5,51,0.2)]"
+                                style={{ color: config.color }}
+                              >
+                                {config.label}
+                              </h2>
+                            </div>
+                          );
+                        })()}
+                        
+                        <div className="absolute -top-6 -right-6 w-16 h-16 bg-[#FFD700] rounded-2xl border-4 border-[#1a0533] flex items-center justify-center rotate-12 shadow-[4px_4px_0px_#1a0533]">
+                           <BookOpen className="w-10 h-10 text-[#1a0533]" />
+                        </div>
+                      </div>
+                      <motion.div
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                        className="text-white font-black uppercase tracking-widest text-xl md:text-2xl mt-8 italic"
+                      >
+                         Prepare-se...
+                      </motion.div>
                     </motion.div>
                   </motion.div>
                 )}
