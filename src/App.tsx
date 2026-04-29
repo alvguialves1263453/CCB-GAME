@@ -1473,6 +1473,27 @@ export default function App() {
       return p;
     }));
 
+    // For solo mode: when user answers, trigger all bots to answer instantly too
+    if (isSolo) {
+      // Clear pending bot timeouts since we are forcing them now
+      botTimeoutsRef.current.forEach(clearTimeout);
+      botTimeoutsRef.current = [];
+
+      setPlayers(current => current.map(p => {
+        if (p.id.includes("bot") && !p.hasAnswered) {
+          const isHard = difficultyRef.current === 'dificil';
+          const isCorrect = Math.random() > (isHard ? 0.3 : 0.4); // Bots are smarter in hard mode
+          let points = 0;
+          if (isCorrect) {
+            // Give them points based on when they "would" have answered
+            points = Math.max(100, Math.floor(Math.random() * 400) + 400); // Random points for bots when forced
+          }
+          return { ...p, hasAnswered: true, score: p.score + points };
+        }
+        return p;
+      }));
+    }
+
     if (!isSolo && localPlayerId && roomId) {
       multiplayerService.submitAnswer(roomId, isUserCorrect, pointsToAdd, currentRound);
     }
