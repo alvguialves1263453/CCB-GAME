@@ -3905,7 +3905,7 @@ SAIR
           )}
         </AnimatePresence>
 
-        {/* GLOBAL PODIUM CINEMATIC OVERLAY - Moved outside AnimatePresence wait */}
+        {/* GLOBAL PODIUM CINEMATIC OVERLAY */}
         <AnimatePresence>
           {showPodium && (
               <motion.div
@@ -3937,24 +3937,24 @@ SAIR
                   )}
 
                   {podiumStep >= 1 && (
-                    <div className="flex flex-col md:flex-row items-end justify-center gap-4 md:gap-8 w-full max-w-5xl h-full pb-10">
+                    <div className="flex flex-col md:flex-row items-center md:items-end justify-center gap-4 md:gap-8 w-full max-w-5xl h-full pb-10 overflow-y-auto md:overflow-visible no-scrollbar">
                       {/* 3rd Place */}
                       <motion.div
                         initial={{ y: 200, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0, type: "spring" }}
-                        className="flex-grow md:flex-grow-0 flex flex-col items-center gap-2 md:gap-3 order-3 md:order-1"
+                        className="flex flex-col items-center gap-2 md:gap-3 order-3 md:order-1 scale-90 md:scale-100"
                       >
                         <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={window.innerWidth < 768 ? 70 : 120} />
-                           <div className="absolute -top-4 -left-4 w-12 h-12 bg-[#CD7F32] rounded-full border-4 border-white flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-[#CD7F32]/20">3º</div>
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={window.innerWidth < 768 ? 60 : 120} />
+                           <div className="absolute -top-3 -left-3 w-10 h-10 bg-[#CD7F32] rounded-full border-2 md:border-4 border-white flex items-center justify-center text-white font-black text-lg shadow-lg">3º</div>
                         </div>
-                        <span className="text-white font-black uppercase italic tracking-wide text-lg md:text-xl truncate max-w-[150px]">
+                        <span className="text-white font-black uppercase italic tracking-wide text-base md:text-xl truncate max-w-[150px]">
                            {frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.nickname || "---"}
                         </span>
-                        <div className="w-24 md:w-36 h-16 md:h-32 bg-[#CD7F32] border-2 md:border-4 border-white/30 rounded-t-2xl md:rounded-t-3xl flex items-center justify-center flex-col gap-0 md:gap-1 shadow-[0_0_50px_rgba(205,127,50,0.3)]">
-                           <span className="text-white/60 font-black text-[8px] md:text-sm uppercase">Pontos</span>
-                           <span className="text-white font-black text-lg md:text-2xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.score || 0}</span>
+                        <div className="w-24 md:w-36 h-12 md:h-32 bg-[#CD7F32] border-2 md:border-4 border-white/30 rounded-t-xl md:rounded-t-3xl flex items-center justify-center flex-col gap-0 md:gap-1">
+                           <span className="text-white/60 font-black text-[7px] md:text-sm uppercase">Pontos</span>
+                           <span className="text-white font-black text-base md:text-2xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.score || 0}</span>
                         </div>
                       </motion.div>
 
@@ -3963,24 +3963,24 @@ SAIR
                         initial={{ y: 300, opacity: 0 }}
                         animate={podiumStep >= 3 ? { y: 0, opacity: 1 } : { opacity: 0 }}
                         transition={{ type: "spring", stiffness: 100 }}
-                        className="flex-grow md:flex-grow-0 flex flex-col items-center gap-2 md:gap-4 order-1 md:order-2 mb-4 md:mb-10 scale-90 md:scale-100"
+                        className="flex flex-col items-center gap-2 md:gap-4 order-1 md:order-2 mb-2 md:mb-10 scale-95 md:scale-110"
                       >
                         <div className="relative group">
                            <motion.div
                              animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
                              transition={{ repeat: Infinity, duration: 4 }}
                            >
-                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={window.innerWidth < 768 ? 120 : 220} className="ring-8 md:ring-[12px] ring-[#FFD700] ring-offset-4 ring-offset-black/50" />
+                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={window.innerWidth < 768 ? 100 : 220} className="ring-4 md:ring-[12px] ring-[#FFD700] ring-offset-2 md:ring-offset-4 ring-offset-black/50" />
                            </motion.div>
-                           <div className="absolute -top-6 md:-top-10 left-1/2 -translate-x-1/2 w-14 h-14 md:w-24 md:h-24 bg-[#FFD700] rounded-full border-4 md:border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-2xl md:text-4xl shadow-2xl animate-bounce">1º</div>
+                           <div className="absolute -top-4 md:-top-10 left-1/2 -translate-x-1/2 w-12 h-12 md:w-24 md:h-24 bg-[#FFD700] rounded-full border-4 md:border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-xl md:text-4xl shadow-2xl animate-bounce">1º</div>
                         </div>
-                        <h3 className="text-2xl md:text-6xl font-black text-white italic uppercase cartoon-text-white drop-shadow-[0_10px_20px_rgba(255,215,0,0.4)]">
+                        <h3 className="text-xl md:text-6xl font-black text-white italic uppercase cartoon-text-white drop-shadow-[0_4px_10px_rgba(255,215,0,0.4)]">
                            {frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.nickname || "---"}
                         </h3>
-                        <div className="w-32 md:w-56 h-24 md:h-56 bg-gradient-to-b from-[#FFD700] to-[#B8860B] border-4 md:border-[6px] border-white/40 rounded-t-[2rem] md:rounded-t-[3rem] flex items-center justify-center flex-col gap-1 md:gap-2 shadow-[0_0_100px_rgba(255,215,0,0.4)] relative">
+                        <div className="w-32 md:w-56 h-20 md:h-56 bg-gradient-to-b from-[#FFD700] to-[#B8860B] border-4 md:border-[6px] border-white/40 rounded-t-[1.5rem] md:rounded-t-[3rem] flex items-center justify-center flex-col gap-1 md:gap-2 shadow-[0_0_50px_rgba(255,215,0,0.3)] relative">
                            <Trophy className="hidden md:block w-16 h-16 text-white/50 absolute top-4 opacity-30" />
-                           <span className="text-white/70 font-black text-xs md:text-lg uppercase tracking-widest mt-0 md:mt-10">Campeão</span>
-                           <span className="text-white font-black text-2xl md:text-5xl drop-shadow-md">{frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.score || 0}</span>
+                           <span className="text-white/70 font-black text-[9px] md:text-lg uppercase mt-2 md:mt-10">Vencedor</span>
+                           <span className="text-white font-black text-xl md:text-5xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.score || 0}</span>
                         </div>
                       </motion.div>
 
@@ -3989,18 +3989,18 @@ SAIR
                         initial={{ y: 250, opacity: 0 }}
                         animate={podiumStep >= 2 ? { y: 0, opacity: 1 } : { opacity: 0 }}
                         transition={{ type: "spring" }}
-                        className="flex-grow md:flex-grow-0 flex flex-col items-center gap-2 md:gap-3 order-2 md:order-3"
+                        className="flex flex-col items-center gap-2 md:gap-3 order-2 md:order-3 scale-90 md:scale-100"
                       >
                         <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={window.innerWidth < 768 ? 90 : 150} className="ring-4 md:ring-8 ring-[#C0C0C0]" />
-                           <div className="absolute -top-4 -right-4 w-10 h-10 md:w-16 md:h-16 bg-[#C0C0C0] rounded-full border-2 md:border-4 border-white flex items-center justify-center text-white font-black text-lg md:text-2xl shadow-xl">2º</div>
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={window.innerWidth < 768 ? 80 : 150} className="ring-4 md:ring-8 ring-[#C0C0C0]" />
+                           <div className="absolute -top-3 -right-3 w-10 h-10 md:w-16 md:h-16 bg-[#C0C0C0] rounded-full border-2 md:border-4 border-white flex items-center justify-center text-white font-black text-lg md:text-2xl shadow-xl">2º</div>
                         </div>
                         <span className="text-white font-black uppercase italic tracking-wide text-base md:text-2xl">
                            {frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.nickname || "---"}
                         </span>
-                        <div className="w-28 md:w-44 h-20 md:h-44 bg-[#C0C0C0] border-2 md:border-4 border-white/30 rounded-t-2xl md:rounded-t-3xl flex items-center justify-center flex-col gap-0 md:gap-1 shadow-[0_0_60px_rgba(192,192,192,0.3)]">
-                           <span className="text-white/60 font-black text-[10px] md:text-base uppercase">Vice</span>
-                           <span className="text-white font-black text-xl md:text-3xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.score || 0}</span>
+                        <div className="w-28 md:w-44 h-16 md:h-44 bg-[#C0C0C0] border-2 md:border-4 border-white/30 rounded-t-xl md:rounded-t-3xl flex items-center justify-center flex-col gap-0 md:gap-1">
+                           <span className="text-white/60 font-black text-[8px] md:text-base uppercase">Vice</span>
+                           <span className="text-white font-black text-lg md:text-3xl">{frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.score || 0}</span>
                         </div>
                       </motion.div>
                     </div>
