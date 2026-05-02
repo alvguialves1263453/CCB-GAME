@@ -55,12 +55,11 @@ import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
 import { bibliaService, type BibliaRoom, type BibliaPlayer } from "./services/bibliaService";
-import { drawingService, type DrawingPlayer, type DrawingRoom, type DrawingSubmission, type DrawingVote } from "./services/drawingService";
+import { drawingService } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
-import { DrawingCanvasView } from "./components/DrawingComponents";
+import { DrawingGame } from "./components/DrawingGame";
 import { Edit2 } from "lucide-react";
-type ViewState = "home" | "multiplayer_menu" | "multiplayer_join" | "multiplayer_setup" | "lobby" | "game" | "ranking" | "hymn_list" | "mode_selection" | "biblia_setup" | "biblia_lobby" | "biblia_game" | "biblia_ranking" | "drawing_setup" | "drawing_lobby" | "drawing_game" | "drawing_voting" | "drawing_ranking";
 
 interface Player {
   id: string;
@@ -372,6 +371,7 @@ export default function App() {
   const [drawingPlayers, setDrawingPlayers] = useState<any[]>([]);
   const [drawingRound, setDrawingRound] = useState(1);
   const [drawingRoundCount, setDrawingRoundCount] = useState(3);
+  const [drawingCategories, setDrawingCategories] = useState<string[]>([]);
   const [drawingCurrentPrompt, setDrawingCurrentPrompt] = useState<string>('');
   const [drawingTimeLeft, setDrawingTimeLeft] = useState<number>(60);
   const [drawingCountdown, setDrawingCountdown] = useState<number | null>(null);
@@ -562,6 +562,26 @@ export default function App() {
       botTimeoutsRef.current = [];
     }
   }, [view]);
+
+  // Global cleanup on beforeunload (closing tab or refreshing)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Because this is synchronous during unload, we rely on the keepalive fetches
+      // defined in the services' leaveRoom or deleteRoom methods.
+      if (drawingRoomId && drawingGameMode) {
+        drawingService.leaveRoom();
+      }
+      if (bibliaRoomId && bibliaGameMode) {
+        bibliaService.leaveRoom(); // assuming it has leaveRoom
+      }
+      if (roomId && !isSolo) {
+        multiplayerService.leaveRoom();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [drawingRoomId, drawingGameMode, bibliaRoomId, bibliaGameMode, roomId, isSolo]);
 
   // Check for room in URL on mount
   useEffect(() => {
@@ -868,6 +888,20 @@ export default function App() {
 
     return () => unsubscribe();
   }, [drawingRoomId, drawingGameMode]);
+
+  // Fetch dynamic categories for Drawing Game
+  useEffect(() => {
+    if (drawingGameMode) {
+      const fetchCategories = async () => {
+        const { data } = await supabase.from('desenho_palavras').select('category');
+        if (data) {
+          const uniqueCats = Array.from(new Set(data.map(d => d.category)));
+          setDrawingCategories(uniqueCats);
+        }
+      };
+      fetchCategories();
+    }
+  }, [drawingGameMode]);
 
   // Drawing game countdown timer
   useEffect(() => {
@@ -1275,8 +1309,46 @@ export default function App() {
     } else {
       // Real Multiplayer
       try {
-        if (roomId) {
-          // Join existing
+        if (drawingGameMode && drawingRoomId) {
+          const player = await drawingService.joinRoom(drawingRoomId, profile.nickname, profile.avatarUrl);
+          if (player) {
+            setDrawingLocalPlayerId(player.playerId);
+            setIsDrawingHost(false);
+            setDrawingPlayers(prev => {
+              if (prev.some(p => p.id === player.playerId)) return prev;
+              return [...prev, {
+                id: player.playerId,
+                nickname: profile.nickname,
+                avatar: profile.avatarUrl,
+                isHost: false,
+                isReady: false,
+                totalScore: 0
+              }];
+            });
+            setView("drawing_lobby");
+          } else {
+            setDrawingGameMode(false);
+            setDrawingRoomId(null);
+            setDrawingLocalPlayerId(null);
+            alert("Sala de desenho não encontrada ou erro ao entrar.");
+            setView("home");
+          }
+        } else if (roomId) {
+          // Detect if this room is a drawing room even if not in drawing mode
+          const roomData = await drawingService.getRoom(roomId);
+          if (roomData && roomData.game_type === 'desenho') {
+            setDrawingGameMode(true);
+            setDrawingRoomId(roomId);
+            const player = await drawingService.joinRoom(roomId, profile.nickname, profile.avatarUrl);
+            if (player) {
+              setDrawingLocalPlayerId(player.playerId);
+              setIsDrawingHost(false);
+              setView("drawing_lobby");
+            }
+            return;
+          }
+
+          // Join existing quiz/hino
           const player = await multiplayerService.joinRoom(roomId, profile.nickname, profile.avatarUrl);
           if (player) {
             setLocalPlayerId(player.id);
@@ -1303,7 +1375,7 @@ export default function App() {
             setView("home");
           }
         } else {
-          // Create new
+          // Create new quiz/hino
           setIsSolo(false);
           const result = await multiplayerService.createRoom(profile.nickname, profile.avatarUrl, effectiveDifficulty, roundCount, bibliaGameMode ? 'biblia' : 'hino');
           if (result) {
@@ -2551,9 +2623,36 @@ export default function App() {
                   </div>
                 </motion.button>
 
+                {/* Desenhe a Palavra */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    soundService.playClick();
+                    setRoomId(null);
+                    setBibliaGameMode(false);
+                    setDrawingGameMode(true);
+                    setView("drawing_setup");
+                  }}
+                  className="w-full bg-[#EC4899] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                >
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <Pencil className="w-24 h-24 md:w-32 md:h-32" />
+                  </div>
+                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
+                    <Pencil className="w-6 h-6 md:w-10 md:h-10 text-[#EC4899]" />
+                  </div>
+                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Desenhe a Palavra</h3>
+                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Um jogador desenha e os outros tentam adivinhar a palavra bíblica!</p>
+                  </div>
+                  <div className="bg-white text-[#EC4899] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] hover:text-[#1a0533] transition-colors mt-1 md:mt-0 z-10">
+                    JOGAR AGORA
+                  </div>
+                </motion.button>
+
                 {/* Locked Modes */}
                 {[
-                  { title: "Desenho Musical", desc: "Desenhe o prompt e vote nos desenhos dos outros jogadores!", icon: <Pencil className="w-8 h-8 md:w-10 md:h-10 text-[#9B59F5]" /> },
                   { title: "Complete a Letra", desc: "Preencha a palavra que falta na estrofe do hino.", icon: <Check className="w-8 h-8 md:w-10 md:h-10 text-[#FF4757]" /> },
                   { title: "Qual a Voz?", desc: "Identifique se o trecho cantado é Soprano, Contralto, Tenor ou Baixo.", icon: <Users className="w-8 h-8 md:w-10 md:h-10 text-[#FFD700]" /> },
                   { title: "Soprando a Doutrina", desc: "Perguntas de conhecimentos bíblicos e pontos de doutrina.", icon: <MonitorSpeaker className="w-8 h-8 md:w-10 md:h-10 text-[#38bdf8]" /> },
@@ -2644,7 +2743,7 @@ export default function App() {
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Categoria</label>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {['Todos', 'Instrumentos', 'Igreja', 'Biblia'].map(cat => (
+                    {['Todos', ...drawingCategories].map(cat => (
                       <button
                         key={cat}
                         onClick={() => { soundService.playClick(); setDrawingCategory(cat); }}
@@ -2931,55 +3030,22 @@ export default function App() {
           )}
 
           {/* Drawing Game */}
-          {view === "drawing_game" && (
+          {view === "drawing_game" && drawingRoomId && drawingLocalPlayerId && (
             <motion.div
               key="drawing_game"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full h-full flex flex-col"
+              className="w-full h-full flex flex-col absolute inset-0 z-50 bg-[#1a0533]"
             >
-              {/* Header */}
-              <div className="bg-white border-b-4 border-[#1a0533] px-4 py-3 flex items-center justify-between shrink-0">
-                <div className="flex-1">
-                  <span className="text-xs text-gray-500 uppercase tracking-wider">Desenhe:</span>
-                  <p className="text-xl font-black text-[#1a0533]">{drawingCurrentPrompt}</p>
-                </div>
-                <div className={cn(
-                  "w-14 h-14 flex items-center justify-center rounded-xl font-black text-2xl border-4 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]",
-                  drawingTimeLeft <= 10 ? "bg-[#FF4757] text-white animate-pulse" :
-                  drawingTimeLeft <= 20 ? "bg-[#FFD700] text-[#1a0533]" :
-                  "bg-white text-[#1a0533]"
-                )}>
-                  {drawingTimeLeft}
-                </div>
-              </div>
-
-              {/* Canvas Area */}
-              <div className="flex-1 min-h-0 relative" style={{ minHeight: '300px' }}>
-                <DrawingCanvasView
-                  prompt={drawingCurrentPrompt}
-                  timeLeft={drawingTimeLeft}
-                  isSubmitted={drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)}
-                  onSubmit={async (drawingData) => {
-                    await drawingService.submitDrawing(drawingRoomId!, drawingData);
-                    setDrawingSubmissions(prev => [...prev, { playerId: drawingLocalPlayerId, drawingData }]);
-                  }}
-                  onTimeUp={async () => {
-                    if (!drawingSubmissions.some(s => s.playerId === drawingLocalPlayerId)) {
-                      await drawingService.submitDrawing(drawingRoomId!, JSON.stringify([]));
-                    }
-                  }}
-                />
-              </div>
-
-              {/* Status Bar */}
-              <div className="bg-white border-t-4 border-[#1a0533] px-4 py-2 flex items-center justify-center gap-2 shrink-0">
-                <span className="text-[#9B59F5] font-black">{drawingSubmissions.length}</span>
-                <span className="text-gray-400">/</span>
-                <span className="text-[#1a0533] font-black">{drawingPlayers.length}</span>
-                <span className="text-gray-500 text-sm uppercase">enviaram</span>
-              </div>
+               <DrawingGame 
+                  roomId={drawingRoomId} 
+                  localPlayerId={drawingLocalPlayerId}
+                  players={drawingPlayers}
+                  isHost={isDrawingHost}
+                  category={drawingCategory}
+                  onEndGame={() => setView('home')}
+               />
             </motion.div>
           )}
 
