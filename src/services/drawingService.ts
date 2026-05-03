@@ -7,7 +7,7 @@ let _onRoomUpdate: ((room: any) => void) | null = null;
 let channel: any = null;
 
 export const drawingService = {
-  async createRoom(nickname: string, avatar: string, roundCount: number, category: string) {
+  async createRoom(nickname: string, avatar: string, scoreGoal: number, category: string) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let roomId = '';
     for (let i = 0; i < 5; i++) roomId += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -19,7 +19,7 @@ export const drawingService = {
       host_id: playerId,
       phase: 'lobby',
       current_round: 0,
-      round_count: roundCount,
+      round_count: scoreGoal,
       difficulty: category,
       game_type: 'desenho'
     }).select().single();
@@ -160,10 +160,10 @@ export const drawingService = {
     }
   },
 
-  async startDrawingGame(roomId: string, roundCount: number) {
+  async startDrawingGame(roomId: string, scoreGoal: number) {
     await supabase.from('rooms').update({
       phase: 'drawing',
-      round_count: roundCount,
+      round_count: scoreGoal,
       current_round: 1
     }).eq('id', roomId);
   },

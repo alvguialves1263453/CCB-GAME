@@ -370,7 +370,7 @@ export default function App() {
   const [drawingLocalPlayerId, setDrawingLocalPlayerId] = useState<string | null>(null);
   const [drawingPlayers, setDrawingPlayers] = useState<any[]>([]);
   const [drawingRound, setDrawingRound] = useState(1);
-  const [drawingRoundCount, setDrawingRoundCount] = useState(3);
+  const [drawingScoreGoal, setDrawingScoreGoal] = useState(500);
   const [drawingCategories, setDrawingCategories] = useState<string[]>([]);
   const [drawingCurrentPrompt, setDrawingCurrentPrompt] = useState<string>('');
   const [drawingTimeLeft, setDrawingTimeLeft] = useState<number>(60);
@@ -904,6 +904,7 @@ export default function App() {
         if (!room) return;
         
         setDrawingCurrentPrompt(room.currentPrompt || '');
+        if (room.roundCount) setDrawingScoreGoal(room.roundCount);
         
         // State Machine for Drawing Game
         if (room.phase === 'lobby') {
@@ -2759,15 +2760,15 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Rodadas</label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[1, 2, 3, 4, 5].map(n => (
+                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-[#1a0533] opacity-70">Pontuação para Vencer</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[500, 800, 1000].map(n => (
                       <button
                         key={n}
-                        onClick={() => { soundService.playClick(); setDrawingRoundCount(n); }}
+                        onClick={() => { soundService.playClick(); setDrawingScoreGoal(n); }}
                         className={cn(
                           "py-2 rounded-lg border-4 border-[#1a0533] font-black text-base transition-all",
-                          drawingRoundCount === n
+                          drawingScoreGoal === n
                             ? "bg-[#9B59F5] text-white shadow-[3px_3px_0px_#1a0533] scale-105"
                             : "bg-gray-100 text-[#1a0533] opacity-50 hover:bg-gray-200"
                         )}
@@ -2805,7 +2806,7 @@ export default function App() {
                   onClick={async () => {
                     soundService.playClick();
                     setIsLoading(true);
-                    const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingRoundCount, drawingCategory);
+                    const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingScoreGoal, drawingCategory);
                     if (result) {
                       setDrawingRoomId(result.roomId);
                       setDrawingLocalPlayerId(result.playerId);
@@ -2984,8 +2985,8 @@ export default function App() {
                         <span className="bg-[#9B59F5] text-white border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingCategory}</span>
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-bold text-[#1a0533]">
-                        <span>RODADAS:</span>
-                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingRoundCount}</span>
+                        <span>META:</span>
+                        <span className="bg-[#FFD700] text-[#1a0533] border-2 border-[#1a0533] px-2 py-0.5 rounded-md text-[9px] shadow-[1px_1px_0px_#1a0533]">{drawingScoreGoal} pts</span>
                       </div>
                     </div>
                   </div>
@@ -3002,7 +3003,7 @@ export default function App() {
                           return;
                         }
                         soundService.playClick();
-                        await drawingService.startDrawingGame(drawingRoomId!, drawingRoundCount);
+                        await drawingService.startDrawingGame(drawingRoomId!, drawingScoreGoal);
                         
                         // Show countdown 3, 2, 1
                         [3, 2, 1].forEach((n, i) => {
@@ -3013,6 +3014,7 @@ export default function App() {
                           const room = await drawingService.getRoom(drawingRoomId!);
                           if (room) {
                             setDrawingCurrentPrompt(room.currentPrompt || '');
+                            if (room.roundCount) setDrawingScoreGoal(room.roundCount);
                             if (room.deadline_at) {
                               setDrawingTimeLeft(Math.max(0, Math.ceil((room.deadline_at - Date.now()) / 1000)));
                             }
@@ -3099,6 +3101,7 @@ export default function App() {
                   players={drawingPlayers}
                   isHost={isDrawingHost}
                   category={drawingCategory}
+                  scoreGoal={drawingScoreGoal}
                   onEndGame={() => setView('home')}
                />
             </motion.div>

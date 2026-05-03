@@ -33,10 +33,11 @@ interface DrawingGameProps {
   players: any[];
   isHost: boolean;
   category?: string;
+  scoreGoal?: number;
   onEndGame: () => void;
 }
 
-export function DrawingGame({ roomId, localPlayerId, players, isHost, category, onEndGame }: DrawingGameProps) {
+export function DrawingGame({ roomId, localPlayerId, players, isHost, category, scoreGoal = 500, onEndGame }: DrawingGameProps) {
   const [phase, setPhase] = useState<'waiting' | 'selecting_word' | 'drawing' | 'round_end' | 'game_over'>('waiting');
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [words, setWords] = useState<{ word: string; category: string }[]>([]);
@@ -292,15 +293,17 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
   const startNextRound = () => {
     if (!isHost) return;
 
-    const totalRounds = localPlayers.length; // Each player draws once per cycle
-    const nextRound = currentRound + 1;
-
-    if (nextRound > totalRounds) {
+    // Check if anyone reached the score goal
+    const winner = localPlayers.find(p => (p.score || 0) >= scoreGoal);
+    
+    if (winner) {
       setPhase('game_over');
       broadcastState({ phase: 'game_over', players: localPlayers });
       setTimeout(onEndGame, 8000);
       return;
     }
+
+    const nextRound = currentRound + 1;
 
     // Sequential rotation: player at index (nextRound-1) draws
     const idx = (drawerIndex) % localPlayers.length;
@@ -330,7 +333,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       phase: 'selecting_word',
       drawerId: nextDrawer.id,
       currentRound: nextRound,
-      totalRounds,
+      scoreGoal,
       wordChoices: choices,
       players: localPlayers.map(p => ({ ...p, hasGuessed: false }))
     });
@@ -511,9 +514,9 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
              <span className="text-sm md:text-xl">⏱</span>
              <span className="text-[#FFD700] font-black text-base md:text-lg">{time}s</span>
           </div>
-          {currentRound > 0 && (
+          {scoreGoal > 0 && (
             <div className="hidden md:flex bg-white/10 px-3 py-1 rounded-full text-xs font-bold text-white/70">
-              Rodada {currentRound}/{localPlayers.length}
+              {me?.score || 0} / {scoreGoal} pts
             </div>
           )}
           {phase === 'drawing' && (
