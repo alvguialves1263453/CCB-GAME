@@ -297,26 +297,42 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
     await supabase.from('rooms').delete().eq('id', roomId);
   },
 
-  async leaveRoom() {
-    const playerIdToRemove = localPlayerId;
-    const roomIdToLeave = currentRoomId;
+  async leaveRoom(roomId?: string, playerId?: string, isHost?: boolean) {
+    const rId = roomId || currentRoomId;
+    const pId = playerId || localPlayerId;
     
-    // Clear local state first to prevent new events being processed
-    currentRoomId = null;
-    localPlayerId = null;
-    _lastPlayerSnapshot.clear();
-    _isSubscribed = false;
-    
-    // Delete from database
-    if (playerIdToRemove && roomIdToLeave) {
-      await supabase.from('players').delete().eq('id', playerIdToRemove);
+    if (rId && pId) {
+      let hostStatus = isHost;
+      if (hostStatus === undefined) {
+        const { data: player } = await supabase.from('players').select('is_host').eq('id', pId).single();
+        hostStatus = player?.is_host;
+      }
+      
+      if (hostStatus) {
+        await this.deleteRoomWithKeepalive(rId);
+      } else {
+        await supabase.from('players').delete().eq('id', pId);
+        // Fallback keepalive
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseUrl && apikey) {
+          fetch(`${supabaseUrl}/rest/v1/players?id=eq.${pId}`, { 
+            method: 'DELETE', 
+            headers: { 'apikey': apikey, 'Authorization': `Bearer ${apikey}` }, 
+            keepalive: true 
+          }).catch(() => {});
+        }
+      }
     }
-    
-    // Remove channel after database operation completes
+
     if (channel) {
       await supabase.removeChannel(channel);
       channel = null;
     }
+    currentRoomId = null;
+    localPlayerId = null;
+    _lastPlayerSnapshot.clear();
+    _isSubscribed = false;
   },
 
   // Discovery (Keeping it simple for nearby rooms)
@@ -348,7 +364,7 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
          fetchLobbies();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drawing_rooms' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'biblia_rooms' }, () => {
          fetchLobbies();
       })
       .subscribe();

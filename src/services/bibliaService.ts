@@ -268,22 +268,64 @@ export const bibliaService = {
     await supabase.from('biblia_rooms').delete().eq('id', roomId);
   },
 
-  async leaveRoom() {
-    const playerIdToRemove = localPlayerId;
-    const roomIdToLeave = currentRoomId;
+  async leaveRoom(roomId?: string, playerId?: string, isHost?: boolean) {
+    const rId = roomId || currentRoomId;
+    const pId = playerId || localPlayerId;
     
+    if (rId && pId) {
+      let hostStatus = isHost;
+      if (hostStatus === undefined) {
+        const { data: player } = await supabase.from('biblia_players').select('is_host').eq('id', pId).single();
+        hostStatus = player?.is_host;
+      }
+      
+      if (hostStatus) {
+        await this.deleteRoomWithKeepalive(rId);
+      } else {
+        await supabase.from('biblia_players').delete().eq('id', pId);
+        // Fallback keepalive
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseUrl && apikey) {
+          fetch(`${supabaseUrl}/rest/v1/biblia_players?id=eq.${pId}`, { 
+            method: 'DELETE', 
+            headers: { 'apikey': apikey, 'Authorization': `Bearer ${apikey}` }, 
+            keepalive: true 
+          }).catch(() => {});
+        }
+      }
+    }
+
+    if (channel) {
+      await supabase.removeChannel(channel);
+      channel = null;
+    }
     currentRoomId = null;
     localPlayerId = null;
     _lastPlayerSnapshot.clear();
     _isSubscribed = false;
-    
-    if (playerIdToRemove && roomIdToLeave) {
-      await supabase.from('biblia_players').delete().eq('id', playerIdToRemove);
+  },
+
+  async deleteRoomWithKeepalive(roomId: string) {
+    // Normal SDK delete
+    try {
+      await supabase.from('biblia_players').delete().eq('room_id', roomId);
+      await supabase.from('biblia_rooms').delete().eq('id', roomId);
+    } catch (e) {
+      console.error("SDK delete failed, relying on keepalive", e);
     }
     
-    if (channel) {
-      await supabase.removeChannel(channel);
-      channel = null;
+    // Fallback: fetch with keepalive
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (supabaseUrl && apikey) {
+      const headers = {
+        'apikey': apikey,
+        'Authorization': `Bearer ${apikey}`,
+        'Content-Type': 'application/json'
+      };
+      fetch(`${supabaseUrl}/rest/v1/biblia_players?room_id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+      fetch(`${supabaseUrl}/rest/v1/biblia_rooms?id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
     }
   },
 

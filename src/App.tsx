@@ -430,7 +430,31 @@ export default function App() {
   const playersRef = useRef<Player[]>(players);
   const prevPlayersRef = useRef<Player[]>([]);
 
+  const drawingRoomIdRef = useRef(drawingRoomId);
+  const drawingGameModeRef = useRef(drawingGameMode);
+  const drawingLocalPlayerIdRef = useRef(drawingLocalPlayerId);
+  const isDrawingHostRef = useRef(isDrawingHost);
+  const bibliaRoomIdRef = useRef(bibliaRoomId);
+  const bibliaGameModeRef = useRef(bibliaGameMode);
+  const bibliaLocalPlayerIdRef = useRef(bibliaLocalPlayerId);
+  const bibliaIsHostRef = useRef(bibliaIsHost);
+  const roomIdRef = useRef(roomId);
+  const isSoloRef = useRef(isSolo);
+  const localPlayerIdRef = useRef(localPlayerId);
+
   useEffect(() => {
+    drawingRoomIdRef.current = drawingRoomId;
+    drawingGameModeRef.current = drawingGameMode;
+    drawingLocalPlayerIdRef.current = drawingLocalPlayerId;
+    isDrawingHostRef.current = isDrawingHost;
+    bibliaRoomIdRef.current = bibliaRoomId;
+    bibliaGameModeRef.current = bibliaGameMode;
+    bibliaLocalPlayerIdRef.current = bibliaLocalPlayerId;
+    bibliaIsHostRef.current = bibliaIsHost;
+    roomIdRef.current = roomId;
+    isSoloRef.current = isSolo;
+    localPlayerIdRef.current = localPlayerId;
+    
     isGameActiveRef.current = isGameActive;
     showResultRef.current = showResult;
     currentRoundRef.current = currentRound;
@@ -440,7 +464,7 @@ export default function App() {
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
-  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode]);
+  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode, drawingRoomId, drawingGameMode, drawingLocalPlayerId, isDrawingHost, bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost, roomId, isSolo, localPlayerId]);
 
   const [showPodium, setShowPodium] = useState(false);
   const [podiumStep, setPodiumStep] = useState(0); // 0: initial, 1: 3rd, 2: 2nd, 3: 1st
@@ -536,19 +560,30 @@ export default function App() {
 
     // Clean up when going home
     if (view === "home") {
-      // If host leaves, delete the room from Supabase
+      // 1. Regular Multiplayer cleanup
       if (!isSolo && roomId && localPlayerId) {
         const me = playersRef.current.find(p => p.id === localPlayerId);
-        if (me?.isHost) {
-          multiplayerService.deleteRoomWithKeepalive(roomId);
-        } else {
-          multiplayerService.leaveRoom();
-        }
+        multiplayerService.leaveRoom(roomId, localPlayerId, me?.isHost);
       } else {
         multiplayerService.leaveRoom();
       }
+
+      // 2. Drawing Game cleanup
+      if (drawingRoomId && drawingLocalPlayerId) {
+        drawingService.leaveRoom(drawingRoomId, drawingLocalPlayerId, isDrawingHost);
+      }
+
+      // 3. Biblia Game cleanup
+      if (bibliaRoomId && bibliaLocalPlayerId) {
+        bibliaService.leaveRoom(bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost);
+      }
+
       setRoomId(null);
       setLocalPlayerId(null);
+      setDrawingRoomId(null);
+      setDrawingLocalPlayerId(null);
+      setBibliaRoomId(null);
+      setBibliaLocalPlayerId(null);
       setIsSolo(true);
       setPlayers([]);
       setFrozenPlayers([]);
@@ -563,25 +598,43 @@ export default function App() {
     }
   }, [view]);
 
-  // Global cleanup on beforeunload (closing tab or refreshing)
+  // Combined Global cleanup on beforeunload (closing tab or refreshing)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Because this is synchronous during unload, we rely on the keepalive fetches
-      // defined in the services' leaveRoom or deleteRoom methods.
-      if (drawingRoomId && drawingGameMode) {
-        drawingService.leaveRoom();
+      // Use refs to get current values synchronously during unload
+      
+      // 1. Drawing Game cleanup
+      if (drawingRoomIdRef.current && drawingGameModeRef.current) {
+        drawingService.leaveRoom(
+          drawingRoomIdRef.current, 
+          drawingLocalPlayerIdRef.current || undefined, 
+          isDrawingHostRef.current
+        );
       }
-      if (bibliaRoomId && bibliaGameMode) {
-        bibliaService.leaveRoom(); // assuming it has leaveRoom
+      
+      // 2. Biblia Game cleanup
+      if (bibliaRoomIdRef.current && bibliaGameModeRef.current) {
+        bibliaService.leaveRoom(
+          bibliaRoomIdRef.current, 
+          bibliaLocalPlayerIdRef.current || undefined, 
+          bibliaIsHostRef.current
+        );
       }
-      if (roomId && !isSolo) {
-        multiplayerService.leaveRoom();
+      
+      // 3. Regular Multiplayer cleanup
+      if (roomIdRef.current && !isSoloRef.current) {
+        const me = playersRef.current.find(p => p.id === localPlayerIdRef.current);
+        multiplayerService.leaveRoom(
+          roomIdRef.current, 
+          localPlayerIdRef.current || undefined, 
+          me?.isHost || false
+        );
       }
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [drawingRoomId, drawingGameMode, bibliaRoomId, bibliaGameMode, roomId, isSolo]);
+  }, []); // Only register once
 
   // Check for room in URL on mount
   useEffect(() => {
@@ -618,21 +671,6 @@ export default function App() {
       soundService.playVictory();
     }
   }, [view]);
-
-  // Delete room when host closes tab
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isSolo && roomId && localPlayerId) {
-        const me = playersRef.current.find(p => p.id === localPlayerId);
-        if (me?.isHost) {
-          multiplayerService.deleteRoomWithKeepalive(roomId);
-        }
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isSolo, roomId, localPlayerId]);
 
   // Sync prevPlayersRef whenever players changes
   useEffect(() => {
@@ -3038,6 +3076,23 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="w-full h-full flex flex-col absolute inset-0 z-50 bg-[#1a0533]"
             >
+               {/* Exit Button during Drawing Game */}
+               <button 
+                 onClick={async () => {
+                   if (confirm("Deseja mesmo sair da sala de desenho?")) {
+                     soundService.playClick();
+                     await drawingService.leaveRoom(drawingRoomId, drawingLocalPlayerId || undefined, isDrawingHost);
+                     setDrawingGameMode(false);
+                     setDrawingRoomId(null);
+                     setView("mode_selection");
+                   }
+                 }}
+                 className="absolute top-4 right-4 z-[100] w-10 h-10 bg-red-500/20 hover:bg-red-500 border-2 border-white/20 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-md"
+                 title="Sair da Sala"
+               >
+                 <X className="w-6 h-6" />
+               </button>
+
                <DrawingGame 
                   roomId={drawingRoomId} 
                   localPlayerId={drawingLocalPlayerId}

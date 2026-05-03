@@ -173,19 +173,34 @@ export const drawingService = {
     return data;
   },
 
-  async leaveRoom() {
-    if (localPlayerId && currentRoomId) {
-      // Check if host
-      const { data: player } = await supabase.from('players').select('is_host').eq('id', localPlayerId).single();
+  async leaveRoom(roomId?: string, playerId?: string, isHost?: boolean) {
+    const rId = roomId || currentRoomId;
+    const pId = playerId || localPlayerId;
+    
+    if (rId && pId) {
+      let hostStatus = isHost;
+      if (hostStatus === undefined) {
+        const { data: player } = await supabase.from('players').select('is_host').eq('id', pId).single();
+        hostStatus = player?.is_host;
+      }
       
-      if (player?.is_host) {
-        // Host leaving -> destroy room
-        await this.deleteRoomWithKeepalive(currentRoomId);
+      if (hostStatus) {
+        await this.deleteRoomWithKeepalive(rId);
       } else {
-        // Just player leaving
-        await supabase.from('players').delete().eq('id', localPlayerId);
+        await supabase.from('players').delete().eq('id', pId);
+        // Fallback keepalive
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseUrl && apikey) {
+          fetch(`${supabaseUrl}/rest/v1/players?id=eq.${pId}`, { 
+            method: 'DELETE', 
+            headers: { 'apikey': apikey, 'Authorization': `Bearer ${apikey}` }, 
+            keepalive: true 
+          }).catch(() => {});
+        }
       }
     }
+
     if (channel) {
       supabase.removeChannel(channel);
       channel = null;
@@ -195,11 +210,15 @@ export const drawingService = {
   },
   
   async deleteRoomWithKeepalive(roomId: string) {
-    // Use SDK for normal operation
-    await supabase.from('players').delete().eq('room_id', roomId);
-    await supabase.from('rooms').delete().eq('id', roomId);
+    // Normal SDK delete
+    try {
+      await supabase.from('players').delete().eq('room_id', roomId);
+      await supabase.from('rooms').delete().eq('id', roomId);
+    } catch (e) {
+      console.error("SDK delete failed, relying on keepalive", e);
+    }
     
-    // Fallback: also try fetch with keepalive in case SDK fails (e.g. tab closed)
+    // Fallback: fetch with keepalive (works even if tab is closing)
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (supabaseUrl && apikey) {
