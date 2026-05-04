@@ -8,6 +8,27 @@ import { DrawingCanvasView, type DrawingLine, type DrawingCanvasRef } from './Dr
 const TOTAL_TIME = 80;
 const MAX_HINTS = 3;
 
+function SlotMachineWord({ finalWord }: { finalWord: string }) {
+  const [displayWord, setDisplayWord] = useState('...');
+  useEffect(() => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const interval = setInterval(() => {
+       let str = '';
+       for(let i=0; i<finalWord.length; i++) {
+         if (finalWord[i] === ' ' || finalWord[i] === '-') str += finalWord[i];
+         else str += chars[Math.floor(Math.random() * chars.length)];
+       }
+       setDisplayWord(str);
+    }, 60);
+    const stopTimer = setTimeout(() => {
+       clearInterval(interval);
+       setDisplayWord(finalWord.toUpperCase());
+    }, 2000);
+    return () => { clearInterval(interval); clearTimeout(stopTimer); };
+  }, [finalWord]);
+  return <div className="text-4xl md:text-5xl font-black text-white bg-white/10 px-4 md:px-8 py-4 md:py-6 rounded-xl border-2 border-[#FFD700]/50 tracking-widest uppercase truncate shadow-[inset_0_0_20px_rgba(255,215,0,0.1)]">{displayWord}</div>;
+}
+
 // Levenshtein distance for "almost correct" detection
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;
@@ -318,8 +339,8 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     if (phase === 'waiting' && localPlayers.length > 0 && words.length > 0) {
       startNextRound();
     } else if (phase === 'selecting_word') {
-      setTime(10);
-      broadcastState({ phase, drawerId: drawerIdRef.current, time: 10 });
+      setTime(4);
+      broadcastState({ phase, drawerId: drawerIdRef.current, time: 4 });
       timer = setInterval(() => {
         setTime(t => {
           if (t <= 1) {
@@ -398,7 +419,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     const filteredWords = category && category !== 'Todos' ? words.filter(w => w.category.toLowerCase() === category.toLowerCase()) : words;
     const availableWords = filteredWords.length > 0 ? filteredWords : words;
     const shuffled = [...availableWords].sort(() => 0.5 - Math.random());
-    const choices = shuffled.slice(0, 3);
+    const choices = shuffled.length > 0 ? [shuffled[0]] : [{ word: 'ERRO', category: 'N/A' }];
     setWordChoices(choices);
     setPhase('selecting_word');
     setHints([]);
@@ -653,30 +674,25 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
 
       <div className="flex flex-1 overflow-hidden flex-col md:flex-row relative z-0">
         
-        {/* Selecting Word Overlay */}
+         {/* Selecting Word Overlay */}
         {phase === 'selecting_word' && (
            <div className="absolute inset-0 z-50 bg-[#1a0533]/90 flex flex-col items-center justify-center p-4">
               {isDrawer ? (
                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#2D1B69] p-6 rounded-2xl border-2 border-[#FFD700] max-w-md w-full text-center shadow-[0_0_30px_rgba(255,215,0,0.2)]">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-black text-[#FFD700]">Escolha uma palavra</h2>
-                    <span className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full font-bold">⏱ {time}s</span>
+                    <h2 className="text-xl md:text-2xl font-black text-[#FFD700] flex-1">Sua palavra é...</h2>
                   </div>
-                  <div className="flex flex-col gap-3">
-                    {wordChoices.map(w => (
-                      <button key={w.word} onClick={() => selectWord(w)} className="bg-white/10 hover:bg-[#FFD700] hover:text-[#1a0533] p-4 rounded-xl font-bold transition-all transform hover:scale-105 active:scale-95 text-lg flex justify-between items-center">
-                        <span>{w.word}</span>
-                        <span className="text-xs opacity-70 font-normal uppercase bg-black/20 px-2 py-1 rounded">{w.category}</span>
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-3 py-4 md:py-8 justify-center min-h-[140px]">
+                    {wordChoices[0] && <SlotMachineWord finalWord={wordChoices[0].word} />}
                   </div>
+                  <p className="mt-4 opacity-60 text-sm font-semibold uppercase">Prepare-se para desenhar!</p>
                 </motion.div>
               ) : (
                 <div className="text-center">
                   <div className="text-4xl font-black text-[#FFD700] mb-6">⏱ {time}s</div>
-                  <Loader className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-4" />
-                  <h2 className="text-2xl font-black text-white">O desenhista está escolhendo a palavra...</h2>
-                  <p className="opacity-70 mt-2">Prepare-se para adivinhar!</p>
+                  <RefreshCw className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-6" />
+                  <h2 className="text-2xl font-black text-white">Sorteando a palavra...</h2>
+                  <p className="opacity-70 mt-2">O desenhista está se preparando!</p>
                 </div>
               )}
            </div>
