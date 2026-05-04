@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Stage, Layer, Line, Rect } from 'react-konva';
 import Konva from 'konva';
 
@@ -10,11 +10,27 @@ export interface DrawingLine {
   points: number[];
 }
 
+// Exposed API to parent (DrawingGame) via ref
+export interface DrawingCanvasRef {
+  /** Undo last committed line. Returns updated lines array, or null if nothing to undo. */
+  undo: () => DrawingLine[] | null;
+  /** Redo last undone line. Returns updated lines array, or null if nothing to redo. */
+  redo: () => DrawingLine[] | null;
+  /** Whether there is anything to undo */
+  canUndo: () => boolean;
+  /** Whether there is anything to redo */
+  canRedo: () => boolean;
+}
+
 interface DrawingCanvasViewProps {
   isDrawer: boolean;
   onDraw: (line: DrawingLine) => void;
+  /** Fires on every pointer move (throttled ~50fps) with the in-progress line */
+  onDrawMove?: (line: DrawingLine) => void;
   onClear: () => void;
   externalLines: DrawingLine[];
+  /** The in-progress line from the remote drawer, rendered in real-time */
+  activeExternalLine?: DrawingLine | null;
   color: string;
   strokeWidth: number;
   tool: 'pen' | 'eraser';
@@ -24,49 +40,97 @@ interface DrawingCanvasViewProps {
 const VIRTUAL_WIDTH = 800;
 const VIRTUAL_HEIGHT = 600;
 
+// Throttle interval in ms (~50fps)
+const MOVE_THROTTLE_MS = 20;
+
 // ─── Component ───────────────────────────────────────────────────────
-export function DrawingCanvasView({
-  isDrawer,
-  onDraw,
-  onClear,
-  externalLines,
-  color,
-  strokeWidth,
-  tool,
-}: DrawingCanvasViewProps) {
+export const DrawingCanvasView = forwardRef<DrawingCanvasRef, DrawingCanvasViewProps>(
+  function DrawingCanvasView(
+    {
+      isDrawer,
+      onDraw,
+      onDrawMove,
+      onClear,
+      externalLines,
+      activeExternalLine,
+      color,
+      strokeWidth,
+      tool,
+    },
+    ref
+  ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const isDrawingRef = useRef(false);
+  const lastMoveBroadcastRef = useRef<number>(0);
 
-  // Local lines drawn by THIS user in this session
+  // Committed lines drawn by THIS user (local)
   const [localLines, setLocalLines] = useState<DrawingLine[]>([]);
-  // Currently being drawn line
+  const localLinesRef = useRef<DrawingLine[]>([]);
+  // Redo stack — lines that were undone and can be redone
+  const redoStackRef = useRef<DrawingLine[]>([]);
+  // In-progress line (local preview)
+  const currentLineRef = useRef<DrawingLine | null>(null);
   const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
 
-  // Responsive stage dimensions
+  // Stage dimensions = fill the container completely
   const [stageSize, setStageSize] = useState({ width: VIRTUAL_WIDTH, height: VIRTUAL_HEIGHT });
-  const [scale, setScale] = useState(1);
+  // Independent x/y scales so the stage always fills 100% of the container
+  const [scaleX, setScaleX] = useState(1);
+  const [scaleY, setScaleY] = useState(1);
+  const scaleXRef = useRef(1);
+  const scaleYRef = useRef(1);
 
-  // ─── Resize observer ────────────────────────────────────────────
+  // ─── Keep localLinesRef in sync ──────────────────────────────────
+  useEffect(() => {
+    localLinesRef.current = localLines;
+  }, [localLines]);
+
+  // ─── Expose undo/redo/canUndo/canRedo via ref ────────────────────
+  useImperativeHandle(ref, () => ({
+    undo: () => {
+      const lines = localLinesRef.current;
+      if (lines.length === 0) return null;
+      const popped = lines[lines.length - 1];
+      const newLines = lines.slice(0, -1);
+      redoStackRef.current = [popped, ...redoStackRef.current];
+      setLocalLines(newLines);
+      localLinesRef.current = newLines;
+      return newLines;
+    },
+    redo: () => {
+      const stack = redoStackRef.current;
+      if (stack.length === 0) return null;
+      const line = stack[0];
+      redoStackRef.current = stack.slice(1);
+      const newLines = [...localLinesRef.current, line];
+      setLocalLines(newLines);
+      localLinesRef.current = newLines;
+      return newLines;
+    },
+    canUndo: () => localLinesRef.current.length > 0,
+    canRedo: () => redoStackRef.current.length > 0,
+  }));
+
+  // ─── Resize observer — fills the container entirely ─────────────
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const updateSize = () => {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      if (width === 0 || height === 0) return;
+      const rect = container.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      if (!w || !h) return;
 
-      // Fit the virtual canvas into the container keeping aspect ratio
-      const scaleX = width / VIRTUAL_WIDTH;
-      const scaleY = height / VIRTUAL_HEIGHT;
-      const newScale = Math.min(scaleX, scaleY);
+      const sx = w / VIRTUAL_WIDTH;
+      const sy = h / VIRTUAL_HEIGHT;
 
-      setStageSize({
-        width: VIRTUAL_WIDTH * newScale,
-        height: VIRTUAL_HEIGHT * newScale,
-      });
-      setScale(newScale);
+      setStageSize({ width: w, height: h });
+      setScaleX(sx);
+      setScaleY(sy);
+      scaleXRef.current = sx;
+      scaleYRef.current = sy;
     };
 
     updateSize();
@@ -75,11 +139,13 @@ export function DrawingCanvasView({
     return () => observer.disconnect();
   }, []);
 
-  // ─── Clear handler (called by parent) ───────────────────────────
-  // When externalLines becomes empty, reset local lines too
+  // ─── Clear handler ───────────────────────────────────────────────
   useEffect(() => {
     if (externalLines.length === 0) {
       setLocalLines([]);
+      localLinesRef.current = [];
+      redoStackRef.current = [];
+      currentLineRef.current = null;
       setCurrentLine(null);
     }
   }, [externalLines]);
@@ -91,10 +157,10 @@ export function DrawingCanvasView({
     const pointer = stage.getPointerPosition();
     if (!pointer) return null;
     return {
-      x: pointer.x / scale,
-      y: pointer.y / scale,
+      x: pointer.x / scaleXRef.current,
+      y: pointer.y / scaleYRef.current,
     };
-  }, [scale]);
+  }, []);
 
   // ─── Drawing handlers ──────────────────────────────────────────
   const handlePointerDown = useCallback(() => {
@@ -110,66 +176,84 @@ export function DrawingCanvasView({
       strokeWidth: tool === 'eraser' ? strokeWidth * 3 : strokeWidth,
       points: [pos.x, pos.y],
     };
+    currentLineRef.current = newLine;
     setCurrentLine(newLine);
-  }, [isDrawer, tool, color, strokeWidth, getVirtualPos]);
+
+    // Broadcast start immediately
+    onDrawMove?.(newLine);
+    lastMoveBroadcastRef.current = Date.now();
+  }, [isDrawer, tool, color, strokeWidth, getVirtualPos, onDrawMove]);
 
   const handlePointerMove = useCallback(() => {
     if (!isDrawingRef.current || !isDrawer) return;
 
     const pos = getVirtualPos();
-    if (!pos || !currentLine) return;
+    const line = currentLineRef.current;
+    if (!pos || !line) return;
 
     const updatedLine: DrawingLine = {
-      ...currentLine,
-      points: [...currentLine.points, pos.x, pos.y],
+      ...line,
+      points: [...line.points, pos.x, pos.y],
     };
+    currentLineRef.current = updatedLine;
     setCurrentLine(updatedLine);
-  }, [isDrawer, currentLine, getVirtualPos]);
+
+    // Throttled real-time broadcast
+    const now = Date.now();
+    if (onDrawMove && now - lastMoveBroadcastRef.current >= MOVE_THROTTLE_MS) {
+      lastMoveBroadcastRef.current = now;
+      onDrawMove(updatedLine);
+    }
+  }, [isDrawer, getVirtualPos, onDrawMove]);
 
   const handlePointerUp = useCallback(() => {
-    if (!isDrawingRef.current || !currentLine) {
+    if (!isDrawingRef.current) {
       isDrawingRef.current = false;
       return;
     }
     isDrawingRef.current = false;
 
-    // Only emit if line has at least 2 points (4 values = x,y x,y)
-    if (currentLine.points.length >= 2) {
-      setLocalLines(prev => [...prev, currentLine]);
-      onDraw(currentLine);
-    }
-    setCurrentLine(null);
-  }, [currentLine, onDraw]);
+    const line = currentLineRef.current;
+    if (!line) return;
 
-  // ─── All lines to render (external from others + local from me) ─
+    if (line.points.length >= 4) {
+      const newLines = [...localLinesRef.current, line];
+      setLocalLines(newLines);
+      localLinesRef.current = newLines;
+      redoStackRef.current = []; // New stroke clears redo history
+      onDraw(line);
+    }
+    currentLineRef.current = null;
+    setCurrentLine(null);
+  }, [onDraw]);
+
+  // ─── All committed lines ─────────────────────────────────────────
   const allLines = [...externalLines, ...localLines];
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full flex items-center justify-center"
+      className="w-full h-full"
       style={{ touchAction: 'none' }}
     >
       <Stage
         ref={stageRef}
         width={stageSize.width}
         height={stageSize.height}
-        scaleX={scale}
-        scaleY={scale}
+        scaleX={scaleX}
+        scaleY={scaleY}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        style={{
-          cursor: isDrawer ? 'crosshair' : 'default',
-          borderRadius: '12px',
-          overflow: 'hidden',
-        }}
+        onMouseLeave={handlePointerUp}
+        onTouchCancel={handlePointerUp}
+        style={{ cursor: isDrawer ? 'crosshair' : 'default', display: 'block' }}
       >
         <Layer>
-          {/* White background */}
+          {/* White background fills the full virtual canvas */}
           <Rect x={0} y={0} width={VIRTUAL_WIDTH} height={VIRTUAL_HEIGHT} fill="#ffffff" />
 
-          {/* Completed lines */}
+          {/* Committed lines (from all players) */}
           {allLines.map((line, i) => (
             <Line
               key={`line-${i}`}
@@ -185,8 +269,23 @@ export function DrawingCanvasView({
             />
           ))}
 
-          {/* Line currently being drawn */}
-          {currentLine && (
+          {/* Remote drawer's in-progress line — real-time stream */}
+          {activeExternalLine && activeExternalLine.points.length >= 2 && (
+            <Line
+              points={activeExternalLine.points}
+              stroke={activeExternalLine.color}
+              strokeWidth={activeExternalLine.strokeWidth}
+              tension={0.5}
+              lineCap="round"
+              lineJoin="round"
+              globalCompositeOperation={
+                activeExternalLine.tool === 'eraser' ? 'destination-out' : 'source-over'
+              }
+            />
+          )}
+
+          {/* Local drawer's in-progress line — instant preview */}
+          {currentLine && currentLine.points.length >= 2 && (
             <Line
               points={currentLine.points}
               stroke={currentLine.color}
@@ -203,4 +302,4 @@ export function DrawingCanvasView({
       </Stage>
     </div>
   );
-}
+});

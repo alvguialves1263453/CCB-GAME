@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Eraser, Trash2, Check, RefreshCw, Lightbulb, ArrowRight } from 'lucide-react';
+import { Pencil, Eraser, Trash2, Check, RefreshCw, Lightbulb, ArrowRight, Undo2, Redo2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { soundService } from '../lib/soundService';
-import { DrawingCanvasView, type DrawingLine } from './DrawingComponents';
+import { DrawingCanvasView, type DrawingLine, type DrawingCanvasRef } from './DrawingComponents';
 
 const TOTAL_TIME = 80;
 const MAX_HINTS = 3;
@@ -58,18 +58,37 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
   const [drawerIndex, setDrawerIndex] = useState(0);
   const [showCorrectPopup, setShowCorrectPopup] = useState<{ points: number } | null>(null);
   const [almostMsg, setAlmostMsg] = useState('');
+  const hasGuessedCorrectlyRef = useRef(false);
 
   // react-konva lines state
   const [externalLines, setExternalLines] = useState<DrawingLine[]>([]);
+  // The in-progress line being drawn by the remote drawer (real-time stream)
+  const [activeExternalLine, setActiveExternalLine] = useState<DrawingLine | null>(null);
   
   const chatRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const canvasRef = useRef<DrawingCanvasRef>(null);
+  // Track undo/redo availability for button disabled state
+  const [canUndoState, setCanUndoState] = useState(false);
+  const [canRedoState, setCanRedoState] = useState(false);
   const currentWordRef = useRef(currentWord);
   const drawerIdRef = useRef(drawerId);
   const localPlayersRef = useRef(localPlayers);
   useEffect(() => { currentWordRef.current = currentWord; }, [currentWord]);
   useEffect(() => { drawerIdRef.current = drawerId; }, [drawerId]);
   useEffect(() => { localPlayersRef.current = localPlayers; }, [localPlayers]);
+  useEffect(() => { hasGuessedCorrectlyRef.current = hasGuessedCorrectly; }, [hasGuessedCorrectly]);
+
+  useEffect(() => {
+    const syncStates = () => {
+      setCanUndoState(canvasRef.current?.canUndo() || false);
+      setCanRedoState(canvasRef.current?.canRedo() || false);
+    };
+    syncStates();
+    // Also sync on a small interval as a fallback since Konva events are external
+    const timer = setInterval(syncStates, 500);
+    return () => clearInterval(timer);
+  }, [drawerId, phase]);
 
   const me = localPlayers.find(p => p.id === localPlayerId);
   const isDrawer = drawerId === localPlayerId;
@@ -114,7 +133,27 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     channel
       .on('broadcast', { event: 'game_state' }, ({ payload }) => {
         if (!isHost) {
-          if (payload.phase) setPhase(payload.phase);
+          if (payload.phase) {
+            setPhase(payload.phase);
+            // Reset per-round state when a new round phase starts
+            if (payload.phase === 'selecting_word') {
+              // New round starting — clear guessed state for all clients
+              setHasGuessedCorrectly(false);
+              hasGuessedCorrectlyRef.current = false;
+              setAlmostMsg('');
+              setShowCorrectPopup(null);
+              setGuess('');
+            } else if (payload.phase === 'drawing') {
+              // Drawing restarted — make sure guess is cleared
+              setAlmostMsg('');
+              setGuess('');
+            } else if (payload.phase === 'round_end') {
+              // Round ended — prepare reset for next round
+              setHasGuessedCorrectly(false);
+              hasGuessedCorrectlyRef.current = false;
+              setAlmostMsg('');
+            }
+          }
           if (payload.drawerId) setDrawerId(payload.drawerId);
           if (payload.time !== undefined) setTime(payload.time);
           if (payload.wordLength && !payload.currentWord) {
@@ -130,6 +169,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
             setHints(payload.hints);
           }
           if (payload.players) {
+            // Sync players from host including hasGuessed flags
             setLocalPlayers(payload.players);
           }
           if (payload.wordChoices) {
@@ -141,13 +181,28 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         }
       })
       .on('broadcast', { event: 'draw_line' }, ({ payload }) => {
-        // Receive a complete line from the drawer
+        // Receive a COMPLETE line from the drawer — move to permanent lines and clear active
         if (payload.line) {
           setExternalLines(prev => [...prev, payload.line as DrawingLine]);
+          setActiveExternalLine(null);
+        }
+      })
+      .on('broadcast', { event: 'draw_move' }, ({ payload }) => {
+        // Real-time partial line from the drawer while they are still drawing
+        if (payload.line) {
+          setActiveExternalLine(payload.line as DrawingLine);
+        }
+      })
+      .on('broadcast', { event: 'canvas_replace' }, ({ payload }) => {
+        // Full canvas state replace (after undo/redo by the drawer)
+        if (!isHost && Array.isArray(payload.lines)) {
+          setExternalLines(payload.lines as DrawingLine[]);
+          setActiveExternalLine(null);
         }
       })
       .on('broadcast', { event: 'clear' }, () => {
         setExternalLines([]);
+        setActiveExternalLine(null);
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         setChatMessages(prev => [...prev, payload]);
@@ -157,8 +212,14 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         soundService.playCorrect();
         setChatMessages(prev => [...prev, { id: Math.random().toString(), sender: 'Sistema', text: `🎉 ${payload.nickname} acertou a palavra!`, isCorrect: true }]);
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        // Update player's hasGuessed in localPlayers for all clients
+        setLocalPlayers(prev => prev.map(p =>
+          p.id === payload.playerId ? { ...p, hasGuessed: true, score: (p.score || 0) + (payload.points || 0) } :
+          p.id === payload.drawerId ? { ...p, score: (p.score || 0) + (payload.drawerPoints || 0) } : p
+        ));
         if (payload.playerId === localPlayerId) {
           setHasGuessedCorrectly(true);
+          hasGuessedCorrectlyRef.current = true;
           setShowCorrectPopup({ points: payload.points || 0 });
           setTimeout(() => setShowCorrectPopup(null), 2500);
         }
@@ -185,6 +246,12 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
                 if (p.id === drawerIdRef.current) return { ...p, score: (p.score || 0) + drawerPts };
                 return p;
               });
+              // Broadcast updated players list so all clients stay in sync
+              channelRef.current?.send({
+                type: 'broadcast',
+                event: 'players_update',
+                payload: { players: updated }
+              });
               // Check if all non-drawers have guessed
               const allGuessed = updated.filter(p => p.id !== drawerIdRef.current).every(p => p.hasGuessed);
               if (allGuessed) setTimeout(() => endRound(), 500);
@@ -193,7 +260,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
             channelRef.current?.send({
               type: 'broadcast',
               event: 'guess_correct',
-              payload: { playerId: payload.playerId, nickname: payload.nickname, points: pts }
+              payload: { playerId: payload.playerId, nickname: payload.nickname, points: pts, drawerId: drawerIdRef.current, drawerPoints: drawerPts }
             });
             soundService.playCorrect();
             // Don't show the actual word in chat!
@@ -223,6 +290,15 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       .on('broadcast', { event: 'word_selected' }, ({ payload }) => {
         if (isHost) {
           selectWord(payload);
+        }
+      })
+      .on('broadcast', { event: 'players_update' }, ({ payload }) => {
+        // Sync player scores and hasGuessed from host
+        if (!isHost && payload.players) {
+          setLocalPlayers(prev => prev.map(p => {
+            const updated = payload.players.find((u: any) => u.id === p.id);
+            return updated ? { ...p, score: updated.score, hasGuessed: updated.hasGuessed } : p;
+          }));
         }
       })
       .subscribe();
@@ -315,7 +391,9 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     setDrawerId(nextDrawer.id);
     setHintsUsed(0);
     setHasGuessedCorrectly(false);
+    hasGuessedCorrectlyRef.current = false;
     setAlmostMsg('');
+    setGuess('');
     
     const filteredWords = category && category !== 'Todos' ? words.filter(w => w.category.toLowerCase() === category.toLowerCase()) : words;
     const availableWords = filteredWords.length > 0 ? filteredWords : words;
@@ -327,6 +405,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     setCurrentWord(null);
 
     setExternalLines([]);
+    setActiveExternalLine(null);
     channelRef.current?.send({ type: 'broadcast', event: 'clear' });
 
     broadcastState({
@@ -391,11 +470,52 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       event: 'draw_line',
       payload: { line }
     });
+    // Update undo/redo button states
+    setCanUndoState(true);
+    setCanRedoState(false);
+  };
+
+  const handleUndo = () => {
+    if (!canvasRef.current || !isDrawer) return;
+    const newLines = canvasRef.current.undo();
+    if (newLines !== null) {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'canvas_replace',
+        payload: { lines: newLines }
+      });
+      setCanUndoState(canvasRef.current.canUndo());
+      setCanRedoState(true);
+    }
+  };
+
+  const handleRedo = () => {
+    if (!canvasRef.current || !isDrawer) return;
+    const newLines = canvasRef.current.redo();
+    if (newLines !== null) {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'canvas_replace',
+        payload: { lines: newLines }
+      });
+      setCanUndoState(true);
+      setCanRedoState(canvasRef.current.canRedo());
+    }
+  };
+
+  // Called on every pointer move — streams the in-progress line in real-time
+  const handleDrawMove = (line: DrawingLine) => {
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'draw_move',
+      payload: { line }
+    });
   };
 
   const handleClearCanvas = () => {
     if (!isDrawer || phase !== 'drawing') return;
     setExternalLines([]);
+    setActiveExternalLine(null);
     channelRef.current?.send({ type: 'broadcast', event: 'clear' });
   };
 
@@ -613,13 +733,17 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         </AnimatePresence>
 
         {/* ═══════════ Canvas Area ═══════════ */}
-        <div className="flex-1 flex flex-col items-center justify-center p-2 md:p-4 relative">
-          <div className="w-full max-w-3xl aspect-[4/3] bg-white rounded-xl md:rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.5)] relative overflow-hidden ring-4 ring-[#2D1B69] md:ring-8">
+        <div className="flex-1 flex flex-col items-stretch min-h-0 relative overflow-hidden">
+          {/* Canvas fills ALL remaining space — no padding, no max-width */}
+          <div className="flex-1 min-h-0 w-full rounded-none shadow-[inset_0_0_0_3px_rgba(255,255,255,0.15)] relative overflow-hidden">
             <DrawingCanvasView
+              ref={canvasRef}
               isDrawer={isDrawer && phase === 'drawing'}
               onDraw={handleDraw}
+              onDrawMove={isDrawer && phase === 'drawing' ? handleDrawMove : undefined}
               onClear={handleClearCanvas}
               externalLines={externalLines}
+              activeExternalLine={!isDrawer ? activeExternalLine : null}
               color={color}
               strokeWidth={brushSize}
               tool={tool}
@@ -627,62 +751,81 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
           </div>
 
           {/* ═══════════ Drawing Toolbar ═══════════ */}
-          {/* ═══════════ Drawing Toolbar ═══════════ */}
           {isDrawer && phase === 'drawing' && (
-            <div className="mt-2 md:mt-4 bg-[#2D1B69] p-2 md:p-3 rounded-2xl flex flex-row overflow-x-auto no-scrollbar gap-2 md:gap-4 w-full max-w-3xl items-center border border-white/10 shadow-xl shrink-0">
+            <div className="bg-[#2D1B69]/95 backdrop-blur-sm px-2 py-2 flex flex-wrap gap-2 md:gap-3 w-full justify-center items-center border-t border-white/10 shadow-xl shrink-0">
                {/* Tool toggle */}
-               <div className="flex bg-[#1a0533] p-1 rounded-xl gap-1 shrink-0">
-                 <button onClick={() => setTool('pen')} className={`p-2.5 rounded-lg transition-all ${tool === 'pen' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
-                   <Pencil size={22} strokeWidth={2.5} />
+               <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1 shrink-0">
+                 <button onClick={() => setTool('pen')} className={`p-1.5 rounded-md transition-all ${tool === 'pen' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
+                   <Pencil size={18} strokeWidth={2.5} />
                  </button>
-                 <button onClick={() => setTool('eraser')} className={`p-2.5 rounded-lg transition-all ${tool === 'eraser' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
-                   <Eraser size={22} strokeWidth={2.5} />
+                 <button onClick={() => setTool('eraser')} className={`p-1.5 rounded-md transition-all ${tool === 'eraser' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
+                   <Eraser size={18} strokeWidth={2.5} />
                  </button>
                </div>
                
                {/* Color palette */}
-               <div className="flex flex-wrap gap-1 md:gap-1.5 bg-[#1a0533] p-1 rounded-xl px-2 max-w-[160px] sm:max-w-[240px] md:max-w-[300px] shrink-0 justify-center">
+               <div className="flex flex-wrap gap-1 bg-[#1a0533] p-1 rounded-lg px-2 max-w-[180px] md:max-w-[210px] shrink-0 justify-center">
                  {colors.map(c => (
                    <button
                      key={c}
                      onClick={() => { setColor(c); setTool('pen'); }}
-                     className={`w-6 h-6 md:w-7 md:h-7 rounded-full border-2 transition-all ${color === c && tool === 'pen' ? 'border-[#FFD700] scale-125 shadow-[0_0_8px_rgba(255,215,0,0.8)] z-10' : 'border-white/20 hover:scale-110'}`}
+                     className={`w-4 h-4 md:w-5 md:h-5 rounded-full border-2 transition-all ${color === c && tool === 'pen' ? 'border-[#FFD700] scale-125 shadow-[0_0_8px_rgba(255,215,0,0.8)] z-10' : 'border-white/20 hover:scale-110'}`}
                      style={{ backgroundColor: c }}
                    />
                  ))}
                </div>
 
                {/* Brush size */}
-               <div className="flex bg-[#1a0533] p-1 rounded-xl gap-1.5 items-center px-3 shrink-0">
-                  <span className="hidden lg:block text-[10px] font-black uppercase opacity-40 mr-1">Tam</span>
+               <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1.5 items-center px-2 shrink-0">
+                  <span className="hidden sm:block text-[9px] font-black uppercase opacity-40 mr-1">Tam</span>
                   {[2, 5, 10, 20].map(s => (
-                    <button key={s} onClick={() => setBrushSize(s)} className={`w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-full transition-all ${brushSize === s ? 'bg-[#FFD700]/20 ring-2 ring-[#FFD700]' : 'hover:bg-white/10'}`}>
+                    <button key={s} onClick={() => setBrushSize(s)} className={`w-6 h-6 flex items-center justify-center rounded-full transition-all ${brushSize === s ? 'bg-[#FFD700]/20 ring-2 ring-[#FFD700]' : 'hover:bg-white/10'}`}>
                       <div className="bg-white rounded-full shadow-sm" style={{ width: Math.max(3, s/1.5), height: Math.max(3, s/1.5) }} />
                     </button>
                   ))}
                </div>
 
-               <div className="flex gap-2 ml-auto shrink-0 pr-1">
+                {/* Undo/Redo buttons */}
+                <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1 shrink-0">
+                  <button 
+                    onClick={handleUndo} 
+                    disabled={!canUndoState}
+                    className={`p-1.5 rounded-md transition-all ${canUndoState ? 'text-white hover:bg-white/10 active:scale-95' : 'text-white/20 cursor-not-allowed'}`}
+                    title="Desfazer"
+                  >
+                    <Undo2 size={18} />
+                  </button>
+                  <button 
+                    onClick={handleRedo} 
+                    disabled={!canRedoState}
+                    className={`p-1.5 rounded-md transition-all ${canRedoState ? 'text-white hover:bg-white/10 active:scale-95' : 'text-white/20 cursor-not-allowed'}`}
+                    title="Refazer"
+                  >
+                    <Redo2 size={18} />
+                  </button>
+                </div>
+
+               <div className="flex gap-2 ml-auto sm:ml-0 shrink-0">
                  {/* Hint button (drawer gives hints) */}
                  <button
                    type="button"
                    onClick={useHint}
                    disabled={hintsUsed >= MAX_HINTS}
-                   className={`px-3 md:px-4 py-2 rounded-xl font-black text-sm flex items-center gap-2 transition-all ${
+                   className={`px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1.5 transition-all ${
                      hintsUsed >= MAX_HINTS
                        ? 'bg-white/5 text-white/30 cursor-not-allowed'
                        : 'bg-yellow-500 text-[#1a0533] hover:bg-yellow-400 active:scale-95 shadow-lg'
                    }`}
                    title={`Dar dica (${MAX_HINTS - hintsUsed} restantes)`}
                  >
-                   <Lightbulb size={18} strokeWidth={3} />
+                   <Lightbulb size={16} strokeWidth={3} />
                    <span className="hidden sm:inline">Dica</span>
                    <span className="sm:hidden">{MAX_HINTS - hintsUsed}</span>
                  </button>
 
                  {/* Clear button */}
-                 <button onClick={handleClearCanvas} className="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white p-2.5 rounded-xl transition-all">
-                   <Trash2 size={22} />
+                 <button onClick={handleClearCanvas} className="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white p-1.5 rounded-lg transition-all">
+                   <Trash2 size={20} />
                  </button>
                </div>
             </div>
@@ -690,7 +833,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         </div>
 
         {/* ═══════════ Sidebar (Players & Chat) ═══════════ */}
-        <div className="w-full md:w-80 bg-[#1a0533]/90 md:bg-[#1a0533] flex flex-col md:border-l border-white/10 shrink-0 flex-[0.6] md:flex-none shadow-2xl relative z-10">
+        <div className="w-full md:w-80 bg-[#1a0533]/90 md:bg-[#1a0533] flex flex-col md:border-l border-white/10 shrink-0 max-h-[28vh] md:max-h-none md:flex-none shadow-2xl relative z-10">
           
           {/* Players (Desktop: List, Mobile: Horizontal Row) */}
           <div className="p-2 md:p-4 border-b border-white/10 shrink-0 md:max-h-[35%] md:overflow-y-auto flex md:flex-col overflow-x-auto no-scrollbar gap-2 md:gap-3 bg-[#2D1B69]/30 md:bg-transparent">

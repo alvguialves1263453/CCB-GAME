@@ -268,7 +268,7 @@ export default function App() {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty: string; roundCount: number; gameType: string }[]>([]);
+  const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty?: string; roundCount: number; gameType: string }[]>([]);
   const [isRefreshingRooms, setIsRefreshingRooms] = useState(false);
 
   const refreshNearbyRooms = () => {
@@ -2664,8 +2664,9 @@ export default function App() {
 
                 {/* Desenhe a Palavra */}
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={isSolo ? {} : { scale: 1.02 }}
+                  whileTap={isSolo ? {} : { scale: 0.98 }}
+                  disabled={isSolo}
                   onClick={() => {
                     soundService.playClick();
                     setRoomId(null);
@@ -2673,20 +2674,26 @@ export default function App() {
                     setDrawingGameMode(true);
                     setView("drawing_setup");
                   }}
-                  className="w-full bg-[#EC4899] border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group cursor-pointer"
+                  className={cn(
+                    "w-full border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group transition-all",
+                    isSolo ? "bg-gray-400 grayscale opacity-70 cursor-not-allowed" : "bg-[#EC4899] cursor-pointer"
+                  )}
                 >
                   <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
                     <Pencil className="w-24 h-24 md:w-32 md:h-32" />
                   </div>
                   <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
-                    <Pencil className="w-6 h-6 md:w-10 md:h-10 text-[#EC4899]" />
+                    <Pencil className={cn("w-6 h-6 md:w-10 md:h-10", isSolo ? "text-gray-400" : "text-[#EC4899]")} />
                   </div>
                   <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
                     <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Desenhe a Palavra</h3>
                     <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Um jogador desenha e os outros tentam adivinhar a palavra bíblica!</p>
                   </div>
-                  <div className="bg-white text-[#EC4899] px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFD700] hover:text-[#1a0533] transition-colors mt-1 md:mt-0 z-10">
-                    JOGAR AGORA
+                  <div className={cn(
+                    "px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] transition-colors mt-1 md:mt-0 z-10",
+                    isSolo ? "bg-gray-200 text-gray-400 border-gray-400" : "bg-white text-[#EC4899] hover:bg-[#FFD700] hover:text-[#1a0533]"
+                  )}>
+                    {isSolo ? "COMPATÍVEL APENAS MULTIPLAYER" : "JOGAR AGORA"}
                   </div>
                 </motion.button>
 
