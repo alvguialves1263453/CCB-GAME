@@ -264,8 +264,11 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       })
       .on('broadcast', { event: 'hint_used' }, ({ payload }) => {
         if (payload.hints) setHints(payload.hints);
-        setChatMessages(prev => [...prev, { id: Math.random().toString(), sender: 'Sistema', text: `💡 Dica: a palavra contém a letra '${payload.letter}'`, isCorrect: false }]);
+        if (payload.hintsUsed !== undefined) setHintsUsed(payload.hintsUsed);
+        soundService.playCorrect(); // Small sound for hint
+        setChatMessages(prev => [...prev, { id: Math.random().toString(), sender: 'Sistema', text: `💡 Uma dica foi revelada!`, isCorrect: false }]);
       })
+
       .on('broadcast', { event: 'guess_attempt' }, ({ payload }) => {
         // HOST validates guesses from other players
         if (isHost && currentWordRef.current) {
@@ -577,15 +580,19 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     const letter = word[randomIdx];
     const newHints = [...hints];
     newHints[randomIdx] = letter;
+    
+    const newHintsUsed = hintsUsed + 1;
     setHints(newHints);
-    setHintsUsed(prev => prev + 1);
+    setHintsUsed(newHintsUsed);
 
-    // Broadcast hint to all players
     channelRef.current?.send({
       type: 'broadcast',
       event: 'hint_used',
-      payload: { hints: newHints, letter }
+      payload: { hints: newHints, hintsUsed: newHintsUsed, letter }
     });
+    
+    // Also broadcast via game_state for late joiners or sync
+    broadcastState({ hints: newHints, hintsUsed: newHintsUsed });
     setChatMessages(prev => [...prev, { id: Math.random().toString(), sender: 'Sistema', text: `💡 Dica: a palavra contém a letra '${letter.toUpperCase()}'`, isCorrect: false }]);
   };
 
@@ -672,27 +679,26 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-[#1a0533] text-white overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#2D1B69] to-[#1a0533]">
-      {/* Top Bar */}
-      <div className="bg-[#1a0533]/80 backdrop-blur-md p-2 md:p-3 flex justify-between items-center shadow-lg border-b border-white/10 z-10 shrink-0">
-        <div className="flex items-center gap-2 md:gap-4">
-          <div className="bg-[#1a0533] px-3 md:px-4 py-1.5 rounded-full border-2 border-[#FFD700] shadow-[0_0_10px_rgba(255,215,0,0.2)] flex items-center gap-1.5">
-            <span className="text-sm md:text-xl">⏱</span>
-            <span className="text-[#FFD700] font-black text-base md:text-lg">{time}s</span>
+      {/* Top Header */}
+      <div className="bg-[#2D1B69]/90 backdrop-blur-md px-3 md:px-4 py-2 flex items-center justify-between border-b border-white/10 shadow-lg shrink-0 h-14 md:h-16 gap-2">
+        <div className="flex items-center">
+          <div className="bg-[#1a0533] px-2 md:px-3 py-1 rounded-2xl border-2 border-[#FFD700] shadow-[0_0_10px_rgba(255,215,0,0.2)] flex items-center gap-1 md:gap-1.5">
+            <Timer className="text-[#FFD700] w-3.5 h-3.5 md:w-4 h-4" />
+            <span className="text-[#FFD700] font-black text-sm md:text-lg tabular-nums">{time}s</span>
           </div>
-          {scoreGoal > 0 && (
-            <div className="hidden md:flex bg-white/10 px-3 py-1 rounded-full text-xs font-bold text-white/70">
-              {me?.score || 0} / {scoreGoal} pts
-            </div>
-          )}
+        </div>
+
+        <div className="flex-1 flex justify-center min-w-0">
           {phase === 'drawing' && (
-            <div className="bg-white/5 border border-white/10 px-3 md:px-5 py-1 md:py-1.5 rounded-full text-lg md:text-2xl tracking-[0.3em] font-mono font-bold text-white shadow-inner">
+            <div className="bg-white/5 border border-white/10 px-3 md:px-5 py-0.5 md:py-1.5 rounded-full text-base md:text-2xl tracking-[0.2em] md:tracking-[0.3em] font-mono font-bold text-white shadow-inner truncate max-w-full">
               {isDrawer ? currentWord?.word : hints.join(' ')}
             </div>
           )}
         </div>
-        <div className="flex flex-col items-end">
-          <div className="text-xs font-black text-[#FFD700] uppercase tracking-wider opacity-80">Sala</div>
-          <div className="text-sm md:text-base font-bold bg-white/10 px-2 rounded">{roomId}</div>
+
+        <div className="flex flex-col items-end shrink-0">
+          <div className="text-[10px] font-black text-[#FFD700] uppercase tracking-wider opacity-80 leading-none mb-0.5">Sala</div>
+          <div className="text-xs md:text-base font-bold bg-white/10 px-2 py-0.5 rounded leading-none">{roomId}</div>
         </div>
       </div>
 
@@ -701,11 +707,29 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         {/* Selecting Word Overlay */}
         {phase === 'selecting_word' && (
           <div className="absolute inset-0 z-50 bg-[#1a0533]/90 flex flex-col items-center justify-center p-4">
+            {/* Animated Countdown for everyone */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+              <AnimatePresence mode="wait">
+                 {time <= 3 && time > 0 && (
+                   <motion.div
+                     key={`countdown-${time}`}
+                     initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
+                     animate={{ scale: 1.5, opacity: 1, rotate: 0 }}
+                     exit={{ scale: 3, opacity: 0, rotate: 10 }}
+                     transition={{ duration: 0.5, type: 'spring' }}
+                     className="text-[120px] md:text-[200px] font-black text-[#FFD700] drop-shadow-[0_0_30px_rgba(255,215,0,0.5)] italic"
+                   >
+                     {time}
+                   </motion.div>
+                 )}
+              </AnimatePresence>
+            </div>
+
             {isDrawer ? (
                 <motion.div 
                   initial={{ scale: 0.9, opacity: 0 }} 
                   animate={{ scale: 1, opacity: 1 }} 
-                  className="bg-[#2D1B69] p-6 rounded-3xl border-4 border-[#FFD700] w-[90vw] max-w-[450px] h-[320px] md:h-[400px] flex flex-col justify-center items-center text-center shadow-[0_0_50px_rgba(255,215,0,0.3)] relative overflow-hidden"
+                  className="bg-[#2D1B69] p-6 rounded-3xl border-4 border-[#FFD700] w-[90vw] max-w-[450px] h-[320px] md:h-[400px] flex flex-col justify-center items-center text-center shadow-[0_0_50px_rgba(255,215,0,0.3)] relative overflow-hidden z-20"
                 >
                   <div className="mb-6">
                     <h2 className="text-2xl md:text-3xl font-black text-[#FFD700] uppercase tracking-tighter">Sua palavra é...</h2>
@@ -718,14 +742,13 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
                   </div>
                 </motion.div>
             ) : (
-
-              <div className="text-center">
-                <div className="text-4xl font-black text-[#FFD700] mb-6">⏱ {time}s</div>
-                <RefreshCw className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-6" />
-                <h2 className="text-2xl font-black text-white">Sorteando a palavra...</h2>
-                <p className="opacity-70 mt-2">O desenhista está se preparando!</p>
+              <div className="text-center z-20">
+                <RefreshCw className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-6 opacity-30" />
+                <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-widest">Sorteando Palavra</h2>
+                <p className="opacity-70 mt-2 font-bold text-white/50">O desenhista está se preparando...</p>
               </div>
             )}
+
           </div>
         )}
 
