@@ -689,19 +689,25 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
           </div>
         </div>
 
-        <div className="flex-1 flex justify-center min-w-0">
+        <div className="flex-1 flex justify-center min-w-0 px-1">
           {phase === 'drawing' && (
-            <div className="bg-white/5 border border-white/10 px-3 md:px-5 py-0.5 md:py-1.5 rounded-full text-base md:text-2xl tracking-[0.2em] md:tracking-[0.3em] font-mono font-bold text-white shadow-inner truncate max-w-full">
+            <div className={`bg-white/5 border border-white/10 px-2 md:px-5 py-0.5 md:py-1 rounded-full font-mono font-bold text-white shadow-inner flex items-center justify-center whitespace-nowrap overflow-visible ${
+              (isDrawer ? (currentWord?.word.length || 0) : hints.length) > 20 ? 'text-[10px] md:text-sm tracking-widest' :
+              (isDrawer ? (currentWord?.word.length || 0) : hints.length) > 15 ? 'text-xs md:text-base tracking-[0.15em]' :
+              (isDrawer ? (currentWord?.word.length || 0) : hints.length) > 10 ? 'text-sm md:text-xl tracking-[0.2em]' :
+              'text-base md:text-2xl tracking-[0.3em]'
+            }`}>
               {isDrawer ? currentWord?.word : hints.join(' ')}
             </div>
           )}
         </div>
 
-        <div className="flex flex-col items-end shrink-0">
-          <div className="text-[10px] font-black text-[#FFD700] uppercase tracking-wider opacity-80 leading-none mb-0.5">Sala</div>
-          <div className="text-xs md:text-base font-bold bg-white/10 px-2 py-0.5 rounded leading-none">{roomId}</div>
+        <div className="flex flex-col items-end shrink-0 ml-1">
+          <div className="text-[8px] md:text-[10px] font-black text-[#FFD700] uppercase tracking-wider opacity-80 leading-none mb-0.5">Sala</div>
+          <div className="text-[10px] md:text-base font-bold bg-white/10 px-1.5 md:px-2 py-0.5 rounded leading-none">{roomId}</div>
         </div>
       </div>
+
 
       <div className="flex flex-1 overflow-hidden flex-col md:flex-row relative z-0">
 
