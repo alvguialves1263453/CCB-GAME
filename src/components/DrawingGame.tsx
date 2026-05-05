@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Eraser, Trash2, Check, RefreshCw, Lightbulb, ArrowRight, Undo2, Redo2, PaintBucket } from 'lucide-react';
+import { Pencil, Eraser, Trash2, Check, RefreshCw, Lightbulb, ArrowRight, Undo2, Redo2, PaintBucket, Timer } from 'lucide-react';
+
 
 import { motion, AnimatePresence } from 'motion/react';
 import { soundService } from '../lib/soundService';
