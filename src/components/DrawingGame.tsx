@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Eraser, Trash2, Check, RefreshCw, Lightbulb, ArrowRight, Undo2, Redo2 } from 'lucide-react';
+import { Pencil, Eraser, Trash2, Check, RefreshCw, Lightbulb, ArrowRight, Undo2, Redo2, PaintBucket } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'motion/react';
 import { soundService } from '../lib/soundService';
 import { DrawingCanvasView, type DrawingLine, type DrawingCanvasRef } from './DrawingComponents';
@@ -10,24 +11,39 @@ const MAX_HINTS = 3;
 
 function SlotMachineWord({ finalWord }: { finalWord: string }) {
   const [displayWord, setDisplayWord] = useState('...');
+
+  // Scale font size based on word length
+  const len = finalWord.length;
+  const fontSizeClass = len > 15 ? 'text-xl md:text-2xl' :
+    len > 12 ? 'text-2xl md:text-3xl' :
+      len > 8 ? 'text-3xl md:text-4xl' :
+        'text-4xl md:text-5xl';
+
   useEffect(() => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const interval = setInterval(() => {
-       let str = '';
-       for(let i=0; i<finalWord.length; i++) {
-         if (finalWord[i] === ' ' || finalWord[i] === '-') str += finalWord[i];
-         else str += chars[Math.floor(Math.random() * chars.length)];
-       }
-       setDisplayWord(str);
+      let str = '';
+      for (let i = 0; i < finalWord.length; i++) {
+        if (finalWord[i] === ' ' || finalWord[i] === '-') str += finalWord[i];
+        else str += chars[Math.floor(Math.random() * chars.length)];
+      }
+      setDisplayWord(str);
     }, 60);
     const stopTimer = setTimeout(() => {
-       clearInterval(interval);
-       setDisplayWord(finalWord.toUpperCase());
+      clearInterval(interval);
+      setDisplayWord(finalWord.toUpperCase());
     }, 2000);
     return () => { clearInterval(interval); clearTimeout(stopTimer); };
   }, [finalWord]);
-  return <div className="text-4xl md:text-5xl font-black text-white bg-white/10 px-4 md:px-8 py-4 md:py-6 rounded-xl border-2 border-[#FFD700]/50 tracking-widest uppercase truncate shadow-[inset_0_0_20px_rgba(255,215,0,0.1)]">{displayWord}</div>;
+  return (
+    <div className="w-full h-24 md:h-32 bg-white/10 rounded-xl border-2 border-[#FFD700]/50 tracking-widest uppercase shadow-[inset_0_0_20px_rgba(255,215,0,0.1)] flex items-center justify-center p-4">
+      <span className={`${fontSizeClass} font-black text-white text-center break-all`}>
+        {displayWord}
+      </span>
+    </div>
+  );
 }
+
 
 // Levenshtein distance for "almost correct" detection
 function levenshtein(a: string, b: string): number {
@@ -69,8 +85,9 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
   const [guess, setGuess] = useState('');
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
-  const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
-  
+  const [tool, setTool] = useState<'pen' | 'eraser' | 'bucket'>('pen');
+
+
   const [localPlayers, setLocalPlayers] = useState(players);
   const [hasGuessedCorrectly, setHasGuessedCorrectly] = useState(false);
   const [hints, setHints] = useState<string[]>([]);
@@ -85,7 +102,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
   const [externalLines, setExternalLines] = useState<DrawingLine[]>([]);
   // The in-progress line being drawn by the remote drawer (real-time stream)
   const [activeExternalLine, setActiveExternalLine] = useState<DrawingLine | null>(null);
-  
+
   const chatRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
   const canvasRef = useRef<DrawingCanvasRef>(null);
@@ -236,7 +253,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         // Update player's hasGuessed in localPlayers for all clients
         setLocalPlayers(prev => prev.map(p =>
           p.id === payload.playerId ? { ...p, hasGuessed: true, score: (p.score || 0) + (payload.points || 0) } :
-          p.id === payload.drawerId ? { ...p, score: (p.score || 0) + (payload.drawerPoints || 0) } : p
+            p.id === payload.drawerId ? { ...p, score: (p.score || 0) + (payload.drawerPoints || 0) } : p
         ));
         if (payload.playerId === localPlayerId) {
           setHasGuessedCorrectly(true);
@@ -254,13 +271,13 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         if (isHost && currentWordRef.current) {
           const normalizedGuess = payload.text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
           const normalizedWord = currentWordRef.current.word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-          
+
           if (normalizedGuess === normalizedWord) {
             // Correct!
             const guessedCount = localPlayersRef.current.filter(p => p.hasGuessed).length;
             const pts = Math.max(10, 100 - (guessedCount * 10));
             const drawerPts = Math.floor(pts / 2);
-            
+
             setLocalPlayers(prev => {
               const updated = prev.map(p => {
                 if (p.id === payload.playerId) return { ...p, score: (p.score || 0) + pts, hasGuessed: true };
@@ -345,38 +362,45 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         setTime(t => {
           if (t <= 1) {
             clearInterval(timer);
-            if (wordChoices.length > 0) {
-              selectWord(wordChoices[0]);
-            }
+            // Call selectWord outside of the setTime callback to avoid state conflicts
+            setTimeout(() => {
+              if (wordChoices.length > 0) {
+                selectWord(wordChoices[0]);
+              }
+            }, 0);
             return 0;
           }
           broadcastState({ time: t - 1 });
           return t - 1;
         });
       }, 1000);
+
     } else if (phase === 'drawing') {
       timer = setInterval(() => {
         setTime(t => {
-          if (t <= 1) {
-            endRound();
+          const nextT = t - 1;
+          if (nextT <= 0) {
+            clearInterval(timer);
+            setTimeout(endRound, 0);
             return 0;
           }
-          if (currentWord && t === 45 && currentWord.word.length > 2) {
+          if (currentWord && nextT === 45 && currentWord.word.length > 2) {
             const h = [...hints];
             h[0] = currentWord.word[0];
             setHints(h);
             broadcastState({ hints: h });
           }
-          if (currentWord && t === 20 && currentWord.word.length > 4) {
+          if (currentWord && nextT === 20 && currentWord.word.length > 4) {
             const h = [...hints];
             h[currentWord.word.length - 1] = currentWord.word[currentWord.word.length - 1];
             setHints(h);
             broadcastState({ hints: h });
           }
-          broadcastState({ time: t - 1 });
-          return t - 1;
+          broadcastState({ time: nextT });
+          return nextT;
         });
       }, 1000);
+
     } else if (phase === 'round_end') {
       timer = setTimeout(() => {
         startNextRound();
@@ -392,7 +416,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
 
     // Check if anyone reached the score goal
     const winner = localPlayers.find(p => (p.score || 0) >= scoreGoal);
-    
+
     if (winner) {
       setPhase('game_over');
       broadcastState({ phase: 'game_over', players: localPlayers });
@@ -415,7 +439,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     hasGuessedCorrectlyRef.current = false;
     setAlmostMsg('');
     setGuess('');
-    
+
     const filteredWords = category && category !== 'Todos' ? words.filter(w => w.category.toLowerCase() === category.toLowerCase()) : words;
     const availableWords = filteredWords.length > 0 ? filteredWords : words;
     const shuffled = [...availableWords].sort(() => 0.5 - Math.random());
@@ -455,7 +479,7 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
     setTime(80);
     setHints(Array(wordObj.word.length).fill('_'));
     setHasGuessedCorrectly(false);
-    
+
     broadcastState({
       phase: 'drawing',
       drawerId: drawerId,
@@ -589,10 +613,10 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
         const guessedCount = localPlayersRef.current.filter(p => p.hasGuessed).length;
         const pts = Math.max(10, 100 - (guessedCount * 10));
         const drawerPts = Math.floor(pts / 2);
-        
+
         setShowCorrectPopup({ points: pts });
         setTimeout(() => setShowCorrectPopup(null), 2500);
-        
+
         setLocalPlayers(prev => {
           const updated = prev.map(p => {
             if (p.id === localPlayerId) return { ...p, score: (p.score || 0) + pts, hasGuessed: true };
@@ -652,8 +676,8 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       <div className="bg-[#1a0533]/80 backdrop-blur-md p-2 md:p-3 flex justify-between items-center shadow-lg border-b border-white/10 z-10 shrink-0">
         <div className="flex items-center gap-2 md:gap-4">
           <div className="bg-[#1a0533] px-3 md:px-4 py-1.5 rounded-full border-2 border-[#FFD700] shadow-[0_0_10px_rgba(255,215,0,0.2)] flex items-center gap-1.5">
-             <span className="text-sm md:text-xl">⏱</span>
-             <span className="text-[#FFD700] font-black text-base md:text-lg">{time}s</span>
+            <span className="text-sm md:text-xl">⏱</span>
+            <span className="text-[#FFD700] font-black text-base md:text-lg">{time}s</span>
           </div>
           {scoreGoal > 0 && (
             <div className="hidden md:flex bg-white/10 px-3 py-1 rounded-full text-xs font-bold text-white/70">
@@ -661,9 +685,9 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
             </div>
           )}
           {phase === 'drawing' && (
-             <div className="bg-white/5 border border-white/10 px-3 md:px-5 py-1 md:py-1.5 rounded-full text-lg md:text-2xl tracking-[0.3em] font-mono font-bold text-white shadow-inner">
-               {isDrawer ? currentWord?.word : hints.join(' ')}
-             </div>
+            <div className="bg-white/5 border border-white/10 px-3 md:px-5 py-1 md:py-1.5 rounded-full text-lg md:text-2xl tracking-[0.3em] font-mono font-bold text-white shadow-inner">
+              {isDrawer ? currentWord?.word : hints.join(' ')}
+            </div>
           )}
         </div>
         <div className="flex flex-col items-end">
@@ -673,60 +697,73 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       </div>
 
       <div className="flex flex-1 overflow-hidden flex-col md:flex-row relative z-0">
-        
-         {/* Selecting Word Overlay */}
+
+        {/* Selecting Word Overlay */}
         {phase === 'selecting_word' && (
-           <div className="absolute inset-0 z-50 bg-[#1a0533]/90 flex flex-col items-center justify-center p-4">
-              {isDrawer ? (
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#2D1B69] p-6 rounded-2xl border-2 border-[#FFD700] max-w-md w-full text-center shadow-[0_0_30px_rgba(255,215,0,0.2)]">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl md:text-2xl font-black text-[#FFD700] flex-1">Sua palavra é...</h2>
+          <div className="absolute inset-0 z-50 bg-[#1a0533]/90 flex flex-col items-center justify-center p-4">
+            {isDrawer ? (
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }} 
+                  animate={{ scale: 1, opacity: 1 }} 
+                  className="bg-[#2D1B69] p-6 rounded-3xl border-4 border-[#FFD700] w-[90vw] max-w-[450px] h-[320px] md:h-[400px] flex flex-col justify-center items-center text-center shadow-[0_0_50px_rgba(255,215,0,0.3)] relative overflow-hidden"
+                >
+                  <div className="mb-6">
+                    <h2 className="text-2xl md:text-3xl font-black text-[#FFD700] uppercase tracking-tighter">Sua palavra é...</h2>
                   </div>
-                  <div className="flex flex-col gap-3 py-4 md:py-8 justify-center min-h-[140px]">
+                  <div className="w-full px-2">
                     {wordChoices[0] && <SlotMachineWord finalWord={wordChoices[0].word} />}
                   </div>
-                  <p className="mt-4 opacity-60 text-sm font-semibold uppercase">Prepare-se para desenhar!</p>
+                  <div className="mt-8 flex flex-col items-center gap-1">
+                    <p className="opacity-60 text-xs md:text-sm font-black uppercase tracking-[0.2em]">Prepare-se para desenhar!</p>
+                  </div>
                 </motion.div>
-              ) : (
-                <div className="text-center">
-                  <div className="text-4xl font-black text-[#FFD700] mb-6">⏱ {time}s</div>
-                  <RefreshCw className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-6" />
-                  <h2 className="text-2xl font-black text-white">Sorteando a palavra...</h2>
-                  <p className="opacity-70 mt-2">O desenhista está se preparando!</p>
-                </div>
-              )}
-           </div>
+            ) : (
+
+              <div className="text-center">
+                <div className="text-4xl font-black text-[#FFD700] mb-6">⏱ {time}s</div>
+                <RefreshCw className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-6" />
+                <h2 className="text-2xl font-black text-white">Sorteando a palavra...</h2>
+                <p className="opacity-70 mt-2">O desenhista está se preparando!</p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Round End Overlay */}
         {phase === 'round_end' && (
-           <div className="absolute inset-0 z-50 bg-[#1a0533]/90 flex flex-col items-center justify-center">
-              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
-                <h2 className="text-4xl font-black text-[#FFD700] mb-2">A palavra era:</h2>
-                <div className="text-6xl font-black text-white mb-8 bg-[#2D1B69] py-4 px-8 rounded-2xl border border-white/20">
-                  {currentWord?.word}
+            <div className="absolute inset-0 z-50 bg-[#1a0533]/90 flex flex-col items-center justify-center p-4">
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center w-full max-w-2xl">
+                <h2 className="text-3xl md:text-4xl font-black text-[#FFD700] mb-6 uppercase tracking-widest">A palavra era:</h2>
+                <div className="bg-[#2D1B69] py-8 px-8 rounded-3xl border-4 border-[#FFD700]/30 shadow-2xl inline-block min-w-[300px] max-w-[full] overflow-hidden">
+                  <span className={`${(currentWord?.word.length || 0) > 15 ? 'text-3xl md:text-4xl' : (currentWord?.word.length || 0) > 10 ? 'text-4xl md:text-5xl' : 'text-6xl md:text-7xl'} font-black text-white uppercase tracking-tighter block break-words`}>
+                    {currentWord?.word}
+                  </span>
                 </div>
-                <p className="text-xl">Próxima rodada em breve...</p>
+                <div className="mt-10 flex items-center justify-center gap-3">
+                  <div className="w-8 h-1 bg-[#FFD700]/30 rounded-full"></div>
+                  <p className="text-xl font-bold text-white/70 uppercase tracking-widest">Próxima rodada em breve</p>
+                  <div className="w-8 h-1 bg-[#FFD700]/30 rounded-full"></div>
+                </div>
               </motion.div>
-           </div>
+            </div>
         )}
 
         {/* Game Over Overlay */}
         {phase === 'game_over' && (
-           <div className="absolute inset-0 z-50 bg-[#1a0533]/95 flex flex-col items-center justify-center p-4">
-              <h2 className="text-5xl font-black text-[#FFD700] mb-8">🏆 Fim de Jogo!</h2>
-              <div className="bg-[#2D1B69] p-6 rounded-2xl w-full max-w-md">
-                 {[...localPlayers].sort((a,b) => (b.score || 0) - (a.score || 0)).map((p, i) => (
-                    <div key={p.id} className="flex justify-between items-center py-3 border-b border-white/10 last:border-0">
-                       <span className="font-bold flex items-center gap-2">
-                         {i === 0 && '👑'} {i === 1 && '🥈'} {i === 2 && '🥉'}
-                         {p.nickname}
-                       </span>
-                       <span className="font-black text-[#FFD700]">{p.score || 0} pts</span>
-                    </div>
-                 ))}
-              </div>
-           </div>
+          <div className="absolute inset-0 z-50 bg-[#1a0533]/95 flex flex-col items-center justify-center p-4">
+            <h2 className="text-5xl font-black text-[#FFD700] mb-8">🏆 Fim de Jogo!</h2>
+            <div className="bg-[#2D1B69] p-6 rounded-2xl w-full max-w-md">
+              {[...localPlayers].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, i) => (
+                <div key={p.id} className="flex justify-between items-center py-3 border-b border-white/10 last:border-0">
+                  <span className="font-bold flex items-center gap-2">
+                    {i === 0 && '👑'} {i === 1 && '🥈'} {i === 2 && '🥉'}
+                    {p.nickname}
+                  </span>
+                  <span className="font-black text-[#FFD700]">{p.score || 0} pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* ✅ Correct Guess Popup (center overlay, LOCAL only) */}
@@ -769,88 +806,92 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
           {/* ═══════════ Drawing Toolbar ═══════════ */}
           {isDrawer && phase === 'drawing' && (
             <div className="bg-[#2D1B69]/95 backdrop-blur-sm px-2 py-2 flex flex-wrap gap-2 md:gap-3 w-full justify-center items-center border-t border-white/10 shadow-xl shrink-0">
-               {/* Tool toggle */}
-               <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1 shrink-0">
-                 <button onClick={() => setTool('pen')} className={`p-1.5 rounded-md transition-all ${tool === 'pen' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
-                   <Pencil size={18} strokeWidth={2.5} />
-                 </button>
-                 <button onClick={() => setTool('eraser')} className={`p-1.5 rounded-md transition-all ${tool === 'eraser' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
-                   <Eraser size={18} strokeWidth={2.5} />
-                 </button>
-               </div>
-               
-               {/* Color palette */}
-               <div className="flex flex-wrap gap-1 bg-[#1a0533] p-1 rounded-lg px-2 max-w-[180px] md:max-w-[210px] shrink-0 justify-center">
-                 {colors.map(c => (
-                   <button
-                     key={c}
-                     onClick={() => { setColor(c); setTool('pen'); }}
-                     className={`w-4 h-4 md:w-5 md:h-5 rounded-full border-2 transition-all ${color === c && tool === 'pen' ? 'border-[#FFD700] scale-125 shadow-[0_0_8px_rgba(255,215,0,0.8)] z-10' : 'border-white/20 hover:scale-110'}`}
-                     style={{ backgroundColor: c }}
-                   />
-                 ))}
-               </div>
+              {/* Tool toggle */}
+              <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1 shrink-0">
+                <button onClick={() => setTool('pen')} className={`p-1.5 rounded-md transition-all ${tool === 'pen' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
+                  <Pencil size={18} strokeWidth={2.5} />
+                </button>
+                <button onClick={() => setTool('eraser')} className={`p-1.5 rounded-md transition-all ${tool === 'eraser' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`}>
+                  <Eraser size={18} strokeWidth={2.5} />
+                </button>
+                <button onClick={() => setTool('bucket')} className={`p-1.5 rounded-md transition-all ${tool === 'bucket' ? 'bg-[#FFD700] text-[#1a0533] shadow-md scale-105' : 'text-white hover:bg-white/10'}`} title="Balde de Tinta">
+                  <PaintBucket size={18} strokeWidth={2.5} />
+                </button>
+              </div>
 
-               {/* Brush size */}
-               <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1.5 items-center px-2 shrink-0">
-                  <span className="hidden sm:block text-[9px] font-black uppercase opacity-40 mr-1">Tam</span>
-                  {[2, 5, 10, 20].map(s => (
-                    <button key={s} onClick={() => setBrushSize(s)} className={`w-6 h-6 flex items-center justify-center rounded-full transition-all ${brushSize === s ? 'bg-[#FFD700]/20 ring-2 ring-[#FFD700]' : 'hover:bg-white/10'}`}>
-                      <div className="bg-white rounded-full shadow-sm" style={{ width: Math.max(3, s/1.5), height: Math.max(3, s/1.5) }} />
-                    </button>
-                  ))}
-               </div>
 
-                {/* Undo/Redo buttons */}
-                <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1 shrink-0">
-                  <button 
-                    onClick={handleUndo} 
-                    disabled={!canUndoState}
-                    className={`p-1.5 rounded-md transition-all ${canUndoState ? 'text-white hover:bg-white/10 active:scale-95' : 'text-white/20 cursor-not-allowed'}`}
-                    title="Desfazer"
-                  >
-                    <Undo2 size={18} />
+              {/* Color palette */}
+              <div className="flex flex-wrap gap-1 bg-[#1a0533] p-1 rounded-lg px-2 max-w-[180px] md:max-w-[210px] shrink-0 justify-center">
+                {colors.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => { setColor(c); if(tool === 'eraser') setTool('pen'); }}
+                    className={`w-4 h-4 md:w-5 md:h-5 rounded-full border-2 transition-all ${color === c && (tool === 'pen' || tool === 'bucket') ? 'border-[#FFD700] scale-125 shadow-[0_0_8px_rgba(255,215,0,0.8)] z-10' : 'border-white/20 hover:scale-110'}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+
+              </div>
+
+              {/* Brush size */}
+              <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1.5 items-center px-2 shrink-0">
+                <span className="hidden sm:block text-[9px] font-black uppercase opacity-40 mr-1">Tam</span>
+                {[2, 5, 10, 20].map(s => (
+                  <button key={s} onClick={() => setBrushSize(s)} className={`w-6 h-6 flex items-center justify-center rounded-full transition-all ${brushSize === s ? 'bg-[#FFD700]/20 ring-2 ring-[#FFD700]' : 'hover:bg-white/10'}`}>
+                    <div className="bg-white rounded-full shadow-sm" style={{ width: Math.max(3, s / 1.5), height: Math.max(3, s / 1.5) }} />
                   </button>
-                  <button 
-                    onClick={handleRedo} 
-                    disabled={!canRedoState}
-                    className={`p-1.5 rounded-md transition-all ${canRedoState ? 'text-white hover:bg-white/10 active:scale-95' : 'text-white/20 cursor-not-allowed'}`}
-                    title="Refazer"
-                  >
-                    <Redo2 size={18} />
-                  </button>
-                </div>
+                ))}
+              </div>
 
-               <div className="flex gap-2 ml-auto sm:ml-0 shrink-0">
-                 {/* Hint button (drawer gives hints) */}
-                 <button
-                   type="button"
-                   onClick={useHint}
-                   disabled={hintsUsed >= MAX_HINTS}
-                   className={`px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1.5 transition-all ${
-                     hintsUsed >= MAX_HINTS
-                       ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                       : 'bg-yellow-500 text-[#1a0533] hover:bg-yellow-400 active:scale-95 shadow-lg'
-                   }`}
-                   title={`Dar dica (${MAX_HINTS - hintsUsed} restantes)`}
-                 >
-                   <Lightbulb size={16} strokeWidth={3} />
-                   <span className="hidden sm:inline">Dica</span>
-                   <span className="sm:hidden">{MAX_HINTS - hintsUsed}</span>
-                 </button>
+              {/* Undo/Redo buttons */}
+              <div className="flex bg-[#1a0533] p-1 rounded-lg gap-1 shrink-0">
+                <button
+                  onClick={handleUndo}
+                  disabled={!canUndoState}
+                  className={`p-1.5 rounded-md transition-all ${canUndoState ? 'text-white hover:bg-white/10 active:scale-95' : 'text-white/20 cursor-not-allowed'}`}
+                  title="Desfazer"
+                >
+                  <Undo2 size={18} />
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={!canRedoState}
+                  className={`p-1.5 rounded-md transition-all ${canRedoState ? 'text-white hover:bg-white/10 active:scale-95' : 'text-white/20 cursor-not-allowed'}`}
+                  title="Refazer"
+                >
+                  <Redo2 size={18} />
+                </button>
+              </div>
 
-                 {/* Clear button */}
-                 <button onClick={handleClearCanvas} className="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white p-1.5 rounded-lg transition-all">
-                   <Trash2 size={20} />
-                 </button>
-               </div>
+              <div className="flex gap-2 ml-auto sm:ml-0 shrink-0">
+                {/* Hint button (drawer gives hints) */}
+                <button
+                  type="button"
+                  onClick={useHint}
+                  disabled={hintsUsed >= MAX_HINTS}
+                  className={`px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1.5 transition-all ${hintsUsed >= MAX_HINTS
+                      ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                      : 'bg-yellow-500 text-[#1a0533] hover:bg-yellow-400 active:scale-95 shadow-lg'
+                    }`}
+                  title={`Dar dica (${MAX_HINTS - hintsUsed} restantes)`}
+                >
+                  <Lightbulb size={16} strokeWidth={3} />
+                  <span className="hidden sm:inline">Dica</span>
+                  <span className="sm:hidden">{MAX_HINTS - hintsUsed}</span>
+                </button>
+
+                {/* Clear button */}
+                <button onClick={handleClearCanvas} className="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white p-1.5 rounded-lg transition-all">
+                  <Trash2 size={20} />
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* ═══════════ Sidebar (Players & Chat) ═══════════ */}
         <div className="w-full md:w-80 bg-[#1a0533]/90 md:bg-[#1a0533] flex flex-col md:border-l border-white/10 shrink-0 max-h-[28vh] md:max-h-none md:flex-none shadow-2xl relative z-10">
-          
+
           {/* Players (Desktop: List, Mobile: Horizontal Row) */}
           <div className="p-2 md:p-4 border-b border-white/10 shrink-0 md:max-h-[35%] md:overflow-y-auto flex md:flex-col overflow-x-auto no-scrollbar gap-2 md:gap-3 bg-[#2D1B69]/30 md:bg-transparent">
             <h3 className="hidden md:block text-xs font-black text-[#FFD700] uppercase tracking-[0.2em] opacity-80">Jogadores</h3>
