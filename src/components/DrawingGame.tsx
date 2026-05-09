@@ -195,7 +195,14 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
           }
           if (payload.drawerId) setDrawerId(payload.drawerId);
           if (payload.time !== undefined) setTime(payload.time);
-          if (payload.wordLength && !payload.currentWord) {
+          if (payload.actualWord) {
+            const currentDrawer = payload.drawerId || drawerIdRef.current;
+            if (currentDrawer === localPlayerId) {
+              setCurrentWord(payload.actualWord);
+            } else if (!payload.currentWord) {
+              setCurrentWord({ word: '_'.repeat(payload.wordLength || payload.actualWord.word.length), category: payload.actualWord.category });
+            }
+          } else if (payload.wordLength && !payload.currentWord) {
             const currentDrawer = payload.drawerId || drawerIdRef.current;
             if (currentDrawer !== localPlayerId) {
               setCurrentWord({ word: '_'.repeat(payload.wordLength), category: payload.category });
@@ -490,7 +497,8 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
       time: 80,
       wordLength: wordObj.word.length,
       category: wordObj.category,
-      hints: Array(wordObj.word.length).fill('_')
+      hints: Array(wordObj.word.length).fill('_'),
+      actualWord: wordObj
     });
   };
 
@@ -749,11 +757,15 @@ export function DrawingGame({ roomId, localPlayerId, players, isHost, category, 
                   </div>
                 </motion.div>
             ) : (
-              <div className="text-center z-20">
+              <motion.div 
+                initial={{ opacity: 1 }}
+                animate={{ opacity: time <= 3 && time > 0 ? 0 : 1 }}
+                className="text-center z-20 flex flex-col items-center justify-center pointer-events-none"
+              >
                 <RefreshCw className="w-12 h-12 text-[#FFD700] animate-spin mx-auto mb-6 opacity-30" />
-                <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-widest">Sorteando Palavra</h2>
-                <p className="opacity-70 mt-2 font-bold text-white/50">O desenhista está se preparando...</p>
-              </div>
+                <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-widest text-center">Sorteando Palavra</h2>
+                <p className="opacity-70 mt-2 font-bold text-white/50 text-center">O desenhista está se preparando...</p>
+              </motion.div>
             )}
 
           </div>
