@@ -233,14 +233,13 @@ export const DrawingCanvasView = forwardRef<DrawingCanvasRef, DrawingCanvasViewP
       const h = rect.height;
       if (!w || !h) return;
 
-      const sx = w / VIRTUAL_WIDTH;
-      const sy = h / VIRTUAL_HEIGHT;
+      const scale = Math.min(w / VIRTUAL_WIDTH, h / VIRTUAL_HEIGHT);
 
-      setStageSize({ width: w, height: h });
-      setScaleX(sx);
-      setScaleY(sy);
-      scaleXRef.current = sx;
-      scaleYRef.current = sy;
+      setStageSize({ width: VIRTUAL_WIDTH * scale, height: VIRTUAL_HEIGHT * scale });
+      setScaleX(scale);
+      setScaleY(scale);
+      scaleXRef.current = scale;
+      scaleYRef.current = scale;
     };
 
     updateSize();
@@ -357,7 +356,7 @@ export const DrawingCanvasView = forwardRef<DrawingCanvasRef, DrawingCanvasViewP
   return (
     <div
       ref={containerRef}
-      className="w-full h-full"
+      className="w-full h-full flex items-center justify-center bg-black/20 overflow-hidden"
       style={{ touchAction: 'none' }}
     >
       <Stage
