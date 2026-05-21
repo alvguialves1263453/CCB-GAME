@@ -59,6 +59,8 @@ import { drawingService } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
 import { DrawingGame } from "./components/DrawingGame";
+import { WordBomb } from "./components/WordBomb";
+import { WordBombLobby } from "./components/WordBombLobby";
 import { Edit2 } from "lucide-react";
 
 interface Player {
@@ -249,6 +251,7 @@ const MusicalNotesBackground = ({ reducedMotion }: { reducedMotion?: boolean }) 
 
 type Difficulty = 'facil' | 'medio' | 'dificil' | 'aleatorio';
 type HinoDifficulty = 'sem_tempo' | 'medio' | 'rapido';
+type ViewState = 'home' | 'game' | 'lobby' | 'ranking' | 'setup' | 'hymn_list' | 'multiplayer_menu' | 'multiplayer_join' | 'multiplayer_setup' | 'mode_selection' | 'drawing_setup' | 'drawing_lobby' | 'drawing_game' | 'drawing_voting' | 'drawing_ranking' | 'biblia_setup' | 'biblia_lobby' | 'biblia_game' | 'biblia_ranking' | 'word_bomb_setup' | 'word_bomb_lobby' | 'word_bomb_game' | 'word_bomb_ranking';
 
 const TIME_LIMITS = {
   // Hino Mode
@@ -411,6 +414,14 @@ export default function App() {
   const [hymnSearchQuery, setHymnSearchQuery] = useState("");
   const [showDifficultyAnnouncement, setShowDifficultyAnnouncement] = useState(false);
   
+  // Word Bomb game states
+  const [wordBombGameMode, setWordBombGameMode] = useState(false);
+  const [wordBombRoomId, setWordBombRoomId] = useState<string | null>(null);
+  const [wordBombLocalPlayerId, setWordBombLocalPlayerId] = useState<string | null>(null);
+  const [wordBombPlayers, setWordBombPlayers] = useState<any[]>([]);
+  const [wordBombLives, setWordBombLives] = useState(3);
+  const [wordBombIsHost, setWordBombIsHost] = useState(false);
+  
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
   const lastHandledRoundRef = useRef<number>(-1);
@@ -438,6 +449,10 @@ export default function App() {
   const bibliaGameModeRef = useRef(bibliaGameMode);
   const bibliaLocalPlayerIdRef = useRef(bibliaLocalPlayerId);
   const bibliaIsHostRef = useRef(bibliaIsHost);
+  const wordBombRoomIdRef = useRef(wordBombRoomId);
+  const wordBombGameModeRef = useRef(wordBombGameMode);
+  const wordBombLocalPlayerIdRef = useRef(wordBombLocalPlayerId);
+  const wordBombIsHostRef = useRef(wordBombIsHost);
   const roomIdRef = useRef(roomId);
   const isSoloRef = useRef(isSolo);
   const localPlayerIdRef = useRef(localPlayerId);
@@ -451,6 +466,10 @@ export default function App() {
     bibliaGameModeRef.current = bibliaGameMode;
     bibliaLocalPlayerIdRef.current = bibliaLocalPlayerId;
     bibliaIsHostRef.current = bibliaIsHost;
+    wordBombRoomIdRef.current = wordBombRoomId;
+    wordBombGameModeRef.current = wordBombGameMode;
+    wordBombLocalPlayerIdRef.current = wordBombLocalPlayerId;
+    wordBombIsHostRef.current = wordBombIsHost;
     roomIdRef.current = roomId;
     isSoloRef.current = isSolo;
     localPlayerIdRef.current = localPlayerId;
@@ -464,7 +483,7 @@ export default function App() {
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
-  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode, drawingRoomId, drawingGameMode, drawingLocalPlayerId, isDrawingHost, bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost, roomId, isSolo, localPlayerId]);
+  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode, drawingRoomId, drawingGameMode, drawingLocalPlayerId, isDrawingHost, bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost, wordBombRoomId, wordBombGameMode, wordBombLocalPlayerId, wordBombIsHost, roomId, isSolo, localPlayerId]);
 
   const [showPodium, setShowPodium] = useState(false);
   const [podiumStep, setPodiumStep] = useState(0); // 0: initial, 1: 3rd, 2: 2nd, 3: 1st
@@ -2697,6 +2716,40 @@ export default function App() {
                   </div>
                 </motion.button>
 
+                {/* Word Bomb */}
+                <motion.button
+                  whileHover={isSolo ? {} : { scale: 1.02 }}
+                  whileTap={isSolo ? {} : { scale: 0.98 }}
+                  disabled={isSolo}
+                  onClick={() => {
+                    soundService.playClick();
+                    setWordBombRoomId(null);
+                    setWordBombGameMode(true);
+                    setView("word_bomb_setup");
+                  }}
+                  className={cn(
+                    "w-full border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group transition-all",
+                    isSolo ? "bg-gray-400 grayscale opacity-70 cursor-not-allowed" : "bg-[#FF6B35] cursor-pointer"
+                  )}
+                >
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform text-4xl">
+                    💣
+                  </div>
+                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10 text-2xl">
+                    💣
+                  </div>
+                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Word Bomb</h3>
+                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Adivinhe palavras em português antes da bomba explodir!</p>
+                  </div>
+                  <div className={cn(
+                    "px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] transition-colors mt-1 md:mt-0 z-10",
+                    isSolo ? "bg-gray-200 text-gray-400 border-gray-400" : "bg-white text-[#FF6B35] hover:bg-[#FFD700] hover:text-[#1a0533]"
+                  )}>
+                    {isSolo ? "COMPATÍVEL APENAS MULTIPLAYER" : "JOGAR AGORA"}
+                  </div>
+                </motion.button>
+
                 {/* Locked Modes */}
                 {[
                   { title: "Complete a Letra", desc: "Preencha a palavra que falta na estrofe do hino.", icon: <Check className="w-8 h-8 md:w-10 md:h-10 text-[#FF4757]" /> },
@@ -4266,6 +4319,149 @@ export default function App() {
               </button>
             </motion.div>
           </div>
+        )}
+
+        {/* Word Bomb Setup */}
+        {(view === "word_bomb_setup") && (
+          <motion.div
+            key="word_bomb_setup"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-20 flex items-center justify-center p-4 bg-gradient-to-br from-[#6d28d9] via-[#db2777] to-[#f97316]"
+          >
+            {/* Back button */}
+            <button
+              onClick={() => {
+                soundService.playClick();
+                setWordBombGameMode(false);
+                setView("mode_selection");
+              }}
+              className="absolute top-6 left-6 w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform"
+            >
+              <ArrowLeft className="w-6 h-6 text-[#1a0533]" />
+            </button>
+
+            <div className="flex flex-col items-center gap-6 max-w-md w-full">
+              <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} className="text-6xl">
+                💣
+              </motion.div>
+              <h1 className="text-4xl font-black text-white drop-shadow-[3px_3px_0px_#1a0533]">WORD BOMB</h1>
+              <p className="text-white font-bold text-center">Criar nova sala ou entrar em uma existente?</p>
+
+              <div className="flex flex-col gap-4 w-full">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={async () => {
+                    const nickname = prompt("Seu apelido:");
+                    if (nickname) {
+                      const result = await multiplayerService.createRoom(nickname, "1.png", "facil", 5, "word_bomb");
+                      if (result) {
+                        setWordBombRoomId(result.room.id);
+                        setWordBombLocalPlayerId(result.player.id);
+                        setWordBombIsHost(true);
+                        setWordBombPlayers([result.player as any]);
+                        setView("word_bomb_lobby");
+                      }
+                    }
+                  }}
+                  className="bg-[#4ECB71] hover:bg-[#2EAA4E] text-white font-black py-4 px-6 rounded-xl border-4 border-[#1a0533] transition-all"
+                >
+                  CRIAR SALA
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    const roomCode = prompt("Código da sala:");
+                    if (roomCode) {
+                      const nickname = prompt("Seu apelido:");
+                      if (nickname) {
+                        multiplayerService.joinRoom(roomCode, nickname, "1.png").then(player => {
+                          if (player) {
+                            setWordBombRoomId(roomCode);
+                            setWordBombLocalPlayerId(player.id);
+                            setWordBombIsHost(false);
+                            setView("word_bomb_lobby");
+                          }
+                        });
+                      }
+                    }
+                  }}
+                  className="bg-[#9B59F5] hover:bg-[#8B48E5] text-white font-black py-4 px-6 rounded-xl border-4 border-[#1a0533] transition-all"
+                >
+                  ENTRAR EM SALA
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Word Bomb Lobby */}
+        {view === "word_bomb_lobby" && wordBombRoomId && (
+          <motion.div
+            key="word_bomb_lobby"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-20"
+          >
+            <WordBombLobby
+              roomId={wordBombRoomId}
+              players={wordBombPlayers.map(p => ({ id: p.id, nickname: p.nickname, avatar: p.avatar || "1.png", isHost: p.is_host }))}
+              localPlayerId={wordBombLocalPlayerId || ""}
+              lives={wordBombLives}
+              setLives={setWordBombLives}
+              onStartGame={() => {
+                if (wordBombIsHost && wordBombRoomId) {
+                  setView("word_bomb_game");
+                }
+              }}
+              onLeaveRoom={async () => {
+                if (wordBombRoomId) {
+                  await multiplayerService.leaveRoom(wordBombRoomId);
+                }
+                setWordBombGameMode(false);
+                setWordBombRoomId(null);
+                setWordBombLocalPlayerId(null);
+                setWordBombPlayers([]);
+                setView("mode_selection");
+              }}
+            />
+          </motion.div>
+        )}
+
+        {/* Word Bomb Game */}
+        {view === "word_bomb_game" && wordBombRoomId && (
+          <motion.div
+            key="word_bomb_game"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-20"
+          >
+            <WordBomb
+              players={wordBombPlayers.map(p => ({ id: p.id, nickname: p.nickname, avatar: p.avatar, lives: wordBombLives, isAlive: true, isCurrentTurn: false }))}
+              roomId={wordBombRoomId}
+              playerId={wordBombLocalPlayerId || ""}
+              lives={wordBombLives}
+              onGameEnd={(winner) => {
+                soundService.playClick();
+              }}
+              onQuit={async () => {
+                if (wordBombRoomId) {
+                  await multiplayerService.leaveRoom(wordBombRoomId);
+                }
+                setWordBombGameMode(false);
+                setWordBombRoomId(null);
+                setWordBombLocalPlayerId(null);
+                setWordBombPlayers([]);
+                setView("mode_selection");
+              }}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
