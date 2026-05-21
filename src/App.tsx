@@ -55,6 +55,7 @@ import { supabase } from "./lib/supabase";
 import { fetchHymns, generateQuestions, type Hymn, type Question } from "./services/hymnService";
 import { multiplayerService, type Room, type Player as DBPlayer } from "./services/multiplayerService";
 import { bibliaService, type BibliaRoom, type BibliaPlayer } from "./services/bibliaService";
+import { wordBombService, type WBRoom, type WBPlayer, initWords, isValidWord, wordContainsFragment, getLastLetter, normalizeLetter, generateFragments } from "./services/wordBombService";
 import { drawingService } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
 import { ProfileCreator, Avatar } from "./components/ProfileCreator";
@@ -269,7 +270,9 @@ export default function App() {
   useEffect(() => { viewRef.current = view; }, [view]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [nearbyRooms, setNearbyRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; difficulty?: string; roundCount: number; gameType: string }[]>([]);
+  const [nearbyWbRooms, setNearbyWbRooms] = useState<{ id: string; hostName: string; hostAvatar?: string; lives: number; turnDuration: number }[]>([]);
   const [isRefreshingRooms, setIsRefreshingRooms] = useState(false);
+  const [wbJoinConfirmRoom, setWbJoinConfirmRoom] = useState<string | null>(null);
 
   const refreshNearbyRooms = () => {
     soundService.playClick();
@@ -410,7 +413,37 @@ export default function App() {
   const bibliaStartTimeRef = useRef<number>(0);
   const [hymnSearchQuery, setHymnSearchQuery] = useState("");
   const [showDifficultyAnnouncement, setShowDifficultyAnnouncement] = useState(false);
-  
+
+  // Word Bomb states
+  const [wbGameMode, setWbGameMode] = useState(false);
+  const [wbRoomId, setWbRoomId] = useState<string | null>(null);
+  const [wbLocalPlayerId, setWbLocalPlayerId] = useState<string | null>(null);
+  const [wbPlayers, setWbPlayers] = useState<WBPlayer[]>([]);
+  const [wbRoom, setWbRoom] = useState<WBRoom | null>(null);
+  const [wbLives, setWbLives] = useState(2);
+  const [wbTurnDuration, setWbTurnDuration] = useState(15);
+  const [wbInputWord, setWbInputWord] = useState("");
+  const [wbMessage, setWbMessage] = useState("");
+  const [wbMessageType, setWbMessageType] = useState<"success" | "error" | "info" | "">("");
+  const [wbTimeLeft, setWbTimeLeft] = useState<number | null>(null);
+  const [wbCountdown, setWbCountdown] = useState<number | null>(null);
+  const [wbEliminatedPlayer, setWbEliminatedPlayer] = useState<string | null>(null);
+  const [wbFinalRanking, setWbFinalRanking] = useState<WBPlayer[]>([]);
+  const [wbIsHost, setWbIsHost] = useState(false);
+  const [wbRealTimeTyping, setWbRealTimeTyping] = useState("");
+  const [wbTypingPlayerId, setWbTypingPlayerId] = useState<string | null>(null);
+  const [wbFillPercent, setWbFillPercent] = useState(0);
+  const [wbBurningPlayerId, setWbBurningPlayerId] = useState<string | null>(null);
+  const [wbNotifications, setWbNotifications] = useState<{ message: string; type: 'leave' | 'host_left'; id: number }[]>([]);
+  const [wbHostLeftMessage, setWbHostLeftMessage] = useState<string | null>(null);
+  const [wbLoading, setWbLoading] = useState(false);
+  const [wbLoadingMessage, setWbLoadingMessage] = useState("");
+  const wbStartTimeRef = useRef<number>(0);
+  const wbRoomIdRef = useRef<string | null>(null);
+  const wbLocalPlayerIdRef = useRef<string | null>(null);
+  const wbIsHostRef = useRef(false);
+  const wbPlayersRef = useRef<WBPlayer[]>([]);
+
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
   const lastHandledRoundRef = useRef<number>(-1);
@@ -451,6 +484,10 @@ export default function App() {
     bibliaGameModeRef.current = bibliaGameMode;
     bibliaLocalPlayerIdRef.current = bibliaLocalPlayerId;
     bibliaIsHostRef.current = bibliaIsHost;
+    wbRoomIdRef.current = wbRoomId;
+    wbLocalPlayerIdRef.current = wbLocalPlayerId;
+    wbIsHostRef.current = wbIsHost;
+    wbPlayersRef.current = wbPlayers;
     roomIdRef.current = roomId;
     isSoloRef.current = isSolo;
     localPlayerIdRef.current = localPlayerId;
@@ -464,7 +501,7 @@ export default function App() {
     feedbackRef.current = feedback;
     selectedOptionRef.current = selectedOption;
     playersRef.current = players;
-  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode, drawingRoomId, drawingGameMode, drawingLocalPlayerId, isDrawingHost, bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost, roomId, isSolo, localPlayerId]);
+  }, [isGameActive, showResult, currentRound, difficulty, hinoDifficulty, questions, feedback, selectedOption, players, bibliaGameMode, drawingRoomId, drawingGameMode, drawingLocalPlayerId, isDrawingHost, bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost, wbRoomId, wbLocalPlayerId, wbIsHost, wbPlayers, roomId, isSolo, localPlayerId]);
 
   const [showPodium, setShowPodium] = useState(false);
   const [podiumStep, setPodiumStep] = useState(0); // 0: initial, 1: 3rd, 2: 2nd, 3: 1st
@@ -528,7 +565,9 @@ export default function App() {
     const saved = localStorage.getItem("ccb_quiz_profile");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.avatarUrl === "1.png") parsed.avatarUrl = "irmaos/1.png";
+        return parsed;
       } catch (e) {
         console.error("Error loading profile", e);
       }
@@ -536,7 +575,7 @@ export default function App() {
     // Default guest profile
     return {
       nickname: "Maestro",
-      avatarUrl: "1.png"
+      avatarUrl: "irmaos/1.png"
     };
   });
 
@@ -578,12 +617,19 @@ export default function App() {
         bibliaService.leaveRoom(bibliaRoomId, bibliaLocalPlayerId, bibliaIsHost);
       }
 
+      // 4. Word Bomb cleanup
+      if (wbRoomId && wbLocalPlayerId) {
+        wordBombService.leaveRoom(wbRoomId, wbLocalPlayerId, wbIsHost);
+      }
+
       setRoomId(null);
       setLocalPlayerId(null);
       setDrawingRoomId(null);
       setDrawingLocalPlayerId(null);
       setBibliaRoomId(null);
       setBibliaLocalPlayerId(null);
+      setWbRoomId(null);
+      setWbLocalPlayerId(null);
       setIsSolo(true);
       setPlayers([]);
       setFrozenPlayers([]);
@@ -630,6 +676,15 @@ export default function App() {
           me?.isHost || false
         );
       }
+      
+      // 4. Word Bomb cleanup
+      if (wbRoomIdRef.current) {
+        wordBombService.leaveRoom(
+          wbRoomIdRef.current,
+          wbLocalPlayerIdRef.current || undefined,
+          wbIsHostRef.current
+        );
+      }
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -662,6 +717,13 @@ export default function App() {
       setDrawingRoomId(drawingParam.toUpperCase());
       setDrawingGameMode(true);
       setView("drawing_setup");
+    }
+    
+    const wbParam = params.get("wb");
+    if (wbParam) {
+      setWbGameMode(true);
+      setIsSolo(false);
+      setWbJoinConfirmRoom(wbParam.toUpperCase());
     }
   }, []);
 
@@ -1023,6 +1085,152 @@ export default function App() {
     return () => unsubscribe();
   }, [bibliaRoomId, bibliaGameMode]);
 
+  // Word Bomb auto-join via deep link
+  useEffect(() => {
+    if (wbRoomId && !wbLocalPlayerId && wbGameMode) {
+      const doJoin = async () => {
+        const player = await wordBombService.joinRoom(wbRoomId, profile?.nickname || "Maestro", profile?.avatarUrl);
+        if (player) {
+          setWbLocalPlayerId(player.id);
+          setWbIsHost(false);
+          setView("wordbomb_lobby");
+        }
+      };
+      doJoin();
+    }
+  }, [wbRoomId, wbGameMode]);
+
+  // Word Bomb room subscription
+  const wbPrevPlayerIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!wbRoomId || !wbGameMode) return;
+
+    // Clear any stale host_left notification when re-subscribing
+    setWbHostLeftMessage(null);
+    setWbNotifications([]);
+
+    const unsubscribe = wordBombService.subscribeToRoom(
+      wbRoomId,
+      (dbPlayers) => {
+        setWbPlayers(prev => {
+          // Detect if a player left
+          if (prev.length > 0 && dbPlayers.length < prev.length) {
+            const prevIds = new Set(prev.map(p => p.id));
+            const leftPlayer = prev.find(p => !dbPlayers.some(dp => dp.id === p.id));
+            if (leftPlayer && leftPlayer.id !== wbLocalPlayerIdRef.current) {
+              const msg = leftPlayer.isHost
+                ? `${leftPlayer.nickname} (HOST) saiu da partida`
+                : `${leftPlayer.nickname} saiu da partida`;
+              setWbNotifications(n => [...n.slice(-4), { message: msg, type: leftPlayer.isHost ? 'host_left' as const : 'leave' as const, id: Date.now() }]);
+              if (leftPlayer.isHost) {
+                setWbHostLeftMessage(`O HOST ${leftPlayer.nickname} saiu. A sala será fechada.`);
+              }
+            }
+          }
+          return dbPlayers;
+        });
+      },
+      (room) => {
+        if (!room) return;
+        setWbRoom(room);
+        setWbLives(room.lives);
+
+        if (room.phase === 'lobby') {
+          if (viewRef.current !== 'wordbomb_lobby') setView('wordbomb_lobby');
+        } else if (room.phase === 'playing') {
+          if (viewRef.current !== 'wordbomb_game') setView('wordbomb_game');
+          wbStartTimeRef.current = Date.now();
+          setWbMessage("");
+          setWbMessageType("");
+          setWbInputWord("");
+          setWbRealTimeTyping("");
+          setWbFillPercent(0);
+          setWbBurningPlayerId(null);
+        } else if (room.phase === 'finished') {
+          const sorted = [...wbPlayers].sort((a, b) => b.score - a.score);
+          setWbFinalRanking(sorted);
+          setView('wordbomb_ranking');
+        }
+      },
+      (playerId, text) => {
+        setWbTypingPlayerId(text ? playerId : null);
+        setWbRealTimeTyping(text);
+      },
+      (message, type) => {
+        setWbNotifications(n => [...n.slice(-4), { message, type, id: Date.now() }]);
+        if (type === 'host_left') {
+          setWbHostLeftMessage(message);
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [wbRoomId, wbGameMode]);
+
+  // Word Bomb host left redirect
+  useEffect(() => {
+    if (wbHostLeftMessage) {
+      const timer = setTimeout(() => {
+        setWbGameMode(false);
+        setWbRoomId(null);
+        setWbLocalPlayerId(null);
+        setWbHostLeftMessage(null);
+        setView("home");
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [wbHostLeftMessage]);
+
+  // Auto-clear notifications after 4s
+  useEffect(() => {
+    if (wbNotifications.length > 0) {
+      const timer = setTimeout(() => {
+        setWbNotifications([]);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [wbNotifications]);
+
+  // Word Bomb timer effect
+  useEffect(() => {
+    if (view !== 'wordbomb_game' || !wbRoom || wbRoom.phase !== 'playing') return;
+
+    const interval = setInterval(() => {
+      if (wbRoom.turnStartedAt) {
+        const elapsed = (Date.now() - wbRoom.turnStartedAt) / 1000;
+        const remaining = Math.max(0, wbRoom.turnDuration - elapsed);
+        setWbTimeLeft(remaining);
+        const fill = Math.min(100, Math.round((elapsed / wbRoom.turnDuration) * 100));
+        setWbFillPercent(fill);
+      }
+    }, 30);
+
+    return () => clearInterval(interval);
+  }, [view, wbRoom?.phase, wbRoom?.turnStartedAt, wbRoom?.turnDuration]);
+
+  // Word Bomb timeout detection
+  const lastTimeoutTurnRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (view !== 'wordbomb_game' || !wbRoom || wbRoom.phase !== 'playing') return;
+    if (wbTimeLeft !== null && wbTimeLeft <= 0) {
+      const currentAlive = wbPlayers.filter(p => p.isAlive);
+      if (currentAlive.length === 0) return;
+      const currentIdx = wbRoom.currentTurnIndex;
+      if (currentIdx < 0 || currentIdx >= currentAlive.length) return;
+      if (lastTimeoutTurnRef.current === currentIdx) return;
+      const currentPlayer = currentAlive[currentIdx];
+      if (currentPlayer) {
+        setWbBurningPlayerId(currentPlayer.id);
+        setTimeout(() => {
+          setWbBurningPlayerId(null);
+        }, 1500);
+        wordBombService.handleTimeout(wbRoom.id, currentPlayer.id, currentIdx).then(handled => {
+          if (handled) lastTimeoutTurnRef.current = currentIdx;
+        });
+      }
+    }
+  }, [wbTimeLeft, wbRoom?.phase, wbRoom?.currentTurnIndex]);
+
   // biblia game countdown timer
   useEffect(() => {
     if (view !== 'biblia_game') return;
@@ -1154,6 +1362,19 @@ export default function App() {
       };
     }
   }, [view]);
+
+  // Word Bomb rooms discovery on wordbomb setup screen
+  // Disabled: Salas amigas should not appear in wordbomb creation
+  // useEffect(() => {
+  //   if (view === "wordbomb_setup") {
+  //     wordBombService.startDiscoveryListener((rooms) => {
+  //       setNearbyWbRooms(rooms);
+  //     });
+  //     return () => {
+  //       wordBombService.stopDiscoveryListener();
+  //     };
+  //   }
+  // }, [view]);
 
   // biblia rooms discovery - also on mode_selection
   useEffect(() => {
@@ -2096,7 +2317,7 @@ export default function App() {
                     </div>
 
                     <div className="relative mb-2 md:mb-4 group flex flex-col items-center">
-                      <Avatar url={profile?.avatarUrl || "1.png"} size={window.innerWidth < 768 ? 70 : 180} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
+                      <Avatar url={profile?.avatarUrl || "irmaos/1.png"} size={window.innerWidth < 768 ? 70 : 180} className="shadow-[4px_4px_0px_#1a0533] md:shadow-[8px_8px_0px_#1a0533]" />
 
                       <div className="text-center transition-transform mt-2 md:mt-3">
                         <div className="relative">
@@ -2106,7 +2327,7 @@ export default function App() {
                             value={profile?.nickname}
                             onChange={(e) => {
                               const newNick = e.target.value;
-                              setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
+                              setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "irmaos/1.png" });
                               localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
                             }}
                             className="bg-transparent text-base md:text-2xl font-black text-white italic cartoon-text-white drop-shadow-md tracking-tight leading-tight text-center focus:outline-none border-b-2 border-white/20 focus:border-white/50 transition-colors w-full max-w-[120px] md:max-w-[200px]"
@@ -2185,7 +2406,7 @@ export default function App() {
                     </div>
 
                     <div className="flex flex-col items-end opacity-40">
-                      <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V1.2.6</p>
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest leading-none">V2.1.5</p>
                       <p className="text-[9px] md:text-[10px] font-black uppercase text-white cartoon-text tracking-widest">BETA</p>
                     </div>
                   </div>
@@ -2466,7 +2687,7 @@ export default function App() {
               {/* PROFILE SETUP SECTION */}
               <div className="bg-purple-50 rounded-2xl p-4 border-2 border-dashed border-[#9B59F5]/30 flex flex-col items-center gap-3">
                 <div className="relative">
-                  <Avatar url={profile?.avatarUrl || "1.png"} size={80} />
+                  <Avatar url={profile?.avatarUrl || "irmaos/1.png"} size={80} />
                   <button 
                     onClick={() => setIsEditingProfile(true)}
                     className="absolute -bottom-1 -right-1 bg-[#FFD700] p-1.5 rounded-lg border-2 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]"
@@ -2481,7 +2702,7 @@ export default function App() {
                   value={profile?.nickname}
                   onChange={(e) => {
                     const newNick = e.target.value;
-                    setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
+                    setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "irmaos/1.png" });
                     localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
                   }}
                   className="bg-white border-2 border-[#190c33] px-3 py-1.5 rounded-xl font-black text-center text-sm w-full focus:outline-none focus:border-[#9B59F5] shadow-sm"
@@ -2697,6 +2918,43 @@ export default function App() {
                   </div>
                 </motion.button>
 
+                {/* Word Bomb */}
+                <motion.button
+                  whileHover={isSolo ? {} : { scale: 1.02 }}
+                  whileTap={isSolo ? {} : { scale: 0.98 }}
+                  disabled={isSolo}
+                  onClick={() => {
+                    soundService.playClick();
+                    setRoomId(null);
+                    setBibliaGameMode(false);
+                    setDrawingGameMode(false);
+                    setWbGameMode(true);
+                    setWbJoinConfirmRoom(null);
+                    setView("wordbomb_setup");
+                  }}
+                  className={cn(
+                    "w-full border-4 border-[#1a0533] rounded-2xl p-3 md:p-6 flex flex-col md:flex-row items-center gap-3 md:gap-4 text-left game-shadow relative overflow-hidden group transition-all",
+                    isSolo ? "bg-gray-400 grayscale opacity-70 cursor-not-allowed" : "bg-[#FF6B35] cursor-pointer"
+                  )}
+                >
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <Flame className="w-24 h-24 md:w-32 md:h-32" />
+                  </div>
+                  <div className="w-12 h-12 md:w-20 md:h-20 bg-white border-4 border-[#1a0533] rounded-xl flex items-center justify-center shrink-0 shadow-[4px_4px_0px_rgba(26,5,51,0.2)] z-10">
+                    <Flame className={cn("w-6 h-6 md:w-10 md:h-10", isSolo ? "text-gray-400" : "text-[#FF6B35]")} />
+                  </div>
+                  <div className="flex-1 z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h3 className="text-xl md:text-3xl font-black italic uppercase text-white drop-shadow-[2px_2px_0px_#1a0533]">Word Bomb</h3>
+                    <p className="font-bold text-white/90 mt-1 text-xs md:text-base leading-tight">Digite palavras antes da bomba explodir! &Uacute;ltimo sobrevivente vence!</p>
+                  </div>
+                  <div className={cn(
+                    "px-3 py-1.5 md:px-6 md:py-3 rounded-xl border-4 border-[#1a0533] font-black uppercase text-xs md:text-sm shrink-0 whitespace-nowrap shadow-[3px_3px_0px_#1a0533] transition-colors mt-1 md:mt-0 z-10",
+                    isSolo ? "bg-gray-200 text-gray-400 border-gray-400" : "bg-white text-[#FF6B35] hover:bg-[#FFD700] hover:text-[#1a0533]"
+                  )}>
+                    {isSolo ? "COMPATÍVEL APENAS MULTIPLAYER" : "JOGAR AGORA"}
+                  </div>
+                </motion.button>
+
                 {/* Locked Modes */}
                 {[
                   { title: "Complete a Letra", desc: "Preencha a palavra que falta na estrofe do hino.", icon: <Check className="w-8 h-8 md:w-10 md:h-10 text-[#FF4757]" /> },
@@ -2748,7 +3006,7 @@ export default function App() {
               {/* Profile & Config */}
               <div className="cartoon-panel bg-white p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-3">
-                  <Avatar url={profile?.avatarUrl || "1.png"} size={70} />
+                  <Avatar url={profile?.avatarUrl || "irmaos/1.png"} size={70} />
                   <input 
                     type="text" 
                     maxLength={15}
@@ -2756,7 +3014,7 @@ export default function App() {
                     value={profile?.nickname}
                     onChange={(e) => {
                       const newNick = e.target.value;
-                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
+                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "irmaos/1.png" });
                       localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
                     }}
                     className="bg-white border-2 border-[#190c33] px-3 py-1.5 rounded-xl font-black text-center text-sm flex-1 focus:outline-none focus:border-[#9B59F5] shadow-sm"
@@ -3114,6 +3372,630 @@ export default function App() {
             </motion.div>
           )}
 
+          {/* Word Bomb Setup + Lobby */}
+          {(view === "wordbomb_setup") && (
+            <motion.div
+              key="wordbomb_setup"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+            >
+              <div className="flex items-center justify-between px-2 shrink-0">
+                <button onClick={() => { setWbGameMode(false); setWbRoomId(null); setView("mode_selection"); }} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
+                  <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                </button>
+                <h2 className="text-2xl md:text-3xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Word Bomb</h2>
+                <div className="w-10 h-10" />
+              </div>
+
+              {/* Profile & Config */}
+              <div className="cartoon-panel bg-white p-4 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar url={profile?.avatarUrl || "irmaos/1.png"} size={70} />
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="Seu Nome"
+                    value={profile?.nickname}
+                    onChange={(e) => {
+                      const newNick = e.target.value;
+                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "irmaos/1.png" });
+                      localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
+                    }}
+                    className="bg-white border-2 border-[#190c33] px-3 py-1.5 rounded-xl font-black text-center text-sm flex-1 focus:outline-none focus:border-[#FF6B35] shadow-sm"
+                  />
+                  <button onClick={() => setIsEditingProfile(true)} className="bg-[#FFD700] p-2 rounded-lg border-2 border-[#1a0533] shadow-[2px_2px_0px_#1a0533]">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {!wbRoomId ? (
+                  <>
+                    <div className="space-y-3">
+                      <div className="bg-gray-50 border-2 border-[#1a0533] rounded-xl p-3 space-y-2">
+                        <h4 className="font-black uppercase text-xs tracking-widest text-[#1a0533]">Criar Sala</h4>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm text-[#1a0533]">Vidas:</span>
+                          <div className="flex gap-2">
+                            {[1, 2, 3].map((n) => (
+                              <button
+                                key={n}
+                                onClick={() => setWbLives(n)}
+                                className={cn(
+                                  "w-10 h-10 rounded-xl border-3 font-black text-sm transition-all",
+                                  wbLives === n
+                                    ? "bg-[#FF6B35] text-white border-[#1a0533] shadow-[2px_2px_0px_#1a0533]"
+                                    : "bg-white text-[#1a0533] border-[#1a0533] hover:bg-gray-100"
+                                )}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={async () => {
+                          soundService.playClick();
+                          setWbLoading(true);
+                          setWbLoadingMessage("Criando sala...");
+                          const result = await wordBombService.createRoom(profile?.nickname || "Maestro", profile?.avatarUrl, wbLives);
+                          setWbLoading(false);
+                          if (result) {
+                            setWbRoomId(result.room.id);
+                            setWbLocalPlayerId(result.player.id);
+                            setWbIsHost(true);
+                            setView("wordbomb_lobby");
+                          }
+                        }}
+                        className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest"
+                      >
+                        CRIAR SALA
+                      </motion.button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Room code display */}
+              {wbRoomId && (
+                <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Código da Sala</p>
+                      <p className="text-3xl font-black tracking-[0.3em] text-[#1a0533]">{wbRoomId}</p>
+                      <p className="text-[10px] font-bold text-gray-400 mt-1">Compartilhe este código com seus amigos!</p>
+                    </div>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(window.location.origin + '?wb=' + wbRoomId); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                      className="bg-[#FFD700] border-4 border-[#1a0533] rounded-xl p-3 shadow-[4px_4px_0px_#1a0533] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all hover:scale-105"
+                    >
+                      {copied ? <Check className="w-6 h-6" /> : <Share2 className="w-6 h-6" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Word Bomb Lobby */}
+          {view === "wordbomb_lobby" && wbRoomId && (
+            <motion.div
+              key="wordbomb_lobby"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+            >
+              <div className="flex items-center justify-between px-2">
+                <button onClick={async () => {
+                  await wordBombService.leaveRoom(wbRoomId, wbLocalPlayerId || undefined, wbIsHost);
+                  setWbGameMode(false);
+                  setWbRoomId(null);
+                  setWbLocalPlayerId(null);
+                  setView("mode_selection");
+                }} className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform">
+                  <ArrowLeft className="w-5 h-5 text-[#1a0533]" />
+                </button>
+                <h2 className="text-2xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Sala {wbRoomId}</h2>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(window.location.origin + '?wb=' + wbRoomId); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  className="w-10 h-10 bg-white border-4 border-[#1a0533] rounded-lg flex items-center justify-center game-shadow cursor-pointer hover:scale-105 transition-transform"
+                >
+                  {copied ? <Check className="w-4 h-4 text-[#1a0533]" /> : <Share2 className="w-4 h-4 text-[#1a0533]" />}
+                </button>
+              </div>
+
+              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 py-6 flex flex-col gap-4">
+                <h3 className="font-black uppercase text-sm tracking-wider text-center text-[#1a0533]">
+                  Jogadores ({wbPlayers.length})
+                </h3>
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {wbPlayers.map((p) => (
+                    <div key={p.id} className={cn(
+                      "relative p-2.5 border-4 border-[#1a0533] rounded-xl flex flex-col items-center gap-1.5 transition-all",
+                      "bg-gray-100"
+                    )}>
+                      {p.isHost && (
+                        <div className="absolute -top-2 -right-2 bg-[#FFD700] border-2 border-[#1a0533] rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10">
+                          👑
+                        </div>
+                      )}
+                      <Avatar url={p.avatar || "irmaos/1.png"} size={80} className="rounded-2xl" />
+                      <p className="font-black text-xs truncate w-full text-center text-[#1a0533]">{p.nickname}</p>
+                      <div className="flex gap-0.5 items-center">
+                        {Array.from({ length: p.lives }).map((_, i) => (
+                          <Flame key={i} className="w-3 h-3 text-[#FF6B35] fill-[#FF6B35]" />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-3 flex flex-col gap-2">
+                <h4 className="font-black uppercase text-[10px] tracking-widest text-center text-[#1a0533]">Configurações</h4>
+                <div className="flex justify-center gap-4">
+                  <div className="bg-gray-100 border-2 border-[#1a0533] rounded-xl px-3 py-1.5 flex items-center gap-2">
+                    <span className="font-black text-xs text-[#1a0533]">Vidas:</span>
+                    <span className="font-black text-sm text-[#FF6B35]">{wbLives}</span>
+                  </div>
+                </div>
+              </div>
+
+              {wbIsHost && (
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={async () => {
+                    soundService.playClick();
+                    if (wbPlayers.length < 2) {
+                      setWbMessage("É necessário pelo menos 2 jogadores!");
+                      setWbMessageType("error");
+                      setTimeout(() => { setWbMessage(""); setWbMessageType(""); }, 3000);
+                      return;
+                    }
+                    setWbLoading(true);
+                    setWbLoadingMessage("Iniciando partida...");
+                    await wordBombService.startGame(wbRoomId!);
+                    setWbLoading(false);
+                  }}
+                  className="btn-cartoon btn-orange w-full py-3 text-lg tracking-widest"
+                  style={{ background: "#FF6B35" }}
+                >
+                  COMEÇAR!
+                </motion.button>
+              )}
+
+              {wbMessage && (
+                <div className={cn(
+                  "text-center font-black text-sm p-2 rounded-xl border-2",
+                  wbMessageType === "error" ? "bg-red-100 text-red-800 border-red-300" : "bg-green-100 text-green-800 border-green-300"
+                )}>
+                  {wbMessage}
+                </div>
+              )}
+
+              {/* Notifications */}
+              <AnimatePresence>
+                {wbNotifications.map((n) => (
+                  <motion.div
+                    key={n.id}
+                    initial={{ opacity: 0, y: 20, x: -20 }}
+                    animate={{ opacity: 1, y: 0, x: 0 }}
+                    exit={{ opacity: 0, x: 100 }}
+                    className={cn(
+                      "font-black text-sm p-3 rounded-xl border-3 border-[#1a0533] shadow-[3px_3px_0px_#1a0533]",
+                      n.type === 'host_left' ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"
+                    )}
+                  >
+                    {n.message}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {wbHostLeftMessage && (
+                <div className="bg-red-200 border-4 border-red-700 rounded-2xl p-4 text-center">
+                  <p className="font-black text-red-800 text-sm">{wbHostLeftMessage}</p>
+                  <p className="font-bold text-red-600 text-xs mt-1">Voltando ao menu...</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Word Bomb Game */}
+          {view === "wordbomb_game" && wbRoom && (
+            <motion.div
+              key="wordbomb_game"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+            >
+              {/* Fire Timer - empty container filling up */}
+              <div className="relative bg-[#1a0533] border-4 border-[#FF6B35] rounded-2xl p-1 text-center overflow-hidden" style={{ minHeight: 200 }}>
+                <div
+                  className="absolute bottom-0 left-0 right-0 transition-all duration-300 ease-linear"
+                  style={{
+                    height: `${Math.min(100, wbFillPercent)}%`,
+                    background: 'linear-gradient(to top, #FF4500, #FF6B35, #FFD700)',
+                    boxShadow: '0 0 40px rgba(255,107,53,0.6)',
+                    borderRadius: '0 0 12px 12px',
+                  }}
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                  <motion.div
+                    animate={{ scale: wbTimeLeft !== null && wbTimeLeft <= 3 ? [1, 1.2, 1] : 1 }}
+                    transition={{ repeat: wbTimeLeft !== null && wbTimeLeft <= 3 ? Infinity : 0, duration: 0.5 }}
+                  >
+                    <svg viewBox="0 0 100 120" className={cn("w-16 h-20 md:w-20 md:h-24", wbTimeLeft !== null && wbTimeLeft <= 3 ? "drop-shadow-[0_0_20px_rgba(255,107,53,0.8)]" : "")}>
+                      <defs>
+                        <linearGradient id="flameGrad" x1="0" y1="1" x2="0" y2="0">
+                          <stop offset={`${Math.max(0, 100 - wbFillPercent)}%`} stopColor="#FFD700" />
+                          <stop offset={`${Math.max(0, 100 - wbFillPercent * 0.6)}%`} stopColor="#FF6B35" />
+                          <stop offset={`${Math.max(0, 100 - wbFillPercent * 0.3)}%`} stopColor="#FF4500" />
+                        </linearGradient>
+                      </defs>
+                      <path d="M50 5 Q65 30 70 50 Q75 70 65 85 Q60 95 50 100 Q40 95 35 85 Q25 70 30 50 Q35 30 50 5Z" fill="url(#flameGrad)" stroke="#FF6B35" strokeWidth="2" />
+                      <path d="M50 15 Q58 30 60 45 Q62 60 55 75 Q52 82 50 85 Q48 82 45 75 Q38 60 40 45 Q42 30 50 15Z" fill="#FFF8DC" opacity={Math.min(0.7, wbFillPercent / 100)} />
+                    </svg>
+                  </motion.div>
+                  <div className="text-3xl md:text-4xl font-black italic tracking-widest tabular-nums text-white drop-shadow-[2px_2px_0px_#000] font-mono">
+                    <span className={wbTimeLeft !== null && wbTimeLeft <= 3 ? "text-red-400" : "text-white"}>
+                      {wbTimeLeft !== null ? wbTimeLeft.toFixed(2) : (wbRoom.turnDuration ?? 15).toFixed(2)}
+                    </span>
+                    <span className="text-lg text-white/60 ml-1">s</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Fragment with examples */}
+              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 text-center relative overflow-hidden">
+                <motion.div
+                  key={wbRoom.currentFragment || "?"}
+                  initial={{ scale: 0, rotate: -10 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  className="text-5xl md:text-6xl font-black italic text-[#FF6B35] uppercase tracking-[0.15em] drop-shadow-[3px_3px_0px_#1a0533]"
+                >
+                  {wbRoom.currentFragment || "?"}
+                </motion.div>
+                <p className="text-[10px] font-bold text-gray-400 mt-2">A palavra deve conter este fragmento</p>
+              </div>
+
+              {/* VEZ DE indicator */}
+              {(() => {
+                const alivePlayers = wbPlayers.filter(p => p.isAlive);
+                const currentPlayer = alivePlayers.length > 0 && wbRoom.currentTurnIndex < alivePlayers.length
+                  ? alivePlayers[wbRoom.currentTurnIndex] : null;
+                if (!currentPlayer) return null;
+                return (
+                  <motion.div
+                    key={currentPlayer.id + (wbRoom.currentTurnIndex ?? 0)}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-[#FF6B35] border-3 border-[#1a0533] rounded-2xl py-3 px-4 text-center shadow-[4px_4px_0px_#1a0533]"
+                  >
+                    <span className="text-white font-black text-lg md:text-xl tracking-wider">
+                      VEZ DE: <span className="underline decoration-2 decoration-[#FFD700]">{currentPlayer.nickname.toUpperCase()}</span>
+                    </span>
+                  </motion.div>
+                );
+              })()}
+
+              {/* Real-time typing display */}
+              <div className="bg-[#1a0533] border-2 border-[#FF6B35]/50 rounded-xl p-3 text-center min-h-[40px] flex items-center justify-center">
+                {wbRealTimeTyping && wbTypingPlayerId ? (
+                  (() => {
+                    const typingPlayer = wbPlayers.find(p => p.id === wbTypingPlayerId);
+                    return (
+                      <motion.p
+                        key={wbRealTimeTyping + wbTypingPlayerId}
+                        initial={{ opacity: 0.5 }}
+                        animate={{ opacity: 1 }}
+                        className="text-lg md:text-xl font-black italic tracking-wider text-[#FFD700] uppercase"
+                      >
+                        <span className="text-white/70">{typingPlayer?.nickname.toUpperCase() || "ALGUÉM"}: </span>
+                        {wbRealTimeTyping}
+                      </motion.p>
+                    );
+                  })()
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Aguardando digitação...</p>
+                )}
+              </div>
+
+              {/* Player Cards with Animated Arrow */}
+              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-3">
+                <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+                  {(() => {
+                    const alivePlayers = wbPlayers.filter(p => p.isAlive);
+                    return wbPlayers.map((p, idx) => {
+                      const isCurrent = alivePlayers.length > 0 && alivePlayers.findIndex(x => x.id === p.id) === wbRoom.currentTurnIndex;
+                      const isBurning = wbBurningPlayerId === p.id;
+                      const aliveIdx = alivePlayers.findIndex(x => x.id === p.id);
+                      return (
+                        <div key={p.id} className={cn(
+                          "relative flex flex-col items-center gap-1 p-2 border-3 rounded-xl transition-all min-w-[80px] overflow-hidden",
+                          p.isAlive
+                            ? isCurrent
+                              ? "bg-gradient-to-b from-[#FF6B35]/30 to-transparent border-[#FF6B35] shadow-[0_0_15px_rgba(255,107,53,0.3)]"
+                              : "bg-white border-[#1a0533]"
+                            : "bg-gray-200 border-gray-300 opacity-40"
+                        )}>
+                          {/* Burning overlay */}
+                          {isBurning && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: [0.8, 1, 0.8] }}
+                              transition={{ repeat: 5, duration: 0.3 }}
+                              className="absolute inset-0 z-30 pointer-events-none"
+                              style={{
+                                background: 'radial-gradient(circle, rgba(255,69,0,0.9), rgba(255,107,53,0.6), transparent)',
+                                boxShadow: 'inset 0 0 30px 10px rgba(255,69,0,0.8)',
+                              }}
+                            />
+                          )}
+                          {/* Animated Arrow - bigger */}
+                          {isCurrent && alivePlayers.length > 0 && (
+                            <motion.div
+                              initial={{ y: -20, opacity: 0 }}
+                              animate={{ y: [0, -10, 0], opacity: 1 }}
+                              transition={{ repeat: Infinity, duration: 1.2 }}
+                              className="absolute -top-9 left-1/2 -translate-x-1/2 z-20"
+                            >
+                              <svg width="40" height="40" viewBox="0 0 24 24" fill="#FF6B35" className="drop-shadow-[0_3px_6px_rgba(0,0,0,0.4)]">
+                                <path d="M12 2L22 22H2L12 2Z" />
+                              </svg>
+                            </motion.div>
+                          )}
+                          <Avatar url={p.avatar || "irmaos/1.png"} size={60} className="rounded-xl" />
+                          <p className={cn(
+                            "font-black text-[10px] truncate w-full text-center max-w-[70px]",
+                            p.isAlive ? "text-[#1a0533]" : "text-gray-400 line-through"
+                          )}>
+                            {p.nickname}
+                          </p>
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: Math.max(0, p.lives) }).map((_, i) => (
+                              <svg key={i} viewBox="0 0 20 20" className="w-4 h-4">
+                                <path d="M10 18C10 18 3 13 3 8C3 5 5 3 7 3C8.5 3 9.5 4 10 5C10.5 4 11.5 3 13 3C15 3 17 5 17 8C17 13 10 18 10 18Z" fill={p.isAlive ? "#E32636" : "#ccc"} stroke={p.isAlive ? "#8B0000" : "#999"} strokeWidth="0.5" />
+                              </svg>
+                            ))}
+                          </div>
+                          {!p.isAlive && <span className="text-lg">💀</span>}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Input (only for the local player who is alive and it's their turn) */}
+              {(() => {
+                const me = wbPlayers.find(p => p.id === wbLocalPlayerId);
+                const alivePlayers = wbPlayers.filter(p => p.isAlive);
+                const myAliveIdx = alivePlayers.findIndex(p => p.id === wbLocalPlayerId);
+                const isMyTurn = myAliveIdx === wbRoom.currentTurnIndex;
+                if (!me || !me.isAlive) return (
+                  <div className="bg-gray-100 border-4 border-gray-300 rounded-2xl p-4 text-center">
+                    <p className="font-black text-gray-400 uppercase text-sm">Você foi eliminado!</p>
+                  </div>
+                );
+                if (!isMyTurn) return (
+                  <div className="bg-gray-100 border-4 border-gray-300 rounded-2xl p-4 text-center">
+                    <p className="font-black text-gray-400 text-sm">Aguarde sua vez...</p>
+                  </div>
+                );
+                return (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!wbInputWord.trim()) return;
+                      const result = await wordBombService.submitWord(wbRoom.id, wbInputWord, wbLocalPlayerId!, myAliveIdx);
+                      if (!result.success) {
+                        const messages: Record<string, string> = {
+                          game_not_active: "Jogo não está ativo!",
+                          not_your_turn: "Não é sua vez!",
+                          no_fragment: "Nenhum fragmento definido!",
+                          wrong_fragment: `A palavra deve conter "${wbRoom.currentFragment}"!`,
+                          invalid_word: "Palavra inválida! Use apenas letras (mín. 3).",
+                          word_already_used: "Palavra já usada!",
+                          no_players: "Nenhum jogador ativo!",
+                        };
+                        setWbMessage(messages[result.reason] || "Erro!");
+                        setWbMessageType("error");
+                        setTimeout(() => { setWbMessage(""); setWbMessageType(""); }, 2000);
+                      } else {
+                        setWbInputWord("");
+                        setWbMessage(`"${result.word}" +${result.word.length} pts`);
+                        setWbMessageType("success");
+                        setTimeout(() => { setWbMessage(""); setWbMessageType(""); }, 1500);
+                      }
+                    }}
+                    className="bg-white border-4 border-[#1a0533] rounded-2xl p-3 flex gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={wbInputWord}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-záàâãäéèêëíìîïóòôõöúùûüçñ]/g, '');
+                        setWbInputWord(val);
+                        wordBombService.sendTyping(val);
+                      }}
+                      placeholder="Digite a palavra..."
+                      autoFocus
+                      className="flex-1 bg-gray-50 border-3 border-[#1a0533] rounded-xl px-4 py-3 font-bold text-lg focus:outline-none focus:border-[#FF6B35] uppercase tracking-wider"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-[#FF6B35] border-3 border-[#1a0533] rounded-xl px-5 py-3 font-black text-white uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all hover:bg-[#ff8c5a]"
+                    >
+                      ENVIAR
+                    </button>
+                  </form>
+                );
+              })()}
+
+              {wbMessage && (
+                <div className={cn(
+                  "text-center font-black text-sm p-2 rounded-xl border-2",
+                  wbMessageType === "error" ? "bg-red-100 text-red-800 border-red-300" :
+                  wbMessageType === "success" ? "bg-green-100 text-green-800 border-green-300" :
+                  "bg-blue-100 text-blue-800 border-blue-300"
+                )}>
+                  {wbMessage}
+                </div>
+              )}
+
+              {/* Word History */}
+              {wbRoom.currentWord && (
+                <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Última palavra</p>
+                  <p className="text-lg font-black italic text-[#FF6B35] uppercase">{wbRoom.currentWord}</p>
+                </div>
+              )}
+
+              {/* Notifications */}
+              <AnimatePresence>
+                {wbNotifications.map((n) => (
+                  <motion.div
+                    key={n.id}
+                    initial={{ opacity: 0, y: 20, x: -20 }}
+                    animate={{ opacity: 1, y: 0, x: 0 }}
+                    exit={{ opacity: 0, x: 100 }}
+                    className={cn(
+                      "font-black text-sm p-3 rounded-xl border-3 border-[#1a0533] shadow-[3px_3px_0px_#1a0533]",
+                      n.type === 'host_left' ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"
+                    )}
+                  >
+                    {n.message}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {wbHostLeftMessage && (
+                <div className="bg-red-200 border-4 border-red-700 rounded-2xl p-4 text-center">
+                  <p className="font-black text-red-800 text-sm">{wbHostLeftMessage}</p>
+                  <p className="font-bold text-red-600 text-xs mt-1">Voltando ao menu...</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Word Bomb Ranking */}
+          {view === "wordbomb_ranking" && wbFinalRanking.length > 0 && (
+            <motion.div
+              key="wordbomb_ranking"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              className="w-full max-w-lg flex flex-col gap-4 mx-auto"
+            >
+              <div className="text-center">
+                <Trophy className="w-16 h-16 mx-auto text-[#FFD700] fill-[#FFD700] drop-shadow-[3px_3px_0px_#1a0533]" />
+                <h2 className="text-3xl font-black italic uppercase cartoon-text-white drop-shadow-[3px_3px_0px_#1a0533]">Ranking</h2>
+              </div>
+
+              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 space-y-2">
+                {wbFinalRanking.map((p, idx) => (
+                  <div key={p.id} className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl border-3 border-[#1a0533]",
+                    idx === 0 ? "bg-[#FFD700]/20" : idx === 1 ? "bg-gray-200" : idx === 2 ? "bg-[#CD7F32]/20" : "bg-white"
+                  )}>
+                    <span className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm border-2 border-[#1a0533]",
+                      idx === 0 ? "bg-[#FFD700] text-[#1a0533]" :
+                      idx === 1 ? "bg-gray-300 text-[#1a0533]" :
+                      idx === 2 ? "bg-[#CD7F32] text-white" : "bg-gray-100 text-[#1a0533]"
+                    )}>
+                      {idx + 1}
+                    </span>
+                    <Avatar url={p.avatar || "irmaos/1.png"} size={40} className="rounded-xl" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-sm truncate text-[#1a0533]">{p.nickname}</p>
+                      <div className="flex gap-0.5 mt-0.5">
+                        {Array.from({ length: p.lives }).map((_, i) => (
+                          <Flame key={i} className="w-3 h-3 text-[#FF6B35] fill-[#FF6B35]" />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-lg text-[#FF6B35]">{p.score}</p>
+                      <p className="text-[8px] font-bold text-gray-400">pts</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                {wbIsHost && (
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={async () => {
+                      soundService.playClick();
+                      setWbLoading(true);
+                      setWbLoadingMessage("Preparando nova partida...");
+                      await wordBombService.resetRoom(wbRoomId!);
+                      setWbLoading(false);
+                    }}
+                    className="flex-1 btn-cartoon py-3 text-lg tracking-widest"
+                    style={{ background: "#4ECB71" }}
+                  >
+                    JOGAR NOVAMENTE
+                  </motion.button>
+                )}
+                {!wbIsHost && (
+                  <div className="flex-1 bg-gray-100 border-4 border-gray-300 rounded-2xl p-3 text-center">
+                    <p className="font-black text-sm text-gray-400">Aguardando host reiniciar...</p>
+                  </div>
+                )}
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={async () => {
+                    soundService.playClick();
+                    if (wbIsHost) {
+                      await wordBombService.deleteRoom(wbRoomId!);
+                    }
+                    setWbGameMode(false);
+                    setWbRoomId(null);
+                    setWbLocalPlayerId(null);
+                    setView("home");
+                  }}
+                  className="btn-cartoon py-3 text-lg tracking-widest"
+                  style={{ background: "#9B59F5" }}
+                >
+                  SAIR
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Word Bomb Loading Overlay */}
+          {wbLoading && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white border-4 border-[#1a0533] rounded-2xl p-6 flex flex-col items-center gap-3 min-w-[250px] shadow-[8px_8px_0px_#1a0533]"
+              >
+                <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden border-2 border-[#1a0533]">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-[#FF6B35] to-[#FFD700] rounded-full"
+                    animate={{ x: ['-100%', '100%'] }}
+                    transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                    style={{ width: '40%' }}
+                  />
+                </div>
+                <p className="font-black text-sm text-[#1a0533] tracking-wider">{wbLoadingMessage}</p>
+              </motion.div>
+            </div>
+          )}
+
           {/* biblIA Setup */}
           {(view === "biblia_setup") && (
             <motion.div
@@ -3133,7 +4015,7 @@ export default function App() {
 
               <div className="cartoon-panel bg-white p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-3">
-                  <Avatar url={profile?.avatarUrl || "1.png"} size={70} />
+                  <Avatar url={profile?.avatarUrl || "irmaos/1.png"} size={70} />
                   <input 
                     type="text" 
                     maxLength={15}
@@ -3141,7 +4023,7 @@ export default function App() {
                     value={profile?.nickname}
                     onChange={(e) => {
                       const newNick = e.target.value;
-                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "1.png" });
+                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "irmaos/1.png" });
                       localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
                     }}
                     className="bg-white border-2 border-[#190c33] px-3 py-1.5 rounded-xl font-black text-center text-sm flex-1 focus:outline-none focus:border-[#FF4757] shadow-sm"
@@ -3275,7 +4157,7 @@ export default function App() {
                           p.isReady ? "bg-green-50" : "bg-gray-50"
                         )}
                       >
-                        <Avatar url={p.avatar || "1.png"} size={50} />
+                        <Avatar url={p.avatar || "irmaos/1.png"} size={50} />
                         <div className="flex-1 min-w-0">
                           <div className="font-black text-[#1a0533] truncate">{p.nickname}</div>
                           <div className="flex items-center gap-1 mt-0.5">
@@ -3425,7 +4307,7 @@ export default function App() {
                     idx === 0 ? "bg-[#FFD700]" : idx === 1 ? "bg-gray-300" : idx === 2 ? "bg-amber-600" : "bg-gray-100"
                   )}>
                     <span className="w-8 h-8 flex items-center justify-center bg-[#1a0533] text-white rounded-lg font-black">{idx + 1}</span>
-                    <Avatar url={p.avatar || "1.png"} size={40} />
+                    <Avatar url={p.avatar || "irmaos/1.png"} size={40} />
                     <span className="flex-1 font-black text-[#1a0533]">{p.nickname}</span>
                     <span className="text-xl font-black text-[#1a0533]">{p.score}</span>
                   </div>
@@ -3979,7 +4861,7 @@ export default function App() {
                           #{idx + 1}
                         </div>
                         
-                        <Avatar url={p.avatar || '1.png'} size={idx === 0 || isMe ? 52 : 44} className="shrink-0" />
+                        <Avatar url={p.avatar || 'irmaos/1.png'} size={idx === 0 || isMe ? 52 : 44} className="shrink-0" />
 
                         <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-2">
@@ -4059,7 +4941,7 @@ export default function App() {
                         className="flex flex-col items-center gap-2 md:gap-3 order-3 md:order-1 scale-90 md:scale-100"
                       >
                         <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || '1.png'} size={window.innerWidth < 768 ? 60 : 120} />
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[2]?.avatar || 'irmaos/1.png'} size={window.innerWidth < 768 ? 60 : 120} />
                            <div className="absolute -top-3 -left-3 w-10 h-10 bg-[#CD7F32] rounded-full border-2 md:border-4 border-white flex items-center justify-center text-white font-black text-lg shadow-lg">3º</div>
                         </div>
                         <span className="text-white font-black uppercase italic tracking-wide text-base md:text-xl truncate max-w-[150px]">
@@ -4083,7 +4965,7 @@ export default function App() {
                              animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
                              transition={{ repeat: Infinity, duration: 4 }}
                            >
-                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || '1.png'} size={window.innerWidth < 768 ? 100 : 220} className="ring-4 md:ring-[12px] ring-[#FFD700] ring-offset-2 md:ring-offset-4 ring-offset-black/50" />
+                             <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[0]?.avatar || 'irmaos/1.png'} size={window.innerWidth < 768 ? 100 : 220} className="ring-4 md:ring-[12px] ring-[#FFD700] ring-offset-2 md:ring-offset-4 ring-offset-black/50" />
                            </motion.div>
                            <div className="absolute -top-4 md:-top-10 left-1/2 -translate-x-1/2 w-12 h-12 md:w-24 md:h-24 bg-[#FFD700] rounded-full border-4 md:border-[6px] border-white flex items-center justify-center text-[#1a0533] font-black text-xl md:text-4xl shadow-2xl animate-bounce">1º</div>
                         </div>
@@ -4105,7 +4987,7 @@ export default function App() {
                         className="flex flex-col items-center gap-2 md:gap-3 order-2 md:order-3 scale-90 md:scale-100"
                       >
                         <div className="relative group">
-                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || '1.png'} size={window.innerWidth < 768 ? 80 : 150} className="ring-4 md:ring-8 ring-[#C0C0C0]" />
+                           <Avatar url={frozenPlayers.sort((a,b)=>b.score-a.score)[1]?.avatar || 'irmaos/1.png'} size={window.innerWidth < 768 ? 80 : 150} className="ring-4 md:ring-8 ring-[#C0C0C0]" />
                            <div className="absolute -top-3 -right-3 w-10 h-10 md:w-16 md:h-16 bg-[#C0C0C0] rounded-full border-2 md:border-4 border-white flex items-center justify-center text-white font-black text-lg md:text-2xl shadow-xl">2º</div>
                         </div>
                         <span className="text-white font-black uppercase italic tracking-wide text-base md:text-2xl">
@@ -4127,13 +5009,129 @@ export default function App() {
       {/* Profile Creator Modal */}
       <AnimatePresence>
         {isEditingProfile && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <ProfileCreator
               initialNickname={profile?.nickname}
               initialAvatarUrl={profile?.avatarUrl}
               onSave={saveProfile}
               onCancel={() => setIsEditingProfile(false)}
             />
+          </div>
+        )}
+
+        {/* Word Bomb Join Confirmation */}
+        {wbJoinConfirmRoom && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white border-4 border-[#1a0533] rounded-2xl p-5 flex flex-col items-center gap-3 min-w-[260px] shadow-[8px_8px_0px_#1a0533]"
+            >
+              {wbJoinConfirmRoom === "__code__" ? (
+                <>
+                  <h3 className="font-black uppercase text-sm tracking-wider text-[#1a0533]">Entrar com Código</h3>
+                  <input
+                    type="text"
+                    maxLength={5}
+                    placeholder="CÓDIGO DA SALA"
+                    value={joinRoomCode}
+                    onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                    className="w-full bg-gray-50 border-3 border-[#1a0533] rounded-xl px-4 py-3 font-black text-center text-lg tracking-[0.2em] uppercase focus:outline-none focus:border-[#FF6B35]"
+                    autoFocus
+                  />
+                  <div className="flex gap-2 w-full">
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => { setWbJoinConfirmRoom(null); setJoinRoomCode(""); }}
+                      className="flex-1 bg-gray-100 border-3 border-[#1a0533] rounded-xl py-2 font-black text-xs tracking-wider text-[#1a0533]"
+                    >
+                      CANCELAR
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (joinRoomCode.length < 4) return;
+                        setWbJoinConfirmRoom(joinRoomCode);
+                        setJoinRoomCode("");
+                      }}
+                      disabled={joinRoomCode.length < 4}
+                      className={cn(
+                        "flex-1 border-3 rounded-xl py-2 font-black text-xs tracking-wider transition-all",
+                        joinRoomCode.length >= 4
+                          ? "bg-[#4ECB71] border-[#1a0533] text-white shadow-[3px_3px_0px_#1a0533]"
+                          : "bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed"
+                      )}
+                    >
+                      BUSCAR
+                    </motion.button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-black uppercase text-sm tracking-wider text-[#1a0533]">Confirmar Entrada</h3>
+                  <p className="text-[10px] font-bold text-gray-500 -mt-2">Sala #{wbJoinConfirmRoom}</p>
+                  
+                  {/* Avatar com botão de editar */}
+                  <div className="relative">
+                    <Avatar url={profile?.avatarUrl || "irmaos/1.png"} size={70} className="rounded-2xl border-3 border-[#1a0533] mx-auto" />
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsEditingProfile(true)}
+                      className="absolute bottom-0 right-0 bg-[#FFD700] border-3 border-[#1a0533] rounded-full p-2 shadow-[3px_3px_0px_#1a0533] hover:bg-[#FFC700] transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4 text-[#1a0533]" />
+                    </motion.button>
+                  </div>
+
+                  {/* Input para nome */}
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="Seu Nome"
+                    value={profile?.nickname || ""}
+                    onChange={(e) => {
+                      const newNick = e.target.value;
+                      setProfile(prev => prev ? { ...prev, nickname: newNick } : { nickname: newNick, avatarUrl: "irmaos/1.png" });
+                      localStorage.setItem("ccb_quiz_profile", JSON.stringify({ ...profile, nickname: newNick }));
+                    }}
+                    className="w-full bg-white border-3 border-[#1a0533] px-4 py-2 rounded-xl font-black text-center text-[#1a0533] focus:outline-none focus:border-[#FF6B35] shadow-sm"
+                  />
+
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={async () => {
+                      const roomId = wbJoinConfirmRoom;
+                      setWbJoinConfirmRoom(null);
+                      setWbLoading(true);
+                      setWbLoadingMessage("Entrando na sala...");
+                      const player = await wordBombService.joinRoom(roomId, profile?.nickname || "Maestro", profile?.avatarUrl);
+                      setWbLoading(false);
+                      if (player) {
+                        setWbRoomId(roomId);
+                        setWbLocalPlayerId(player.id);
+                        setWbIsHost(false);
+                      } else {
+                        setWbMessage("Sala não encontrada!");
+                        setWbMessageType("error");
+                        setTimeout(() => { setWbMessage(""); setWbMessageType(""); }, 3000);
+                      }
+                    }}
+                    className="w-full bg-[#4ECB71] border-3 border-[#1a0533] rounded-xl py-3 font-black text-xs tracking-wider text-white shadow-[3px_3px_0px_#1a0533] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  >
+                    CONFIRMAR
+                  </motion.button>
+
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setWbJoinConfirmRoom(null)}
+                    className="text-[10px] font-bold text-gray-400 underline mt-1"
+                  >
+                    Cancelar
+                  </motion.button>
+                </>
+              )}
+            </motion.div>
           </div>
         )}
 
