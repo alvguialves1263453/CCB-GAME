@@ -3489,9 +3489,9 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-lg flex flex-col gap-3 mx-auto"
+              className="w-full max-w-lg flex flex-col gap-2 md:gap-3 mx-auto px-2 md:px-0"
             >
-              <div className="flex items-center justify-between px-2">
+              <div className="flex items-center justify-between gap-2">
                 <button onClick={async () => {
                   await wordBombService.leaveRoom(wbRoomId, wbLocalPlayerId || undefined, wbIsHost);
                   setWbGameMode(false);
@@ -3510,24 +3510,24 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 py-6 flex flex-col gap-4">
-                <h3 className="font-black uppercase text-sm tracking-wider text-center text-[#1a0533]">
+              <div className="bg-white border-3 md:border-4 border-[#1a0533] rounded-2xl p-2 md:p-4 flex flex-col gap-2 md:gap-3">
+                <h3 className="font-black uppercase text-xs md:text-sm tracking-wider text-center text-[#1a0533]">
                   Jogadores ({wbPlayers.length})
                 </h3>
 
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 gap-1.5 md:gap-3 justify-center">
                   {wbPlayers.map((p) => (
                     <div key={p.id} className={cn(
-                      "relative p-2.5 border-4 border-[#1a0533] rounded-xl flex flex-col items-center gap-1.5 transition-all",
+                      "relative p-1.5 md:p-2.5 border-2 md:border-4 border-[#1a0533] rounded-lg md:rounded-xl flex flex-col items-center gap-1 transition-all",
                       "bg-gray-100"
                     )}>
                       {p.isHost && (
-                        <div className="absolute -top-2 -right-2 bg-[#FFD700] border-2 border-[#1a0533] rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10">
+                        <div className="absolute -top-1.5 -right-1.5 bg-[#FFD700] border-2 border-[#1a0533] rounded-full w-5 h-5 flex items-center justify-center text-[8px] font-black z-10">
                           👑
                         </div>
                       )}
-                      <Avatar url={p.avatar || "irmaos/1.png"} size={80} className="rounded-2xl" />
-                      <p className="font-black text-xs truncate w-full text-center text-[#1a0533]">{p.nickname}</p>
+                      <Avatar url={p.avatar || "irmaos/1.png"} size={50} className="rounded-lg md:rounded-2xl" />
+                      <p className="font-black text-[9px] md:text-xs truncate w-full text-center text-[#1a0533] leading-tight">{p.nickname}</p>
                       <div className="flex gap-0.5 items-center">
                         {Array.from({ length: p.lives }).map((_, i) => (
                           <Flame key={i} className="w-3 h-3 text-[#FF6B35] fill-[#FF6B35]" />
@@ -3617,7 +3617,7 @@ export default function App() {
               className="w-full max-w-lg flex flex-col gap-3 mx-auto"
             >
               {/* Fire Timer - empty container filling up */}
-              <div className="relative bg-[#1a0533] border-4 border-[#FF6B35] rounded-2xl p-1 text-center overflow-hidden" style={{ minHeight: 200 }}>
+              <div className="relative bg-[#1a0533] border-3 md:border-4 border-[#FF6B35] rounded-xl md:rounded-2xl p-1 text-center overflow-hidden" style={{ minHeight: 'min(160px, 30vh)' }}>
                 <div
                   className="absolute bottom-0 left-0 right-0 transition-all duration-300 ease-linear"
                   style={{
@@ -3632,7 +3632,7 @@ export default function App() {
                     animate={{ scale: wbTimeLeft !== null && wbTimeLeft <= 3 ? [1, 1.2, 1] : 1 }}
                     transition={{ repeat: wbTimeLeft !== null && wbTimeLeft <= 3 ? Infinity : 0, duration: 0.5 }}
                   >
-                    <svg viewBox="0 0 100 120" className={cn("w-16 h-20 md:w-20 md:h-24", wbTimeLeft !== null && wbTimeLeft <= 3 ? "drop-shadow-[0_0_20px_rgba(255,107,53,0.8)]" : "")}>
+                    <svg viewBox="0 0 100 120" className={cn("w-12 h-16 md:w-16 md:h-20 lg:w-20 lg:h-24", wbTimeLeft !== null && wbTimeLeft <= 3 ? "drop-shadow-[0_0_20px_rgba(255,107,53,0.8)]" : "")}>
                       <defs>
                         <linearGradient id="flameGrad" x1="0" y1="1" x2="0" y2="0">
                           <stop offset={`${Math.max(0, 100 - wbFillPercent)}%`} stopColor="#FFD700" />
@@ -3644,26 +3644,26 @@ export default function App() {
                       <path d="M50 15 Q58 30 60 45 Q62 60 55 75 Q52 82 50 85 Q48 82 45 75 Q38 60 40 45 Q42 30 50 15Z" fill="#FFF8DC" opacity={Math.min(0.7, wbFillPercent / 100)} />
                     </svg>
                   </motion.div>
-                  <div className="text-3xl md:text-4xl font-black italic tracking-widest tabular-nums text-white drop-shadow-[2px_2px_0px_#000] font-mono">
+                  <div className="text-xl md:text-3xl lg:text-4xl font-black italic tracking-widest tabular-nums text-white drop-shadow-[2px_2px_0px_#000] font-mono">
                     <span className={wbTimeLeft !== null && wbTimeLeft <= 3 ? "text-red-400" : "text-white"}>
                       {wbTimeLeft !== null ? wbTimeLeft.toFixed(2) : (wbRoom.turnDuration ?? 15).toFixed(2)}
                     </span>
-                    <span className="text-lg text-white/60 ml-1">s</span>
+                    <span className="text-xs md:text-lg text-white/60 ml-1">s</span>
                   </div>
                 </div>
               </div>
 
               {/* Current Fragment with examples */}
-              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-4 text-center relative overflow-hidden">
+              <div className="bg-white border-3 md:border-4 border-[#1a0533] rounded-xl md:rounded-2xl p-2 md:p-4 text-center relative overflow-hidden">
                 <motion.div
                   key={wbRoom.currentFragment || "?"}
                   initial={{ scale: 0, rotate: -10 }}
                   animate={{ scale: 1, rotate: 0 }}
-                  className="text-5xl md:text-6xl font-black italic text-[#FF6B35] uppercase tracking-[0.15em] drop-shadow-[3px_3px_0px_#1a0533]"
+                  className="text-3xl md:text-5xl lg:text-6xl font-black italic text-[#FF6B35] uppercase tracking-[0.15em] drop-shadow-[2px_2px_0px_#1a0533] md:drop-shadow-[3px_3px_0px_#1a0533]"
                 >
                   {wbRoom.currentFragment || "?"}
                 </motion.div>
-                <p className="text-[10px] font-bold text-gray-400 mt-2">A palavra deve conter este fragmento</p>
+                <p className="text-[8px] md:text-[10px] font-bold text-gray-400 mt-1 md:mt-2">A palavra deve conter este fragmento</p>
               </div>
 
               {/* VEZ DE indicator */}
@@ -3677,9 +3677,9 @@ export default function App() {
                     key={currentPlayer.id + (wbRoom.currentTurnIndex ?? 0)}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-[#FF6B35] border-3 border-[#1a0533] rounded-2xl py-3 px-4 text-center shadow-[4px_4px_0px_#1a0533]"
+                    className="bg-[#FF6B35] border-2 md:border-3 border-[#1a0533] rounded-lg md:rounded-2xl py-2 md:py-3 px-3 md:px-4 text-center shadow-[2px_2px_0px_#1a0533] md:shadow-[4px_4px_0px_#1a0533]"
                   >
-                    <span className="text-white font-black text-lg md:text-xl tracking-wider">
+                    <span className="text-white font-black text-xs md:text-lg lg:text-xl tracking-wider line-clamp-2">
                       VEZ DE: <span className="underline decoration-2 decoration-[#FFD700]">{currentPlayer.nickname.toUpperCase()}</span>
                     </span>
                   </motion.div>
@@ -3687,7 +3687,7 @@ export default function App() {
               })()}
 
               {/* Real-time typing display */}
-              <div className="bg-[#1a0533] border-2 border-[#FF6B35]/50 rounded-xl p-3 text-center min-h-[40px] flex items-center justify-center">
+              <div className="bg-[#1a0533] border-2 border-[#FF6B35]/50 rounded-lg md:rounded-xl p-2 md:p-3 text-center min-h-[36px] md:min-h-[40px] flex items-center justify-center">
                 {wbRealTimeTyping && wbTypingPlayerId ? (
                   (() => {
                     const typingPlayer = wbPlayers.find(p => p.id === wbTypingPlayerId);
@@ -3696,21 +3696,21 @@ export default function App() {
                         key={wbRealTimeTyping + wbTypingPlayerId}
                         initial={{ opacity: 0.5 }}
                         animate={{ opacity: 1 }}
-                        className="text-lg md:text-xl font-black italic tracking-wider text-[#FFD700] uppercase"
+                        className="text-xs md:text-lg lg:text-xl font-black italic tracking-wider text-[#FFD700] uppercase line-clamp-1"
                       >
-                        <span className="text-white/70">{typingPlayer?.nickname.toUpperCase() || "ALGUÉM"}: </span>
+                        <span className="text-white/70 hidden md:inline">{typingPlayer?.nickname.toUpperCase() || "ALGUÉM"}: </span>
                         {wbRealTimeTyping}
                       </motion.p>
                     );
                   })()
                 ) : (
-                  <p className="text-sm text-gray-400 italic">Aguardando digitação...</p>
+                  <p className="text-[10px] md:text-sm text-gray-400 italic">Aguardando...</p>
                 )}
               </div>
 
               {/* Player Cards with Animated Arrow */}
-              <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-3">
-                <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+              <div className="bg-white border-3 md:border-4 border-[#1a0533] rounded-xl md:rounded-2xl p-2 md:p-3">
+                <div className="flex flex-wrap justify-center gap-1.5 md:gap-3">
                   {(() => {
                     const alivePlayers = wbPlayers.filter(p => p.isAlive);
                     return wbPlayers.map((p, idx) => {
@@ -3719,10 +3719,10 @@ export default function App() {
                       const aliveIdx = alivePlayers.findIndex(x => x.id === p.id);
                       return (
                         <div key={p.id} className={cn(
-                          "relative flex flex-col items-center gap-1 p-2 border-3 rounded-xl transition-all min-w-[80px] overflow-hidden",
+                          "relative flex flex-col items-center gap-0.5 md:gap-1 p-1 md:p-2 border-2 md:border-3 rounded-lg md:rounded-xl transition-all min-w-[60px] md:min-w-[80px] overflow-hidden",
                           p.isAlive
                             ? isCurrent
-                              ? "bg-gradient-to-b from-[#FF6B35]/30 to-transparent border-[#FF6B35] shadow-[0_0_15px_rgba(255,107,53,0.3)]"
+                              ? "bg-gradient-to-b from-[#FF6B35]/30 to-transparent border-[#FF6B35] shadow-[0_0_10px_rgba(255,107,53,0.3)] md:shadow-[0_0_15px_rgba(255,107,53,0.3)]"
                               : "bg-white border-[#1a0533]"
                             : "bg-gray-200 border-gray-300 opacity-40"
                         )}>
@@ -3752,21 +3752,21 @@ export default function App() {
                               </svg>
                             </motion.div>
                           )}
-                          <Avatar url={p.avatar || "irmaos/1.png"} size={60} className="rounded-xl" />
+                          <Avatar url={p.avatar || "irmaos/1.png"} size={40} className="rounded-lg md:rounded-xl" />
                           <p className={cn(
-                            "font-black text-[10px] truncate w-full text-center max-w-[70px]",
+                            "font-black text-[8px] md:text-[10px] truncate w-full text-center max-w-[55px] md:max-w-[70px] leading-tight",
                             p.isAlive ? "text-[#1a0533]" : "text-gray-400 line-through"
                           )}>
                             {p.nickname}
                           </p>
-                          <div className="flex gap-0.5">
+                          <div className="flex gap-0.5 min-h-[12px] md:min-h-[16px] items-center">
                             {Array.from({ length: Math.max(0, p.lives) }).map((_, i) => (
-                              <svg key={i} viewBox="0 0 20 20" className="w-4 h-4">
+                              <svg key={i} viewBox="0 0 20 20" className="w-3 h-3 md:w-4 md:h-4">
                                 <path d="M10 18C10 18 3 13 3 8C3 5 5 3 7 3C8.5 3 9.5 4 10 5C10.5 4 11.5 3 13 3C15 3 17 5 17 8C17 13 10 18 10 18Z" fill={p.isAlive ? "#E32636" : "#ccc"} stroke={p.isAlive ? "#8B0000" : "#999"} strokeWidth="0.5" />
                               </svg>
                             ))}
                           </div>
-                          {!p.isAlive && <span className="text-lg">💀</span>}
+                          {!p.isAlive && <span className="text-sm md:text-lg">💀</span>}
                         </div>
                       );
                     });
@@ -3781,13 +3781,13 @@ export default function App() {
                 const myAliveIdx = alivePlayers.findIndex(p => p.id === wbLocalPlayerId);
                 const isMyTurn = myAliveIdx === wbRoom.currentTurnIndex;
                 if (!me || !me.isAlive) return (
-                  <div className="bg-gray-100 border-4 border-gray-300 rounded-2xl p-4 text-center">
-                    <p className="font-black text-gray-400 uppercase text-sm">Você foi eliminado!</p>
+                  <div className="bg-gray-100 border-3 md:border-4 border-gray-300 rounded-lg md:rounded-2xl p-2 md:p-4 text-center">
+                    <p className="font-black text-gray-400 uppercase text-[10px] md:text-sm">Você foi eliminado!</p>
                   </div>
                 );
                 if (!isMyTurn) return (
-                  <div className="bg-gray-100 border-4 border-gray-300 rounded-2xl p-4 text-center">
-                    <p className="font-black text-gray-400 text-sm">Aguarde sua vez...</p>
+                  <div className="bg-gray-100 border-3 md:border-4 border-gray-300 rounded-lg md:rounded-2xl p-2 md:p-4 text-center">
+                    <p className="font-black text-gray-400 text-[10px] md:text-sm">Aguarde sua vez...</p>
                   </div>
                 );
                 return (
@@ -3816,7 +3816,7 @@ export default function App() {
                         setTimeout(() => { setWbMessage(""); setWbMessageType(""); }, 1500);
                       }
                     }}
-                    className="bg-white border-4 border-[#1a0533] rounded-2xl p-3 flex gap-2"
+                    className="bg-white border-3 md:border-4 border-[#1a0533] rounded-lg md:rounded-2xl p-2 md:p-3 flex gap-1.5 md:gap-2"
                   >
                     <input
                       type="text"
@@ -3828,11 +3828,11 @@ export default function App() {
                       }}
                       placeholder="Digite a palavra..."
                       autoFocus
-                      className="flex-1 bg-gray-50 border-3 border-[#1a0533] rounded-xl px-4 py-3 font-bold text-lg focus:outline-none focus:border-[#FF6B35] uppercase tracking-wider"
+                      className="flex-1 bg-gray-50 border-2 md:border-3 border-[#1a0533] rounded-lg md:rounded-xl px-2 md:px-4 py-2 md:py-3 font-bold text-xs md:text-lg focus:outline-none focus:border-[#FF6B35] uppercase tracking-wider"
                     />
                     <button
                       type="submit"
-                      className="bg-[#FF6B35] border-3 border-[#1a0533] rounded-xl px-5 py-3 font-black text-white uppercase tracking-wider shadow-[3px_3px_0px_#1a0533] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all hover:bg-[#ff8c5a]"
+                      className="bg-[#FF6B35] border-2 md:border-3 border-[#1a0533] rounded-lg md:rounded-xl px-3 md:px-5 py-2 md:py-3 font-black text-white uppercase text-xs md:text-sm tracking-wider shadow-[2px_2px_0px_#1a0533] md:shadow-[3px_3px_0px_#1a0533] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all hover:bg-[#ff8c5a] shrink-0"
                     >
                       ENVIAR
                     </button>
@@ -3842,7 +3842,7 @@ export default function App() {
 
               {wbMessage && (
                 <div className={cn(
-                  "text-center font-black text-sm p-2 rounded-xl border-2",
+                  "text-center font-black text-[10px] md:text-sm p-1.5 md:p-2 rounded-lg md:rounded-xl border-2",
                   wbMessageType === "error" ? "bg-red-100 text-red-800 border-red-300" :
                   wbMessageType === "success" ? "bg-green-100 text-green-800 border-green-300" :
                   "bg-blue-100 text-blue-800 border-blue-300"
@@ -3853,9 +3853,9 @@ export default function App() {
 
               {/* Word History */}
               {wbRoom.currentWord && (
-                <div className="bg-white border-4 border-[#1a0533] rounded-2xl p-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Última palavra</p>
-                  <p className="text-lg font-black italic text-[#FF6B35] uppercase">{wbRoom.currentWord}</p>
+                <div className="bg-white border-3 md:border-4 border-[#1a0533] rounded-lg md:rounded-2xl p-2 md:p-3 text-center">
+                  <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-gray-400">Última palavra</p>
+                  <p className="text-base md:text-lg font-black italic text-[#FF6B35] uppercase">{wbRoom.currentWord}</p>
                 </div>
               )}
 
