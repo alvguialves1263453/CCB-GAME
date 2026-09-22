@@ -1,0 +1,420 @@
+import { supabase } from "../lib/supabase";
+import { RealtimeChannel } from "@supabase/supabase-js";
+
+export interface Player {
+  id: string;
+  nickname: string;
+  avatar?: string;
+  isHost: boolean;
+  isReady: boolean;
+  score: number;
+  hasAnswered: boolean;
+  round: number;
+  joinedAt: number;
+}
+
+export interface Room {
+  id: string;
+  hostId: string;
+  phase: 'lobby' | 'preparing' | 'answering' | 'result' | 'ranking';
+  currentRound: number;
+  roundCount: number;
+  difficulty: string;
+  deadlineAt: number | null;
+  questions?: any[];
+  gameType?: string;
+}
+
+let channel: RealtimeChannel | null = null;
+let currentRoomId: string | null = null;
+let localPlayerId: string | null = null;
+
+// Track subscription state to prevent stale events
+let _isSubscribed = false;
+let _lastPlayerSnapshot: Set<string> = new Set();
+let _currentRefreshId = 0;
+let _refreshTimeout: NodeJS.Timeout | null = null;
+
+let _onPlayersChange: ((players: Player[]) => void) | null = null;
+let _onRoomUpdate: ((room: Room) => void) | null = null;
+
+const mapRoom = (row: any): Room => ({
+  id: row.id,
+  hostId: row.host_id,
+  phase: row.phase,
+  currentRound: row.current_round,
+  roundCount: row.round_count,
+  difficulty: row.difficulty,
+  deadlineAt: row.deadline_at ? Number(row.deadline_at) : null,
+  questions: row.questions,
+  gameType: row.game_type || 'hino',
+});
+
+const mapPlayer = (row: any): Player => ({
+  id: row.id,
+  nickname: row.nickname,
+  avatar: row.avatar,
+  isHost: row.is_host,
+  isReady: row.is_ready,
+  score: row.score,
+  hasAnswered: row.has_answered,
+  round: row.round,
+  joinedAt: row.joined_at ? Number(row.joined_at) : 0,
+});
+
+const refreshPlayers = async (roomId: string) => {
+  const { data } = await supabase.from('players').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
+  if (data) {
+    _lastPlayerSnapshot = new Set(data.map(p => p.id));
+    _onPlayersChange?.(data.map(mapPlayer));
+  }
+};
+
+const refreshRoom = async (roomId: string) => {
+  const { data } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+  if (data) {
+    _onRoomUpdate?.(mapRoom(data));
+  }
+};
+
+export const multiplayerService = {
+async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil', roundCount: number = 5, gameType: string = 'hino'): Promise<{ room: Room; player: Player } | null> {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let roomId = '';
+    for (let i = 0; i < 5; i++) {
+        roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    const playerId = Math.random().toString(36).substring(2, 10);
+    const joinedAt = Date.now();
+
+    // Insert Room
+    console.log('[DEBUG] inserting room with round_count:', roundCount, 'gameType:', gameType);
+    const { data: roomData, error: roomError } = await supabase.from('rooms').insert({
+      id: roomId,
+      host_id: playerId,
+      phase: 'lobby',
+      current_round: 0,
+      round_count: roundCount,
+      difficulty: difficulty,
+      game_type: gameType
+    }).select().single();
+
+    if (roomError) {
+      console.error("Error creating room DB:", roomError);
+      return null;
+    }
+
+    // Insert Player
+    const { data: playerData, error: playerError } = await supabase.from('players').insert({
+      id: playerId,
+      room_id: roomId,
+      nickname,
+      avatar,
+      is_host: true,
+      is_ready: false,
+      score: 0,
+      has_answered: false,
+      round: 0,
+      joined_at: joinedAt
+    }).select().single();
+
+    if (playerError) {
+      console.error("Error creating player DB:", playerError);
+      return null;
+    }
+
+    await this.initChannel(roomId, playerId);
+    return { room: mapRoom(roomData), player: mapPlayer(playerData) };
+  },
+
+  async joinRoom(roomId: string, nickname: string, avatar?: string): Promise<Player | null> {
+    roomId = roomId.toUpperCase();
+    const playerId = Math.random().toString(36).substring(2, 10);
+    
+    const { data, error } = await supabase.from('players').insert({
+      id: playerId,
+      room_id: roomId,
+      nickname,
+      avatar,
+      is_host: false,
+      is_ready: false,
+      score: 0,
+      has_answered: false,
+      round: 0,
+      joined_at: Date.now()
+    }).select().single();
+
+    if (error) {
+      console.error("Error joining room DB:", error);
+      return null;
+    }
+
+    await this.initChannel(roomId, playerId);
+    return mapPlayer(data);
+  },
+
+  async initChannel(roomId: string, playerId: string) {
+    if (channel) {
+      await supabase.removeChannel(channel);
+    }
+
+    currentRoomId = roomId;
+    localPlayerId = playerId;
+    _isSubscribed = false;
+    
+    channel = supabase.channel(`room_db:${roomId}`);
+
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
+        // Handle room deletion (when room no longer exists)
+        if (!payload.new) {
+          _onRoomUpdate?.(null as any);
+          return;
+        }
+        _onRoomUpdate?.(mapRoom(payload.new));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, (payload) => {
+        // Handle DELETE - refresh will get the actual current list
+        // We can't access payload.old.id reliably, so just refresh
+        refreshPlayers(roomId);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+        refreshPlayers(roomId);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+        refreshPlayers(roomId);
+      });
+
+    await new Promise((resolve) => {
+      channel!.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          _isSubscribed = true;
+          resolve(true);
+        }
+      });
+    });
+
+    // Initial fetch after confirmed subscription
+    await refreshRoom(roomId);
+    await refreshPlayers(roomId);
+  },
+
+  async toggleReady(roomId: string, isReady: boolean) {
+    if (localPlayerId) {
+      await supabase.from('players').update({ is_ready: isReady }).eq('id', localPlayerId);
+    }
+  },
+
+  async submitAnswer(roomId: string, correct: boolean, score: number, round: number) {
+    if (localPlayerId) {
+      // We must fetch the current score first, or do an RPC. For simplicity, since it's a quiz, 
+      // we can read it from the local state array if needed, but it's safer to read from DB.
+      const { data } = await supabase.from('players').select('score').eq('id', localPlayerId).single();
+      const currentScore = data?.score || 0;
+
+      await supabase.from('players').update({
+        has_answered: true,
+        score: currentScore + score,
+        round: round
+      }).eq('id', localPlayerId);
+    }
+  },
+
+  // Host Actions
+  async startGame(roomId: string, questions: any[], roundCount: number, difficulty: string) {
+    console.log('[Service] startGame called with:', questions.length, questions[0]?.pergunta);
+    await supabase.from('rooms').update({
+      phase: 'preparing',
+      questions: questions,
+      round_count: roundCount,
+      difficulty: difficulty,
+      current_round: 0,
+      deadline_at: Date.now() + 3000 // 3 seconds preparing
+    }).eq('id', roomId);
+    console.log('[Service] Room updated to preparing phase');
+  },
+
+  async touchRoom(roomId: string) {
+    // Heartbeat: update updated_at so we know the room is alive
+    await supabase.from('rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId);
+  },
+
+  async startRound(roomId: string, roundIndex: number, timeLimitSec: number) {
+    // Reset all players has_answered for this room
+    await supabase.from('players').update({ has_answered: false, round: roundIndex }).eq('room_id', roomId);
+
+    await supabase.from('rooms').update({
+      phase: 'answering',
+      current_round: roundIndex,
+      deadline_at: timeLimitSec === Infinity ? null : Date.now() + (timeLimitSec * 1000)
+    }).eq('id', roomId);
+  },
+
+  async endRound(roomId: string) {
+    await supabase.from('rooms').update({
+      phase: 'result',
+      deadline_at: Date.now() + 4000 // 4 seconds showing results
+    }).eq('id', roomId);
+  },
+
+  async finishGame(roomId: string) {
+    await supabase.from('rooms').update({
+      phase: 'ranking',
+      deadline_at: null
+    }).eq('id', roomId);
+  },
+
+  async nextRound(roomId: string, roundIndex: number) {
+    await supabase.from('rooms').update({
+      phase: 'preparing',
+      current_round: roundIndex,
+      deadline_at: Date.now() + 3000
+    }).eq('id', roomId);
+  },
+
+  async resetRoom(roomId: string) {
+    // Reset players
+    await supabase.from('players').update({
+      score: 0,
+      has_answered: false,
+      is_ready: false,
+      round: 0
+    }).eq('room_id', roomId);
+
+    // Reset room
+    await supabase.from('rooms').update({
+      phase: 'lobby',
+      current_round: 0,
+      deadline_at: null
+    }).eq('id', roomId);
+  },
+
+  async deleteRoom(roomId: string) {
+    // Note: If you have foreign keys set to CASCADE on 'players', deleting the room is enough.
+    // Otherwise, we delete players first.
+    await supabase.from('players').delete().eq('room_id', roomId);
+    await supabase.from('rooms').delete().eq('id', roomId);
+  },
+
+  async leaveRoom(roomId?: string, playerId?: string, isHost?: boolean) {
+    const rId = roomId || currentRoomId;
+    const pId = playerId || localPlayerId;
+    
+    if (rId && pId) {
+      let hostStatus = isHost;
+      if (hostStatus === undefined) {
+        const { data: player } = await supabase.from('players').select('is_host').eq('id', pId).single();
+        hostStatus = player?.is_host;
+      }
+      
+      if (hostStatus) {
+        await this.deleteRoomWithKeepalive(rId);
+      } else {
+        await supabase.from('players').delete().eq('id', pId);
+        // Fallback keepalive
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseUrl && apikey) {
+          fetch(`${supabaseUrl}/rest/v1/players?id=eq.${pId}`, { 
+            method: 'DELETE', 
+            headers: { 'apikey': apikey, 'Authorization': `Bearer ${apikey}` }, 
+            keepalive: true 
+          }).catch(() => {});
+        }
+      }
+    }
+
+    if (channel) {
+      await supabase.removeChannel(channel);
+      channel = null;
+    }
+    currentRoomId = null;
+    localPlayerId = null;
+    _lastPlayerSnapshot.clear();
+    _isSubscribed = false;
+  },
+
+  // Discovery (Keeping it simple for nearby rooms)
+  async startDiscoveryListener(onNearbyRoomsChange: (rooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[]) => void) {
+    const fetchLobbies = async () => {
+      const { data: hymnRooms } = await supabase.from('rooms').select('id, round_count, difficulty, game_type, players(id, nickname, avatar)').eq('phase', 'lobby');
+      
+      const allRooms: { id: string; hostName: string; gameType: string; difficulty?: string; roundCount: number }[] = [];
+      
+      if (hymnRooms) {
+        for (const r of hymnRooms) {
+          const { data: players } = await supabase.from('players').select('nickname, avatar').eq('room_id', r.id).eq('is_host', true).limit(1);
+          allRooms.push({
+            id: r.id,
+            hostName: players?.[0]?.nickname || 'Host',
+            gameType: r.game_type || 'hino',
+            difficulty: r.difficulty || 'facil',
+            roundCount: r.round_count || 5
+          });
+        }
+      }
+      
+      onNearbyRoomsChange(allRooms);
+    };
+    
+    fetchLobbies();
+    
+    const channel = supabase.channel('lobby_discovery_db')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+         fetchLobbies();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'biblia_rooms' }, () => {
+         fetchLobbies();
+      })
+      .subscribe();
+      
+    (this as any)._discoveryChannel = channel;
+  },
+
+  stopDiscoveryListener() {
+    if ((this as any)._discoveryChannel) {
+      supabase.removeChannel((this as any)._discoveryChannel);
+      (this as any)._discoveryChannel = null;
+    }
+  },
+
+  subscribeToRoom(
+    roomId: string,
+    onPlayersChange: (players: Player[]) => void,
+    onRoomUpdate: (room: Room) => void
+  ) {
+    _onPlayersChange = onPlayersChange;
+    _onRoomUpdate = onRoomUpdate;
+
+    if (channel && currentRoomId === roomId) {
+      refreshRoom(roomId);
+      refreshPlayers(roomId);
+    }
+
+    return () => {
+      _onPlayersChange = null;
+      _onRoomUpdate = null;
+    };
+  },
+
+  async deleteRoomWithKeepalive(roomId: string) {
+    // Use SDK for normal operation
+    await supabase.from('players').delete().eq('room_id', roomId);
+    await supabase.from('rooms').delete().eq('id', roomId);
+    
+    // Fallback: also try fetch with keepalive in case SDK fails
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (supabaseUrl && apikey) {
+      const headers = {
+        'apikey': apikey,
+        'Authorization': `Bearer ${apikey}`,
+        'Content-Type': 'application/json'
+      };
+      // This fires even if tab closes
+      fetch(`${supabaseUrl}/rest/v1/players?room_id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+      fetch(`${supabaseUrl}/rest/v1/rooms?id=eq.${roomId}`, { method: 'DELETE', headers, keepalive: true }).catch(() => {});
+    }
+  }
+};

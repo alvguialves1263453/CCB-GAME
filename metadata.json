@@ -1,0 +1,6 @@
+{
+  "name": "CCB Quiz Game",
+  "description": "Um jogo de quiz imersivo sobre os hinos da CCB, com extração automática de letras e modo multiplayer simulado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
