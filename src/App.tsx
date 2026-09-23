@@ -2195,10 +2195,22 @@ export default function App() {
       // Se chegar aqui, o countdown já foi iniciado pelo useEffect em 1375
     }
 
-    // Usa REFS (callback tem deps [] e os states estariam stale = submit nunca disparava,
-    // cada um só se marcava local e o outro via "não marcou").
+    // Write immediately + fire-and-forget; fallback poll will pick up the row.
     if (!isSoloRef.current && localPlayerIdRef.current && roomIdRef.current) {
-      multiplayerService.submitAnswer(roomIdRef.current, isUserCorrect, pointsToAdd, currentRoundRef.current);
+      const localId = localPlayerIdRef.current;
+      const correct = isUserCorrect;
+      const pts = pointsToAdd;
+      const rnd = currentRoundRef.current;
+      // 1) realtime service (preferred)
+      multiplayerService.submitAnswer(roomIdRef.current, correct, pts, rnd);
+      // 2) fallback direto ao banco caso o service falhe silenciosamente
+      (async () => {
+        try {
+          const { data } = await supabase.from('players').select('score').eq('id', localId).single();
+          const current = data?.score || 0;
+          await supabase.from('players').update({ has_answered: true, score: current + pts, round: rnd }).eq('id', localId);
+        } catch {}
+      })();
     }
   }, []);
 
