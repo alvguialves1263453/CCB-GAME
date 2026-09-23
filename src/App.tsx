@@ -742,11 +742,13 @@ export default function App() {
     }
     
     if (bibliaParam) {
-      setRoomId(bibliaParam.toUpperCase());
-      setBibliaGameMode(true);  //Marca que é modo biblia
+      // Sala legada biblia_rooms: usa bibliaRoomId e vai para tela de entrada
+      // (biblia_setup em modo join) para escolher nome/foto antes do join.
+      setBibliaRoomId(bibliaParam.toUpperCase());
+      setBibliaGameMode(true);
       setIsSolo(false);
       setIsManualJoin(false);
-      setView("multiplayer_join");
+      setView("biblia_setup");
     }
     
     if (drawingParam) {
@@ -774,12 +776,14 @@ export default function App() {
   }, [players, view]);
 
   // OTIMIZAÇÃO: Fallback polling 8s (era 3s) + evita render se dados iguais + pausa em background
+  // Só após o join (localPlayerId): antes disso o convidado está em
+  // multiplayer_join escolhendo nome/foto e não pode sofrer auto-nav.
   useEffect(() => {
-    if (!roomId || isSolo || view === 'ranking') return;
+    if (!roomId || isSolo || view === 'ranking' || !localPlayerId) return;
     if (document.hidden) return; // pausa se aba em segundo plano
     let lastHash = '';
     const pollInterval = setInterval(async () => {
-      if (!roomIdRef.current || document.hidden || viewRef.current === 'ranking') return;
+      if (!roomIdRef.current || !localPlayerIdRef.current || document.hidden || viewRef.current === 'ranking') return;
       try {
         const { data } = await supabase.from('players').select('id,nickname,avatar,is_host,is_ready,score,has_answered,joined_at').eq('room_id', roomIdRef.current).order('joined_at', { ascending: true });
         if (!data || data.length === 0) {
@@ -846,15 +850,15 @@ export default function App() {
     }, 3000);
     
     return () => clearInterval(pollInterval);
-  }, [roomId, isSolo, view]);
+  }, [roomId, isSolo, view, localPlayerId]);
 
 
 
   // FIX: Ao voltar do background, re-sincroniza imediatamente (evita "não atualiza" 8s)
   useEffect(() => {
-    if (!roomId || isSolo) return;
+    if (!roomId || isSolo || !localPlayerId) return;
     const onVisible = async () => {
-      if (document.visibilityState === 'visible' && roomIdRef.current) {
+      if (document.visibilityState === 'visible' && roomIdRef.current && localPlayerIdRef.current) {
         try {
           const { data } = await supabase.from('players').select('id,nickname,avatar,is_host,is_ready,score,has_answered,joined_at').eq('room_id', roomIdRef.current).order('joined_at', { ascending: true });
           if (data) {
@@ -869,15 +873,17 @@ export default function App() {
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
-  }, [roomId, isSolo]);
+  }, [roomId, isSolo, localPlayerId]);
 
   // Máquina de estados da sala do quiz multiplayer. useCallback estável (só refs +
   // setState): alimenta o realtime E o polling de fallback a cada 3s. Sem o fallback,
   // um único evento realtime perdido travava o jogo na mesma tela pra sempre.
   const handleQuizRoomUpdate = React.useCallback((room: any) => {
         // FIX: Host deletou sala -> convidados voltam pra home (antes ficava congelado)
+        // Não expulsa quem ainda está na tela de entrada (multiplayer_join):
+        // ele ainda nem deu join, precisa escolher nome/foto primeiro.
         if (!room) {
-          if (!isSoloRef.current && viewRef.current !== 'ranking' && viewRef.current !== 'home') {
+          if (!isSoloRef.current && viewRef.current !== 'ranking' && viewRef.current !== 'home' && viewRef.current !== 'multiplayer_join') {
             setHostLeft(true);
             setLeftPlayerName('O host encerrou a sala');
             setTimeout(() => {
@@ -918,7 +924,10 @@ export default function App() {
         };
 
         // State Machine based on Phase
+        // Não auto-avança da tela de entrada (multiplayer_join) para o lobby
+        // antes do join: o convidado precisa escolher nome/foto e clicar ENTRAR.
         if (room.phase === 'lobby') {
+          if (viewRef.current === 'multiplayer_join' && !localPlayerIdRef.current) return;
           if (viewRef.current !== 'lobby') setView('lobby');
           setIsPreparing(false);
           setIsGameActive(false);
@@ -1037,8 +1046,10 @@ export default function App() {
   }, []);
 
   // Handle Multiplayer Subscriptions (STOP when in ranking!)
+  // Só após o join (localPlayerId): evita puxar o convidado da tela de
+  // entrada (multiplayer_join) para o lobby antes de escolher nome/foto.
   useEffect(() => {
-    if (!roomId || isSolo || view === 'ranking') return;
+    if (!roomId || isSolo || view === 'ranking' || !localPlayerId) return;
 
     const unsubscribe = multiplayerService.subscribeToRoom(
       roomId,
@@ -1080,15 +1091,15 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, [roomId, isSolo, view, handleQuizRoomUpdate]);
+  }, [roomId, isSolo, view, localPlayerId, handleQuizRoomUpdate]);
 
   // Fallback anti-travamento: o realtime pode perder o evento de fase
   // (result/answering/ranking). Rele a sala a cada 3s e aplica se mudou.
   // Também faz migração de host se o host sumiu (sem host ninguém avança).
   useEffect(() => {
-    if (!roomId || isSolo || view === 'ranking') return;
+    if (!roomId || isSolo || view === 'ranking' || !localPlayerId) return;
     const pollRoom = setInterval(async () => {
-      if (!roomIdRef.current || document.hidden || viewRef.current === 'ranking') return;
+      if (!roomIdRef.current || !localPlayerIdRef.current || document.hidden || viewRef.current === 'ranking') return;
       try {
         const { data: row } = await supabase.from('rooms').select('id,host_id,phase,current_round,round_count,difficulty,deadline_at,questions,game_type').eq('id', roomIdRef.current).maybeSingle();
         if (!row) return;
@@ -1124,18 +1135,20 @@ export default function App() {
       } catch {}
     }, 3000);
     return () => clearInterval(pollRoom);
-  }, [roomId, isSolo, view, handleQuizRoomUpdate]);
+  }, [roomId, isSolo, view, localPlayerId, handleQuizRoomUpdate]);
 
   // Handle Drawing Game Subscriptions
+  // Só após o join (drawingLocalPlayerId): evita puxar o convidado da tela
+  // de entrada (drawing_setup) para o lobby antes de escolher nome/foto.
   useEffect(() => {
-    if (!drawingRoomId || !drawingGameMode) return;
+    if (!drawingRoomId || !drawingGameMode || !drawingLocalPlayerId) return;
 
     const unsubscribe = drawingService.subscribeToRoom(
       drawingRoomId,
       (dbPlayers) => setDrawingPlayers(dbPlayers),
       (room) => {
         if (!room) {
-          if (!isDrawingHostRef.current && viewRef.current !== 'home' && viewRef.current !== 'ranking' && drawingRoomIdRef.current) {
+          if (!isDrawingHostRef.current && viewRef.current !== 'home' && viewRef.current !== 'ranking' && viewRef.current !== 'drawing_setup' && drawingRoomIdRef.current) {
             setHostLeft(true);
             setTimeout(() => {
               setView('home');
@@ -1152,7 +1165,9 @@ export default function App() {
         if (room.roundCount) setDrawingScoreGoal(room.roundCount);
         
         // State Machine for Drawing Game
+        // Não auto-avança da tela de entrada antes do join.
         if (room.phase === 'lobby') {
+          if (viewRef.current === 'drawing_setup' && !drawingLocalPlayerIdRef.current) return;
           if (viewRef.current !== 'drawing_lobby') setView('drawing_lobby');
         } else if (room.phase === 'drawing') {
           if (viewRef.current !== 'drawing_game') setView('drawing_game');
@@ -1171,7 +1186,7 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, [drawingRoomId, drawingGameMode]);
+  }, [drawingRoomId, drawingGameMode, drawingLocalPlayerId]);
 
   // Fetch dynamic categories for Drawing Game
   useEffect(() => {
@@ -1199,9 +1214,11 @@ export default function App() {
   }, [view]);
 
   // Handle biblia Game Subscriptions
+  // Só após o join (bibliaLocalPlayerId): evita puxar o convidado da tela
+  // de entrada (biblia_setup) para o lobby antes de escolher nome/foto.
   useEffect(() => {
     console.log('[BIBLIA] useEffect:', { bibliaRoomId, bibliaGameMode });
-    if (!bibliaRoomId || !bibliaGameMode) return;
+    if (!bibliaRoomId || !bibliaGameMode || !bibliaLocalPlayerId) return;
 
     const unsubscribe = bibliaService.subscribeToRoom(
       bibliaRoomId,
@@ -1212,7 +1229,8 @@ export default function App() {
       (room) => {
         if (!room) {
           // Host encerrou - expulsa todos da sala (criação ou jogo)
-          if (!bibliaIsHostRef.current && viewRef.current !== 'home' && viewRef.current !== 'ranking' && bibliaRoomIdRef.current) {
+          // Não expulsa quem ainda está na tela de entrada.
+          if (!bibliaIsHostRef.current && viewRef.current !== 'home' && viewRef.current !== 'ranking' && viewRef.current !== 'biblia_setup' && bibliaRoomIdRef.current) {
             setHostLeft(true);
             setTimeout(() => {
               setView('home');
@@ -1230,6 +1248,7 @@ export default function App() {
         setBibliaOpcoes(room.questions?.[room.currentRound - 1]?.options || []);
         
         if (room.phase === 'lobby') {
+          if (viewRef.current === 'biblia_setup' && !bibliaLocalPlayerIdRef.current) return;
           if (viewRef.current !== 'biblia_lobby') setView('biblia_lobby');
         } else if (room.phase === 'preparing') {
           console.log('[BIBLIA] preparing phase');
@@ -1279,7 +1298,7 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, [bibliaRoomId, bibliaGameMode]);
+  }, [bibliaRoomId, bibliaGameMode, bibliaLocalPlayerId]);
 
   // biblia game countdown timer
   useEffect(() => {
@@ -1652,8 +1671,10 @@ export default function App() {
           }
 
           // Join existing quiz/hino
-          const player = await multiplayerService.joinRoom(roomId, profile.nickname, profile.avatarUrl);
+          // Usa o nome/foto editados na tela de entrada (não o cache antigo).
+          const player = await multiplayerService.joinRoom(roomId, profile.nickname.trim(), profile.avatarUrl);
           if (player) {
+            try { window.history.replaceState({}, '', window.location.pathname); } catch {}
             setLocalPlayerId(player.id);
             saveReconnect(roomId!, player.id, false, bibliaGameMode ? 'biblia' : 'hino');
             setIsSolo(false);
@@ -2994,7 +3015,17 @@ export default function App() {
             >
               {/* Header - volta pro que acabou de acessar */}
               <div className="flex items-center gap-3 shrink-0">
-                <button onClick={() => { soundService.playClick(); setView(view === "multiplayer_join" ? "multiplayer_menu" : "mode_selection"); }} className="btn-icon shrink-0">
+                <button onClick={() => {
+                  soundService.playClick();
+                  // Veio por link/QR (join via URL, sem código digitado): limpa e volta pra home.
+                  if (view === "multiplayer_join" && !isManualJoin && !localPlayerId) {
+                    setRoomId(null);
+                    try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+                    setView("home");
+                  } else {
+                    setView(view === "multiplayer_join" ? "multiplayer_menu" : "mode_selection");
+                  }
+                }} className="btn-icon shrink-0">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
@@ -3023,6 +3054,14 @@ export default function App() {
                     }}
                     className="input-cartoon text-center tracking-[0.5em] text-xl uppercase !py-2.5"
                   />
+                </div>
+              )}
+
+              {/* Convite via link/QR: mostra qual sala vai entrar */}
+              {view === "multiplayer_join" && !isManualJoin && roomId && (
+                <div className="bg-[#18181B] border border-white/10 rounded-xl p-3 flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Código da Sala</span>
+                  <span className="text-2xl font-black italic tracking-widest text-white">{roomId}</span>
                 </div>
               )}
 
@@ -3320,12 +3359,24 @@ export default function App() {
             >
               {/* Header with back to mode_selection */}
               <div className="flex items-center justify-between px-1 shrink-0">
-                <button onClick={() => { setDrawingGameMode(false); setView("mode_selection"); }} className="btn-icon">
+                <button onClick={() => {
+                  soundService.playClick();
+                  // Veio por link/QR (join): limpa e volta pra home. Senão, fluxo normal.
+                  if (drawingRoomId && !drawingLocalPlayerId) {
+                    setDrawingRoomId(null);
+                    setDrawingGameMode(false);
+                    try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+                    setView("home");
+                  } else {
+                    setDrawingGameMode(false);
+                    setView("mode_selection");
+                  }
+                }} className="btn-icon">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="text-center">
                   <p className="eyebrow text-[#A3E635]">Multiplayer</p>
-                  <h2 className="display-md text-white">Desenho Musical</h2>
+                  <h2 className="display-md text-white">{drawingRoomId && !drawingLocalPlayerId ? "Entrar na Sala" : "Desenho Musical"}</h2>
                 </div>
                 <div className="w-11 h-11" />
               </div>
@@ -3351,71 +3402,110 @@ export default function App() {
                   </button>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Pontuação para Vencer</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[500, 800, 1000].map(n => (
-                      <button
-                        key={n}
-                        onClick={() => { soundService.playClick(); setDrawingScoreGoal(n); }}
-                        className={cn(
-                          "py-2 rounded-lg border border-white/10 font-black text-base transition-all",
-                          drawingScoreGoal === n
-                            ? "bg-[#8B5CF6] text-white shadow-md scale-105"
-                            : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]"
-                        )}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Modo join via link/QR: esconde config do host, mostra sala + ENTRAR */}
+                {drawingRoomId && !drawingLocalPlayerId ? (
+                  <>
+                    <div className="bg-[#18181B] border border-white/10 rounded-xl p-3 flex flex-col items-center gap-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Código da Sala</span>
+                      <span className="text-2xl font-black italic tracking-widest text-white">{drawingRoomId}</span>
+                    </div>
+                    <motion.button
+                      whileHover={!profile?.nickname?.trim() || isLoading ? {} : { scale: 1.03 }}
+                      whileTap={!profile?.nickname?.trim() || isLoading ? {} : { scale: 0.97 }}
+                      disabled={!profile?.nickname?.trim() || isLoading}
+                      onClick={async () => {
+                        const nick = profile?.nickname?.trim();
+                        if (!nick) { alert("Escreva seu nome primeiro!"); return; }
+                        soundService.playClick();
+                        setIsLoading(true);
+                        try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+                        const player = await drawingService.joinRoom(drawingRoomId, nick, profile.avatarUrl);
+                        if (player) {
+                          setDrawingLocalPlayerId(player.playerId);
+                          setIsDrawingHost(false);
+                          saveReconnect(drawingRoomId, player.playerId, false, 'desenho');
+                          setDrawingPlayers([{ id: player.playerId, nickname: nick, avatar: profile.avatarUrl, isHost: false, isReady: false, totalScore: 0 }]);
+                          setView("drawing_lobby");
+                        } else {
+                          alert("Sala de desenho não encontrada ou erro ao entrar.");
+                        }
+                        setIsLoading(false);
+                      }}
+                      className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                      ENTRAR
+                    </motion.button>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Pontuação para Vencer</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[500, 800, 1000].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => { soundService.playClick(); setDrawingScoreGoal(n); }}
+                            className={cn(
+                              "py-2 rounded-lg border border-white/10 font-black text-base transition-all",
+                              drawingScoreGoal === n
+                                ? "bg-[#8B5CF6] text-white shadow-md scale-105"
+                                : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]"
+                            )}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Categoria</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {['Todos', ...drawingCategories].map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => { soundService.playClick(); setDrawingCategory(cat); }}
-                        className={cn(
-                          "py-2 rounded-lg border border-white/10 font-black text-xs transition-all",
-                          drawingCategory === cat
-                            ? "bg-[#8B5CF6] text-white shadow-md scale-105"
-                            : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]"
-                        )}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Categoria</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {['Todos', ...drawingCategories].map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => { soundService.playClick(); setDrawingCategory(cat); }}
+                            className={cn(
+                              "py-2 rounded-lg border border-white/10 font-black text-xs transition-all",
+                              drawingCategory === cat
+                                ? "bg-[#8B5CF6] text-white shadow-md scale-105"
+                                : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]"
+                            )}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <motion.button
-                  whileHover={!profile || isLoading ? {} : { scale: 1.03 }}
-                  whileTap={!profile || isLoading ? {} : { scale: 0.97 }}
-                  disabled={!profile || isLoading}
-                  onClick={async () => {
-                    soundService.playClick();
-                    setIsLoading(true);
-                    const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingScoreGoal, drawingCategory);
-                    if (result) {
-                      setDrawingRoomId(result.roomId);
-                      setDrawingLocalPlayerId(result.playerId);
-                      setIsDrawingHost(true);
-                      saveReconnect(result.roomId, result.playerId, true, 'desenho');
-                      setDrawingPlayers([{ id: result.playerId, nickname: profile.nickname, avatar: profile.avatarUrl, isHost: true, isReady: false, totalScore: 0 }]);
-                      setView("drawing_lobby");
-                    } else {
-                      alert("Erro ao criar sala. Verifique sua conexão.");
-                    }
-                    setIsLoading(false);
-                  }}
-                  className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
-                  CRIAR SALA
-                </motion.button>
+                    <motion.button
+                      whileHover={!profile || isLoading ? {} : { scale: 1.03 }}
+                      whileTap={!profile || isLoading ? {} : { scale: 0.97 }}
+                      disabled={!profile || isLoading}
+                      onClick={async () => {
+                        soundService.playClick();
+                        setIsLoading(true);
+                        const result = await drawingService.createRoom(profile.nickname, profile.avatarUrl, drawingScoreGoal, drawingCategory);
+                        if (result) {
+                          setDrawingRoomId(result.roomId);
+                          setDrawingLocalPlayerId(result.playerId);
+                          setIsDrawingHost(true);
+                          saveReconnect(result.roomId, result.playerId, true, 'desenho');
+                          setDrawingPlayers([{ id: result.playerId, nickname: profile.nickname, avatar: profile.avatarUrl, isHost: true, isReady: false, totalScore: 0 }]);
+                          setView("drawing_lobby");
+                        } else {
+                          alert("Erro ao criar sala. Verifique sua conexão.");
+                        }
+                        setIsLoading(false);
+                      }}
+                      className="btn-cartoon btn-green w-full py-3 text-lg tracking-widest gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                      CRIAR SALA
+                    </motion.button>
+                  </>
+                )}
               </div>
             </motion.div>
           )}
@@ -3727,12 +3817,21 @@ export default function App() {
               className="w-full max-w-lg flex flex-col gap-3 mx-auto"
             >
               <div className="flex items-center justify-between px-1 shrink-0">
-                <button onClick={() => setView("home")} className="btn-icon">
+                <button onClick={() => {
+                  soundService.playClick();
+                  // Veio por link/QR (join): limpa e volta pra home.
+                  if (bibliaRoomId && !bibliaLocalPlayerId) {
+                    setBibliaRoomId(null);
+                    setBibliaGameMode(false);
+                    try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+                  }
+                  setView("home");
+                }} className="btn-icon">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="text-center">
                   <p className="eyebrow text-[#A3E635]">Multiplayer</p>
-                  <h2 className="display-md text-white">Conjunto</h2>
+                  <h2 className="display-md text-white">{bibliaRoomId && !bibliaLocalPlayerId ? "Entrar na Sala" : "Conjunto"}</h2>
                 </div>
                 <div className="w-11 h-11" />
               </div>
@@ -3757,87 +3856,124 @@ export default function App() {
                   </button>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Rodadas</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[5, 10, 15, 20].map(n => (
-                      <button
-                        key={n}
-                        onClick={() => { soundService.playClick(); setBibliaRoundCount(n); }}
-                        className={cn(
-                          "py-2 rounded-lg border border-white/10 font-black text-base transition-all",
-                          bibliaRoundCount === n
-                            ? "bg-[#8B5CF6] text-white shadow-md scale-105"
-                            : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]"
-                        )}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Modo join via link/QR (?biblia=): esconde config do host, mostra ENTRAR */}
+                {bibliaRoomId && !bibliaLocalPlayerId ? (
+                  <>
+                    <div className="bg-[#18181B] border border-white/10 rounded-xl p-3 flex flex-col items-center gap-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Código da Sala</span>
+                      <span className="text-2xl font-black italic tracking-widest text-white">{bibliaRoomId}</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const nick = profile?.nickname?.trim();
+                        if (!nick) { alert("Escreve o teu nome primeiro!"); return; }
+                        soundService.playClick();
+                        setIsLoading(true);
+                        try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+                        const player = await bibliaService.joinRoom(bibliaRoomId, nick, profile.avatarUrl);
+                        setIsLoading(false);
+                        if (player) {
+                          setBibliaLocalPlayerId(player.id);
+                          setBibliaIsHost(false);
+                          saveReconnect(bibliaRoomId, player.id, false, 'biblia');
+                          setBibliaGameMode(true);
+                          setBibliaPlayers([{ ...player } as any]);
+                          setView("biblia_lobby");
+                        } else {
+                          alert("Sala não encontrada ou erro ao entrar. Verifique o código.");
+                        }
+                      }}
+                      disabled={isLoading || !profile?.nickname?.trim()}
+                      className="w-full py-3 bg-[#22C55E] border border-white/10 rounded-xl font-black text-xl uppercase tracking-wider shadow-md disabled:opacity-50"
+                    >
+                      {isLoading ? "Entrando..." : "ENTRAR"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Rodadas</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[5, 10, 15, 20].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => { soundService.playClick(); setBibliaRoundCount(n); }}
+                            className={cn(
+                              "py-2 rounded-lg border border-white/10 font-black text-base transition-all",
+                              bibliaRoundCount === n
+                                ? "bg-[#8B5CF6] text-white shadow-md scale-105"
+                                : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]"
+                            )}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Dificuldade</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-{bibliaGameMode ? ([
-                          { value: 'facil' as Difficulty, label: 'FÁCIL', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
-                          { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                          { value: 'dificil' as Difficulty, label: 'DIFÍCIL', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
-                          { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
-                        ]) : ([
-                      { value: 'sem_tempo' as HinoDifficulty, label: 'Sem Tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
-                      { value: 'medio' as HinoDifficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
-                      { value: 'rapido' as HinoDifficulty, label: 'Rápido', color: 'bg-[#8B5CF6]', textColor: 'text-white' }
-                    ] as const).map(d => (
-                      <button
-                        key={d.value}
-                        onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
-                        className={cn(
-                          "py-2 rounded-lg border border-white/10 font-black text-xs transition-all capitalize",
-                          bibliaGameMode ? (difficulty === d.value
-                            ? `${d.color} ${d.textColor} shadow-md scale-105`
-                            : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]") : (hinoDifficulty === d.value
-                            ? `${d.color} ${d.textColor} shadow-md scale-105`
-                            : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]")
-                        )}
-                      >
-                        {d.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block text-zinc-400">Dificuldade</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+    {bibliaGameMode ? ([
+                              { value: 'facil' as Difficulty, label: 'FÁCIL', desc: 'Perguntas fáceis', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                              { value: 'medio' as Difficulty, label: 'MÉDIO', desc: 'Perguntas médias', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                              { value: 'dificil' as Difficulty, label: 'DIFÍCIL', desc: 'Perguntas difíceis', color: 'bg-[#8B5CF6]', textColor: 'text-white' },
+                              { value: 'aleatorio' as Difficulty, label: 'MISTO', desc: 'Todas as dificuldades', color: 'bg-[#EC4899]', textColor: 'text-white' },
+                            ]) : ([
+                          { value: 'sem_tempo' as HinoDifficulty, label: 'Sem Tempo', color: 'bg-[#22C55E]', textColor: 'text-white' },
+                          { value: 'medio' as HinoDifficulty, label: 'Médio', color: 'bg-[#F59E0B]', textColor: 'text-white' },
+                          { value: 'rapido' as HinoDifficulty, label: 'Rápido', color: 'bg-[#8B5CF6]', textColor: 'text-white' }
+                        ] as const).map(d => (
+                          <button
+                            key={d.value}
+                            onClick={() => { soundService.playClick(); bibliaGameMode ? setDifficulty(d.value as Difficulty) : setHinoDifficulty(d.value as HinoDifficulty); }}
+                            className={cn(
+                              "py-2 rounded-lg border border-white/10 font-black text-xs transition-all capitalize",
+                              bibliaGameMode ? (difficulty === d.value
+                                ? `${d.color} ${d.textColor} shadow-md scale-105`
+                                : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]") : (hinoDifficulty === d.value
+                                ? `${d.color} ${d.textColor} shadow-md scale-105`
+                                : "bg-[#121215] text-zinc-500 hover:bg-[#1C1C21]")
+                            )}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <button
-                  onClick={async () => {
-                    const nick = profile?.nickname?.trim();
-                    if (!nick) {
-                      alert("Escreve o teu nome primeiro!");
-                      return;
-                    }
-                    soundService.playClick();
-                    setIsLoading(true);
-                    console.log('[BIBLIA] Creating room for:', nick);
-                    const result = await bibliaService.createRoom(nick, profile.avatarUrl, difficulty, bibliaRoundCount);
-                    console.log('[BIBLIA] Room created:', result);
-                    setIsLoading(false);
-                    if (result) {
-                      setBibliaRoomId(result.room.id);
-                      setBibliaLocalPlayerId(result.player.id);
-                      setBibliaIsHost(true);
-                      saveReconnect(result.room.id, result.player.id, true, 'biblia');
-                      setBibliaGameMode(true);
-                      setBibliaPlayers([result.player]);
-                      setView("biblia_lobby");
-                    } else {
-                      alert('Erro ao criar sala. Ver console (F12)');
-                    }
-                  }}
-                  disabled={isLoading}
-                  className="w-full py-3 bg-[#F43F5E] border border-white/10 rounded-xl font-black text-xl uppercase tracking-wider shadow-md disabled:opacity-50"
-                >
-                  {isLoading ? "A criar..." : "CRIAR SALA"}
-                </button>
+                    <button
+                      onClick={async () => {
+                        const nick = profile?.nickname?.trim();
+                        if (!nick) {
+                          alert("Escreve o teu nome primeiro!");
+                          return;
+                        }
+                        soundService.playClick();
+                        setIsLoading(true);
+                        console.log('[BIBLIA] Creating room for:', nick);
+                        const result = await bibliaService.createRoom(nick, profile.avatarUrl, difficulty, bibliaRoundCount);
+                        console.log('[BIBLIA] Room created:', result);
+                        setIsLoading(false);
+                        if (result) {
+                          setBibliaRoomId(result.room.id);
+                          setBibliaLocalPlayerId(result.player.id);
+                          setBibliaIsHost(true);
+                          saveReconnect(result.room.id, result.player.id, true, 'biblia');
+                          setBibliaGameMode(true);
+                          setBibliaPlayers([result.player]);
+                          setView("biblia_lobby");
+                        } else {
+                          alert('Erro ao criar sala. Ver console (F12)');
+                        }
+                      }}
+                      disabled={isLoading}
+                      className="w-full py-3 bg-[#F43F5E] border border-white/10 rounded-xl font-black text-xl uppercase tracking-wider shadow-md disabled:opacity-50"
+                    >
+                      {isLoading ? "A criar..." : "CRIAR SALA"}
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           )}
