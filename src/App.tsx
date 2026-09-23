@@ -3225,7 +3225,7 @@ export default function App() {
                     title: 'Quem Sou Eu?',
                     desc: 'Faça mímica no mesmo aparelho e adivinhe a palavra!',
                     icon: Sparkles,
-                    accent: '#F472B6',
+                    accent: '#F97316',
                     soloOk: true,
                     onClick: () => {
                       soundService.playClick();

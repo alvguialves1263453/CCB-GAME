@@ -18,7 +18,7 @@ import {
 
 type QSPhase = "setup" | "roleta" | "vezde" | "revelar" | "mimica" | "fim";
 
-const ACCENT = "#F472B6";
+const ACCENT = "#F97316";
 
 function vibrate(pattern: number | number[]) {
   try {
@@ -40,10 +40,13 @@ export function QuemSouEuGame({ onExit }: { onExit: () => void }) {
   const [rouletteDone, setRouletteDone] = useState(false);
   const [flash, setFlash] = useState<{ guesserId: string; pts: number; mimePts: number } | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [selectedGuesser, setSelectedGuesser] = useState<string | null>(null);
+  const [armDesist, setArmDesist] = useState(false);
   const [roundNo, setRoundNo] = useState(1);
 
   const timerRef = useRef<number | null>(null);
   const spinTimeout = useRef<number | null>(null);
+  const disarmRef = useRef<number | null>(null);
   const lastWhole = useRef<number>(QS_TIMER_SECONDS);
   const playersRef = useRef<QSPlayer[]>([]);
   playersRef.current = players;
@@ -69,6 +72,7 @@ export function QuemSouEuGame({ onExit }: { onExit: () => void }) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (spinTimeout.current) clearTimeout(spinTimeout.current);
+      if (disarmRef.current) clearTimeout(disarmRef.current);
     };
   }, []);
 
@@ -148,6 +152,9 @@ export function QuemSouEuGame({ onExit }: { onExit: () => void }) {
     stopTimer();
     setFlash(null);
     setTimedOut(false);
+    setSelectedGuesser(null);
+    setArmDesist(false);
+    if (disarmRef.current) { clearTimeout(disarmRef.current); disarmRef.current = null; }
     setActorIdx(idx);
     setSwapsLeft(QS_SWAPS_PER_ROUND);
     setTimeLeft(QS_TIMER_SECONDS);
@@ -244,10 +251,38 @@ export function QuemSouEuGame({ onExit }: { onExit: () => void }) {
     }, 1800);
   };
 
+  // ---------- desistir / selecionar ----------
+  const toggleSelect = (id: string) => {
+    if (flash || timedOut || phase !== "mimica") return;
+    soundService.playClick();
+    setSelectedGuesser((s) => (s === id ? null : id));
+  };
+
+  const desistir = () => {
+    if (flash || timedOut || phase !== "mimica") return;
+    if (!armDesist) {
+      // 1º toque arma; 2º toque confirma (evita toque acidental na festa)
+      soundService.playClick();
+      setArmDesist(true);
+      if (disarmRef.current) clearTimeout(disarmRef.current);
+      disarmRef.current = window.setTimeout(() => setArmDesist(false), 3000);
+      return;
+    }
+    if (disarmRef.current) { clearTimeout(disarmRef.current); disarmRef.current = null; }
+    setArmDesist(false);
+    stopTimer();
+    soundService.playWrong();
+    vibrate(80);
+    drawNextWord();
+    startRound((actorIdx + 1) % players.length);
+  };
+
   // ---------- fim ----------
   const jogarDeNovo = () => {
     soundService.playClick();
     setPlayers((ps) => ps.map((p) => ({ ...p, pontos: 0, trocasUsadas: 0 })));
+    setSelectedGuesser(null);
+    setArmDesist(false);
     setWordPos(0);
     setRoundNo(1);
     setRouletteIdx(0);
@@ -269,6 +304,8 @@ export function QuemSouEuGame({ onExit }: { onExit: () => void }) {
     setRouletteDone(false);
     setFlash(null);
     setTimedOut(false);
+    setSelectedGuesser(null);
+    setArmDesist(false);
     setPhase("setup");
   };
 
@@ -627,19 +664,56 @@ export function QuemSouEuGame({ onExit }: { onExit: () => void }) {
               ) : (
                 !flash && (
                   <motion.div key="qs-guessers" exit={{ opacity: 0 }} className="flex flex-col gap-2">
-                    <p className="eyebrow text-zinc-500 text-center">Quem acertou? Toque no nome 👇</p>
+                    <p className="eyebrow text-zinc-500 text-center">Quem acertou? Toque no nome e confirme 👇</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {guessers.map((p) => (
-                        <motion.button
-                          key={p.id}
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => marcarAcerto(p.id)}
-                          className="bg-[#121215] border border-white/10 hover:border-white/25 rounded-xl px-3 py-3 flex flex-col items-center gap-0.5 transition-colors"
-                        >
-                          <span className="font-black text-white truncate max-w-full">{p.nome}</span>
-                          <span className="text-xs font-bold text-zinc-500 tabular-nums">{p.pontos} pts</span>
-                        </motion.button>
-                      ))}
+                      {guessers.map((p) => {
+                        const selected = p.id === selectedGuesser;
+                        return (
+                          <motion.button
+                            key={p.id}
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => toggleSelect(p.id)}
+                            className={cn(
+                              "rounded-xl px-3 py-3 flex flex-col items-center gap-0.5 transition-colors border-2",
+                              selected
+                                ? "bg-white/[0.07] text-white"
+                                : "bg-[#121215] border-white/10 hover:border-white/25"
+                            )}
+                            style={selected ? { borderColor: ACCENT } : undefined}
+                          >
+                            <span className="font-black text-white truncate max-w-full">
+                              {selected ? "✓ " : ""}{p.nome}
+                            </span>
+                            <span className="text-xs font-bold tabular-nums" style={{ color: selected ? ACCENT : "#71717a" }}>
+                              {selected ? `+${calcPontos(timeLeft)} pts` : `${p.pontos} pts`}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <motion.button
+                        whileTap={selectedGuesser ? { scale: 0.97 } : {}}
+                        onClick={() => selectedGuesser && marcarAcerto(selectedGuesser)}
+                        disabled={!selectedGuesser}
+                        className="btn-cartoon btn-green p-3 text-sm gap-2 disabled:opacity-50"
+                      >
+                        <Check className="w-4 h-4" />
+                        CONFIRMAR
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.97 }}
+                        onClick={desistir}
+                        className={cn(
+                          "btn-cartoon p-3 text-sm gap-2 border-2",
+                          armDesist
+                            ? "bg-red-600 border-red-400 text-white"
+                            : "bg-white/[0.06] border-white/15 text-zinc-300"
+                        )}
+                      >
+                        <X className="w-4 h-4" />
+                        {armDesist ? "CERTEZA?" : "DESISTIR"}
+                      </motion.button>
                     </div>
                   </motion.div>
                 )
