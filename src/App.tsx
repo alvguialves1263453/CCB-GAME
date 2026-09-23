@@ -63,6 +63,7 @@ import { Avatar } from "./components/Avatar";
 // Avatar fica síncrono (leve, usado nas listas).
 const ProfileCreator = React.lazy(() => import("./components/ProfileCreator").then(m => ({ default: m.ProfileCreator })));
 const DrawingGame = React.lazy(() => import("./components/DrawingGame").then(m => ({ default: m.DrawingGame })));
+const QuemSouEuGame = React.lazy(() => import("./components/QuemSouEuGame").then(m => ({ default: m.QuemSouEuGame })));
 import { presenceService, type OnlinePlayer } from "./services/presenceService";
 import { Edit2 } from "lucide-react";
 
@@ -3219,6 +3220,18 @@ export default function App() {
                       setView("drawing_setup");
                     },
                   },
+                  {
+                    n: '04',
+                    title: 'Quem Sou Eu?',
+                    desc: 'Faça mímica no mesmo aparelho e adivinhe a palavra!',
+                    icon: Sparkles,
+                    accent: '#F472B6',
+                    soloOk: true,
+                    onClick: () => {
+                      soundService.playClick();
+                      setView("quemsou_game");
+                    },
+                  },
                 ].map((mode) => {
                   const disabled = !mode.soloOk && isSolo;
                   const Icon = mode.icon;
@@ -3687,7 +3700,22 @@ export default function App() {
                 />
                 </React.Suspense>
             </motion.div>
-          )}
+           )}
+
+          {/* Quem Sou Eu? (mímica local, pass-and-play) */}
+          {view === "quemsou_game" && (
+            <motion.div
+              key="quemsou_game"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full flex-1 min-h-0 max-w-4xl flex flex-col gap-3 px-2 pb-20 md:pb-4"
+            >
+              <React.Suspense fallback={<div className="flex-1 flex flex-col items-center justify-center gap-3 bg-white min-h-[50dvh]"><Loader2 className="w-8 h-8 animate-spin text-[#1E3A5F]" /><p className="text-xs font-black uppercase tracking-widest text-slate-400">Carregando jogo...</p></div>}>
+                <QuemSouEuGame onExit={() => setView("mode_selection")} />
+              </React.Suspense>
+            </motion.div>
+           )}
 
           {/* biblIA Setup */}
           {(view === "biblia_setup") && (
