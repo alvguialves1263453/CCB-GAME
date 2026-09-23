@@ -2,8 +2,11 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
 import { createServer } from "http";
 import { Server } from "socket.io";
+import ImageKit from "imagekit";
 
 interface Player {
   id: string;
@@ -36,6 +39,80 @@ async function startServer() {
   });
 
   const PORT = 3000;
+
+  // ImageKit init
+  const imagekit = new ImageKit({
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || "public_M4XXMyNcuHsTA/Iv32edvWiub8Q=",
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "private_lBY7O2SbPjBfkdu9LoVsiqTDTfk=",
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/isa2koeb2",
+  });
+
+  // Middleware JSON (precisa pra upload base64)
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+  // ===== ImageKit rotas =====
+  app.get("/api/imagekit-auth", (req, res) => {
+    try {
+      const auth = imagekit.getAuthenticationParameters();
+      res.json(auth);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/imagekit-test", async (req, res) => {
+    try {
+      // testa listando 1 arquivo (ou só valida keys)
+      const result = await imagekit.listFiles({ limit: 1, skip: 0 } as any);
+      res.json({ success: true, message: "Conectado ao ImageKit!", endpoint: process.env.IMAGEKIT_URL_ENDPOINT || process.env.VITE_IMAGEKIT_URL_ENDPOINT, filesCount: Array.isArray(result) ? result.length : 0 });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message || String(e) });
+    }
+  });
+
+  app.post("/api/upload-avatar", async (req, res) => {
+    try {
+      const { dataUrl, fileName } = req.body;
+      if (!dataUrl) return res.status(400).json({ error: "dataUrl obrigatório" });
+      const result = await imagekit.upload({
+        file: dataUrl,
+        fileName: fileName || `avatar_${Date.now()}.jpg`,
+        folder: "/ccb-avatars",
+        useUniqueFileName: true,
+      });
+      res.json({ url: result.url, fileId: result.fileId, thumbnail: result.thumbnailUrl });
+    } catch (e: any) {
+      console.error("ImageKit upload erro:", e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  // Deleta avatar antigo do ImageKit pra não lotar (chamado quando troca foto)
+  app.post("/api/delete-avatar", async (req, res) => {
+    try {
+      const { fileId, url } = req.body;
+      let idToDelete = fileId;
+      // Se só veio URL, tenta extrair fileId via listagem por nome
+      if (!idToDelete && url && url.includes("ik.imagekit.io")) {
+        try {
+          const fileName = url.split("/").pop()?.split("?")[0];
+          if (fileName) {
+            const files: any = await imagekit.listFiles({ searchQuery: `name="${fileName}"` } as any);
+            if (Array.isArray(files) && files.length > 0) idToDelete = files[0].fileId;
+          }
+        } catch {}
+      }
+      if (!idToDelete) return res.json({ success: false, message: "fileId não encontrado, ignorado" });
+      await imagekit.deleteFile(idToDelete);
+      console.log(`[ImageKit] Avatar deletado: ${idToDelete}`);
+      res.json({ success: true, fileId: idToDelete });
+    } catch (e: any) {
+      console.error("ImageKit delete erro:", e);
+      // Não falha o fluxo principal se delete falhar (arquivo pode já ter sido deletado)
+      res.json({ success: false, error: e.message || String(e) });
+    }
+  });
 
   // Socket.io Logic
   io.on("connection", (socket) => {

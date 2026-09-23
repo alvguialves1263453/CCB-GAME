@@ -7,6 +7,10 @@ let _onRoomUpdate: ((room: any) => void) | null = null;
 let channel: any = null;
 
 export const drawingService = {
+  setSession(roomId: string, playerId: string) {
+    currentRoomId = roomId;
+    localPlayerId = playerId;
+  },
   async createRoom(nickname: string, avatar: string, scoreGoal: number, category: string) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let roomId = '';
