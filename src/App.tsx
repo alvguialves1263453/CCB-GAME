@@ -442,6 +442,8 @@ export default function App() {
   const startTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
   const lastHandledRoundRef = useRef<number>(-1);
+  // Round em que o som de resultado (multiplayer) já tocou — evita repetir
+  const resultSoundRoundRef = useRef<number>(-1);
   const botTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const lastBotRoundRef = useRef<number>(-1);
 
@@ -998,6 +1000,7 @@ export default function App() {
              setSelectedOption(null);
              setFeedback(null);
              setResultCountdown(null);
+             resultSoundRoundRef.current = -1;
              setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
                
              // Reset timer state for new round
@@ -1013,6 +1016,17 @@ export default function App() {
           setIsGameActive(false);
           setShowResult(true);
           setResultCountdown(3);
+
+          // Som de acerto/erro adiado do multiplayer: toca 1x por round, só
+          // agora que o resultado foi revelado pra todos (justo).
+          if (!isSoloRef.current && resultSoundRoundRef.current !== room.currentRound) {
+            resultSoundRoundRef.current = room.currentRound;
+            const fb = feedbackRef.current;
+            if (fb) {
+              if (fb.correct) soundService.playCorrect();
+              else if (fb.option && fb.option !== "Tempo Esgotado") soundService.playWrong();
+            }
+          }
            
           // FREEZE PLAYERS WHEN SHOWING LAST RESULT (before going to ranking!)
           if (room.currentRound + 1 >= room.roundCount) {
@@ -2029,12 +2043,15 @@ export default function App() {
 
     setFeedback({ correct: isUserCorrect, option: option || "Tempo Esgotado" });
 
-    // Play sound based on answer
+    // Som de acerto/erro: no SOLO toca na hora; no MULTIPLAYER fica mudo aqui e
+    // toca só quando o resultado é revelado (fase 'result') — senão quem está
+    // perto ouve o acerto/erro e descobre a resposta antes de marcar.
+    const isSoloGame = isSoloRef.current;
     if (isUserCorrect) {
-      soundService.playCorrect();
+      if (isSoloGame) soundService.playCorrect();
       setLastPoints(pointsToAdd);
     } else if (option) {
-      soundService.playWrong();
+      if (isSoloGame) soundService.playWrong();
       setLastPoints(0);
     }
 
