@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { Music, Sparkles, Settings, Users, ChevronRight, Cloud } from "lucide-react";
-import { Avatar } from "./ProfileCreator";
+import { Avatar } from "./Avatar";
 import { ImageKitTestButton } from "./ImageKitTestButton";
 
 interface HomeProps {

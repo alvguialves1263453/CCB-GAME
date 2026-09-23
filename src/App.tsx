@@ -59,7 +59,7 @@ import { bibliaService, type BibliaRoom, type BibliaPlayer } from "./services/bi
 import { wordBombService, type WBRoom, type WBPlayer, initWords, isValidWord, wordContainsFragment, getLastLetter, normalizeLetter, generateFragments } from "./services/wordBombService";
 import { drawingService } from "./services/drawingService";
 import { soundService } from "./lib/soundService";
-import { Avatar } from "./components/ProfileCreator";
+import { Avatar } from "./components/Avatar";
 // Lazy (code-splitting): Konva+DrawingGame e grade de avatares só baixam quando abrir.
 // Avatar fica síncrono (leve, usado nas listas).
 const ProfileCreator = React.lazy(() => import("./components/ProfileCreator").then(m => ({ default: m.ProfileCreator })));
