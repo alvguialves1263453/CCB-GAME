@@ -1,192 +1,433 @@
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:wght@400;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Fredoka", ui-sans-serif, system-ui, sans-serif;
-  --color-game-bg: #1a0533;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  /* Tema Igreja - cinza claro com contraste */
+  --color-game-bg: #E8E9EC;
   --color-game-card: #FFFFFF;
-  --color-game-primary: #9B59F5;
-  --color-game-secondary: #FFD700;
-  --color-game-accent: #FF5A95;
-  --color-game-success: #4ECB71;
-  --color-game-danger: #FF4757;
-  --color-game-border: #1a0533;
-  --shadow-game: 5px 5px 0px 0px #1a0533;
-  --shadow-game-h: 7px 7px 0px 0px #1a0533;
+  --color-game-primary: #1E3A5F;
+  --color-game-secondary: #9A7B4F;
+  --color-game-accent: #4A6FA5;
+  --color-game-success: #2F5D3A;
+  --color-game-danger: #9B2C2C;
+  --color-game-border: #CBD5E1;
+
+  --shadow-game: 0 4px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15,23,42,0.06);
+  --shadow-game-h: 0 12px 40px -8px rgba(15, 23, 42, 0.14), 0 4px 16px rgba(15,23,42,0.08);
 }
 
 /* ===========================
-   BASE BODY - Gartic Phone style gradient
+   BASE — Tema claro igreja
    =========================== */
 html, body {
-  font-family: "Fredoka", sans-serif;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
   height: 100%;
+  height: 100dvh;
   min-height: -webkit-fill-available;
+  min-height: 100dvh;
   overflow: hidden;
-  background: linear-gradient(160deg, #3b0764 0%, #6d28d9 30%, #db2777 70%, #f97316 100%);
-  color: #1a0533;
+  color: #0F172A;
   user-select: none;
   position: relative;
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
+  background: #E8E9EC;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Polka dot overlay like Gartic */
+/* textura sutil - parede pintada */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.07) 2px, transparent 2px);
-  background-size: 38px 38px;
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 25%, transparent 78%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* faixa superior sutil - luz do teto */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 280px;
+  background: linear-gradient(180deg, rgba(30, 58, 95, 0.045) 0%, transparent 100%);
   pointer-events: none;
   z-index: 0;
 }
 
 #root {
   height: 100%;
+  height: 100dvh;
   min-height: -webkit-fill-available;
+  min-height: 100dvh;
   position: relative;
   z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* ===========================
-   CARTOON SHADOWS & BORDERS
+   DISPLAY TYPE
+   =========================== */
+.font-display,
+h1, h2, h3 {
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+.display-xl {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  font-size: clamp(3.5rem, 14vw, 7.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.display-lg {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.display-md {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.35rem, 3.5vw, 2rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.eyebrow {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* legacy text helpers */
+.cartoon-text {
+  -webkit-text-stroke: 0;
+  paint-order: stroke fill;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.cartoon-text-white {
+  -webkit-text-stroke: 0;
+  color: #0F172A;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* ===========================
+   ELEVATION / BORDERS - claro
    =========================== */
 .game-shadow {
-  box-shadow: 5px 5px 0px 0px #1a0533;
+  box-shadow: 0 4px 24px -4px rgba(15, 23, 42, 0.09), 0 1px 6px rgba(15,23,42,0.07);
+  border: 1px solid #CBD5E1;
 }
-
 .game-shadow-lg {
-  box-shadow: 7px 7px 0px 0px #1a0533;
+  box-shadow: 0 12px 40px -8px rgba(15, 23, 42, 0.13), 0 4px 16px rgba(15,23,42,0.09);
+  border: 1px solid #CBD5E1;
 }
-
 .game-shadow-hover {
-  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
-
 .game-shadow-hover:hover {
-  box-shadow: 7px 7px 0px 0px #1a0533;
-  transform: translate(-2px, -2px);
+  box-shadow: 0 16px 48px -12px rgba(45, 74, 122, 0.14), 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-3px);
 }
-
 .game-shadow-hover:active {
-  box-shadow: 2px 2px 0px 0px #1a0533;
-  transform: translate(3px, 3px);
+  transform: translateY(0);
 }
-
 .game-border {
-  border: 4px solid #1a0533;
+  border: 1px solid #CBD5E1;
 }
 
 /* ===========================
-   CARTOON TEXT STROKE
-   =========================== */
-.cartoon-text {
-  -webkit-text-stroke: 2px #1a0533;
-  paint-order: stroke fill;
-}
-
-.cartoon-text-white {
-  -webkit-text-stroke: 2.5px #1a0533;
-  paint-order: stroke fill;
-  color: #ffffff;
-}
-
-/* ===========================
-   PANELS / CARDS
+   PANELS / CARDS - branco limpo
    =========================== */
 .cartoon-panel {
-  background: rgba(255, 255, 255, 0.95);
-  border: 4px solid #1a0533;
-  border-radius: 2rem;
-  box-shadow: 6px 6px 0px 0px #1a0533;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px -4px rgba(15, 23, 42, 0.08), 0 1px 6px rgba(15,23,42,0.07);
+}
+.cartoon-panel-dark {
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 40px -8px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15,23,42,0.08);
+}
+.premium-card {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px -4px rgba(15, 23, 42, 0.08), 0 1px 6px rgba(15,23,42,0.07);
+  position: relative;
+  overflow: hidden;
+}
+.premium-card::before {
+  content: none;
 }
 
-.cartoon-panel-dark {
-  background: rgba(26, 5, 51, 0.85);
-  border: 4px solid rgba(255,255,255,0.3);
-  border-radius: 2rem;
-  box-shadow: 6px 6px 0px 0px rgba(0,0,0,0.5);
-  backdrop-filter: blur(12px);
+.glass-panel {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #CBD5E1;
+  box-shadow: 0 12px 40px -8px rgba(15, 23, 42, 0.12);
+}
+
+/* mode / list card - branco com contraste */
+.mode-card {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.04);
+}
+.mode-card:hover {
+  border-color: #94A3B8;
+  background: #FFFFFF;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15,23,42,0.07);
+}
+.mode-card:active {
+  transform: translateY(-1px);
 }
 
 /* ===========================
-   BUTTONS
+   BUTTONS — tema igreja
    =========================== */
 .btn-cartoon {
-  font-family: "Fredoka", sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   font-weight: 700;
-  border: 4px solid #1a0533;
-  border-radius: 1.5rem;
-  box-shadow: 5px 5px 0px 0px #1a0533;
-  transition: all 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border-radius: 0.75rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15,23,42,0.06);
+  transition: all 0.15s ease;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   user-select: none;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+  border: 1.5px solid transparent;
+}
+.btn-cartoon:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15,23,42,0.06);
+}
+.btn-cartoon:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+}
+.btn-cartoon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
 }
 
-.btn-cartoon:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0px 0px #1a0533;
-}
-
-.btn-cartoon:active {
-  transform: translate(3px, 3px);
-  box-shadow: 2px 2px 0px 0px #1a0533;
-}
-
+/* Botões FLAT sem degradê - paleta igreja sóbria */
 .btn-purple {
-  background: #9B59F5;
-  color: white;
+  background: #23395B;
+  color: #FFFFFF;
+  border-color: #23395B;
 }
+.btn-purple:hover:not(:disabled) { background: #2A446E; border-color: #2A446E; }
 
 .btn-yellow {
-  background: #FFD700;
-  color: #1a0533;
+  background: #FFFFFF;
+  color: #1E293B;
+  border-color: #CBD5E1;
+  font-weight: 800;
 }
+.btn-yellow:hover:not(:disabled) { background: #F8FAFC; border-color: #94A3B8; }
 
 .btn-green {
-  background: #4ECB71;
-  color: white;
+  background: #2F4A3A;
+  color: #FFFFFF;
+  border-color: #2F4A3A;
 }
+.btn-green:hover:not(:disabled) { background: #3A5A47; border-color: #3A5A47; }
 
 .btn-pink {
-  background: #FF5A95;
-  color: white;
+  background: #475569;
+  color: #FFFFFF;
+  border-color: #475569;
 }
+.btn-pink:hover:not(:disabled) { background: #55677F; border-color: #55677F; }
 
 .btn-white {
-  background: white;
-  color: #1a0533;
+  background: #F1F5F9;
+  color: #1E293B;
+  border-color: #CBD5E1;
+  font-weight: 700;
+}
+.btn-white:hover:not(:disabled) { background: #E2E8F0; }
+
+.btn-orange {
+  background: #7C3A18;
+  color: #FFFFFF;
+  border-color: #7C3A18;
+}
+.btn-orange:hover:not(:disabled) { background: #8F4420; border-color: #8F4420; }
+
+.btn-blue {
+  background: #23395B;
+  color: #ffffff;
+  border-color: #23395B;
+}
+.btn-blue:hover:not(:disabled) { background: #2A446E; border-color: #2A446E; }
+
+/* ghost / outline button - contraste */
+.btn-ghost {
+  background: #FFFFFF;
+  color: #334155;
+  border: 1.5px solid #94A3B8;
+  box-shadow: 0 1px 4px rgba(15,23,42,0.04);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: #F1F5F9;
+  color: #0F172A;
+  border-color: #475569;
+}
+
+/* icon square button - contraste */
+.btn-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: #FFFFFF;
+  border: 1.5px solid #94A3B8;
+  color: #334155;
+  transition: all 0.2s;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+.btn-icon:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+  border-color: #475569;
 }
 
 /* ===========================
-   INPUT CARTOON
+   INPUT - claro
    =========================== */
 .input-cartoon {
-  border: 4px solid #1a0533;
-  border-radius: 1rem;
-  padding: 0.8rem 1.2rem;
-  font-family: "Fredoka", sans-serif;
-  font-weight: 700;
-  font-size: 1.1rem;
-  background: white;
-  box-shadow: 4px 4px 0px 0px #1a0533;
+  border: 1.5px solid #94A3B8;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1.15rem;
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  background: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(15,23,42,0.04);
   outline: none;
-  transition: box-shadow 0.1s, transform 0.1s;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
   width: 100%;
-  color: #1a0533;
+  color: #0F172A;
 }
-
+.input-cartoon::placeholder {
+  color: #64748B;
+  font-weight: 500;
+}
 .input-cartoon:focus {
-  box-shadow: 6px 6px 0px 0px #9B59F5;
-  transform: translate(-1px, -1px);
+  border-color: #1E3A5F;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(30, 58, 95, 0.12);
 }
 
 /* ===========================
-   MUSICAL NOTES PARTICLES
+   BADGE
+   =========================== */
+.badge-cartoon {
+  border: 1px solid #1E3A5F;
+  border-radius: 999px;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  padding: 0.35rem 0.8rem;
+  box-shadow: none;
+  background: #1E3A5F;
+  color: #FFFFFF;
+  text-transform: uppercase;
+}
+
+/* ===========================
+   ANSWER TILE (quiz) - claro
+   =========================== */
+.answer-tile {
+  background: #FFFFFF;
+  border: 1.5px solid #94A3B8;
+  border-radius: 1rem;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  color: #0F172A;
+  font-weight: 600;
+}
+.answer-tile:hover:not(:disabled) {
+  border-color: #1E3A5F;
+  background: #EFF6FF;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -4px rgba(30, 58, 95, 0.15);
+}
+.answer-tile:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+.answer-tile:disabled {
+  cursor: default;
+}
+.answer-tile.is-selected {
+  border-color: #1E3A5F;
+  background: #DBEAFE;
+  border-width: 2px;
+}
+.answer-tile.is-correct {
+  border-color: #14532D;
+  background: #DCFCE7;
+  border-width: 2px;
+}
+.answer-tile.is-wrong {
+  border-color: #7F1D1D;
+  background: #FEE2E2;
+  border-width: 2px;
+}
+.answer-tile.is-dim {
+  opacity: 0.4;
+}
+
+/* ===========================
+   ANIMATIONS
    =========================== */
 @keyframes float-note {
   0%   { transform: translateY(110vh) rotate(0deg) scale(0.8); opacity: 0; }
@@ -194,82 +435,59 @@ body::before {
   92%  { opacity: 0.8; }
   100% { transform: translateY(-15vh) rotate(380deg) scale(1.1); opacity: 0; }
 }
-
 @keyframes float-instrument {
   0%   { transform: translateY(0px) rotate(-5deg); }
   50%  { transform: translateY(-18px) rotate(5deg); }
   100% { transform: translateY(0px) rotate(-5deg); }
 }
+.animate-float-note { animation: float-note linear infinite; }
+.animate-float-instrument { animation: float-instrument ease-in-out infinite; }
 
-.animate-float-note {
-  animation: float-note linear infinite;
-}
-
-.animate-float-instrument {
-  animation: float-instrument ease-in-out infinite;
-}
-
-/* ===========================
-   BOUNCE & WIGGLE
-   =========================== */
 @keyframes bounce-subtle {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  30%       { transform: translateY(-8px) rotate(-3deg); }
-  60%       { transform: translateY(-4px) rotate(2deg); }
+  0%, 100% { transform: translateY(0); }
+  30%       { transform: translateY(-8px); }
+  60%       { transform: translateY(-4px); }
 }
-
-.animate-bounce-subtle {
-  animation: bounce-subtle 2.5s ease-in-out infinite;
-}
+.animate-bounce-subtle { animation: bounce-subtle 2.5s ease-in-out infinite; }
 
 @keyframes wiggle {
-  0%, 100% { transform: rotate(-4deg); }
-  50%       { transform: rotate(4deg); }
+  0%, 100% { transform: rotate(-3deg); }
+  50%       { transform: rotate(3deg); }
 }
-
-.animate-wiggle {
-  animation: wiggle 1.5s ease-in-out infinite;
-}
+.animate-wiggle { animation: wiggle 1.5s ease-in-out infinite; }
 
 @keyframes pop-in {
-  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
-  70%  { transform: scale(1.15) rotate(3deg); }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  0%   { transform: scale(0.92); opacity: 0; }
+  70%  { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
 }
-
 .animate-pop-in {
-  animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation: pop-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ===========================
-   PULSE GLOW
-   =========================== */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 5px 5px 0px 0px #1a0533, 0 0 0 0 rgba(155, 89, 245, 0); }
-  50%       { box-shadow: 5px 5px 0px 0px #1a0533, 0 0 20px 8px rgba(155, 89, 245, 0.5); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 74, 122, 0); }
+  50%       { box-shadow: 0 0 24px 4px rgba(45, 74, 122, 0.12); }
 }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* ===========================
-   SHAKE (wrong answer)
-   =========================== */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  20%  { transform: translateX(-10px) rotate(-2deg); }
-  40%  { transform: translateX(10px) rotate(2deg); }
-  60%  { transform: translateX(-7px) rotate(-1deg); }
-  80%  { transform: translateX(7px) rotate(1deg); }
+  20%  { transform: translateX(-8px); }
+  40%  { transform: translateX(8px); }
+  60%  { transform: translateX(-5px); }
+  80%  { transform: translateX(5px); }
 }
+.animate-shake { animation: shake 0.35s ease-in-out; }
 
-.animate-shake {
-  animation: shake 0.35s ease-in-out;
+@keyframes marquee-x {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
+.animate-marquee { animation: marquee-x 28s linear infinite; }
 
 /* ===========================
-   SCROLLBAR HIDE
+   SCROLLBARS - claro
    =========================== */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar {
@@ -277,104 +495,163 @@ body::before {
   scrollbar-width: none;
 }
 
-/* ===========================
-   FLUID TEXT
-   =========================== */
 @layer utilities {
   .text-fluid-large  { font-size: clamp(2.5rem, 12vw, 5rem); }
   .text-fluid-medium { font-size: clamp(1.5rem, 6vw, 2.5rem); }
 }
 
-/* ===========================
-   CONFETTI LAYER
-   =========================== */
 canvas { pointer-events: none; }
 
 /* ===========================
-   GLASS PANEL
-   =========================== */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 2px solid rgba(255,255,255,0.35);
-}
-
-/* ===========================
-   HEADER BADGE
-   =========================== */
-.badge-cartoon {
-  border: 3px solid #1a0533;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  padding: 0.15rem 0.65rem;
-  box-shadow: 3px 3px 0px 0px #1a0533;
-}
-
-/* ===========================
-   TAP HIGHLIGHT
+   BASE RESET
    =========================== */
 * {
   -webkit-tap-highlight-color: transparent;
   box-sizing: border-box;
 }
 
-/* ===========================
-   iOS Safari Safe Area Fix
-   =========================== */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  html, body {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+  html, body { padding-bottom: env(safe-area-inset-bottom); }
 }
-
-:root {
-  --saf-area-bottom: 0px;
-}
-
+:root { --saf-area-bottom: 0px; }
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  :root {
-    --saf-area-bottom: env(safe-area-inset-bottom);
-  }
+  :root { --saf-area-bottom: env(safe-area-inset-bottom); }
 }
 
-/* Extra padding for mobile to avoid Safari toolbar */
 @media screen and (max-width: 768px) {
   html, body {
-    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   }
-
-  .game-answer-btn {
-    min-height: 44px;
-  }
+  .game-answer-btn { min-height: 48px; }
 }
 
-/* ===========================
-   CUSTOM SCROLLBAR
-   =========================== */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #9B59F5;
+  background: rgba(45, 74, 122, 0.18);
   border-radius: 10px;
-  border: 2px solid #f1f1f1;
 }
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #834bd1;
-}
-
-/* For Firefox */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(45, 74, 122, 0.30); }
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #9B59F5 #f1f1f1;
+  scrollbar-color: rgba(45,74,122,0.18) transparent;
+}
+
+::selection {
+  background: rgba(45, 74, 122, 0.14);
+  color: #1E293B;
+}
+
+/* =========================================================
+   OVERRIDES — converte hardcodes escuros para tema claro
+   Com correção de contraste + seletores same-element
+   ========================================================= */
+
+/* BGs escuros -> branco / cinza claro */
+.bg-\[\#121215\],
+.bg-\[\#18181B\],
+.bg-\[\#1C1C21\] {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+}
+.bg-\[\#09090B\] {
+  background-color: #E8E9EC !important;
+}
+
+/* BGs com opacidade - antes eram vidro escuro, agora sólido claro com borda */
+.bg-white\/5,
+.bg-white\/10,
+.bg-white\/\[0\.06\],
+.bg-white\/\[0\.08\] {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.05) !important;
+}
+
+/* Bordas brancas translúcidas -> cinza médio visível */
+.border-white\/10 { border-color: #CBD5E1 !important; }
+.border-white\/5,
+.border-white\/8,
+.border-white\/\[0\.06\],
+.border-white\/\[0\.08\] { border-color: #CBD5E1 !important; }
+.border-white\/15 { border-color: #94A3B8 !important; }
+[class*="border-white"] { border-color: #CBD5E1 !important; }
+
+/* Textos brancos - CORREÇÃO PRINCIPAL: pega tanto filho quanto mesmo elemento */
+.bg-\[\#121215\].text-white,
+.bg-\[\#18181B\].text-white,
+.bg-\[\#09090B\].text-white,
+.bg-\[\#1C1C21\].text-white,
+.bg-\[\#121215\] .text-white,
+.bg-\[\#18181B\] .text-white,
+.bg-\[\#09090B\] .text-white,
+.bg-\[\#1C1C21\] .text-white,
+.cartoon-panel .text-white,
+.cartoon-panel.text-white,
+.premium-card .text-white,
+.premium-card.text-white,
+.mode-card .text-white,
+.mode-card.text-white,
+.glass-panel .text-white {
+  color: #0F172A !important;
+  font-weight: 600;
+}
+/* Força qualquer text-white solto em fundo claro a ficar escuro, exceto em botões escuros */
+.text-white:not(.btn-cartoon):not(.bg-\[\#1E3A5F\]):not(.bg-\[\#1B4332\]):not(.bg-\[\#7C5C2E\]):not([class*="bg-[#8B5CF6]"]):not([class*="bg-indigo"]) {
+  /* não força global, deixa específico acima cuidar */
+}
+
+/* Preserva branco em botões coloridos - TEM QUE VIR DEPOIS */
+.btn-cartoon.text-white,
+.btn-purple,
+.btn-green,
+.btn-pink,
+.btn-blue,
+.bg-\[\#1E3A5F\].text-white,
+.bg-\[\#1E3A5F\] .text-white,
+.bg-\[\#1B4332\].text-white,
+.bg-\[\#7C5C2E\].text-white,
+.bg-\[\#8B5CF6\].text-white,
+.bg-\[\#A3E635\].text-white {
+  color: #FFFFFF !important;
+}
+/* Garante que botões escuros mantenham texto branco sempre */
+.btn-purple *, .btn-green *, .btn-pink *, .btn-blue * { color: #FFFFFF !important; }
+
+/* Text zinc/slate claro (antes muted no escuro) -> cores ESCURAS com contraste */
+.text-zinc-400 { color: #334155 !important; }
+.text-zinc-500 { color: #334155 !important; }
+.text-zinc-600 { color: #1E293B !important; }
+.text-slate-400 { color: #334155 !important; }
+.text-slate-500 { color: #334155 !important; }
+.text-zinc-300 { color: #475569 !important; }
+
+/* Placeholder mais visível */
+.placeholder\:text-zinc-600::placeholder { color: #64748B !important; }
+
+/* Eyebrow - mais forte */
+.eyebrow { color: #1E3A5F !important; font-weight: 700; opacity: 0.85; }
+
+/* Ícones claros -> escuros */
+.text-white\/10, .text-white\/20 { color: #94A3B8 !important; }
+.text-zinc-600 svg, .text-slate-400 svg { color: #334155 !important; }
+
+/* Cards fallback */
+.bg-zinc-900, .bg-zinc-950, .bg-slate-900, .bg-slate-950,
+.bg-\[\#2D1B69\], .bg-\[\#1a0533\] {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Títulos que eram text-white soltos - força escuro */
+h1.text-white, h2.text-white, h3.text-white,
+p.text-white.font-black,
+span.text-white.font-black {
+  color: #0F172A !important;
+}
+
+/* Garante que inputs e áreas de texto tenham contraste */
+input.text-white, textarea.text-white {
+  color: #0F172A !important;
 }

@@ -16,9 +16,29 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
+      host: '0.0.0.0',
+      port: 3000,
+      hmr: process.env.DISABLE_HMR !== 'true' ? { overlay: true } : false,
+      watch: { usePolling: false },
+    },
+    build: {
+      // OTIMIZAÇÃO MOBILE: chunk splitting + target moderno + minify
+      target: 'es2018',
+      chunkSizeWarningLimit: 800,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'motion'],
+            'supabase': ['@supabase/supabase-js'],
+            'drawing': ['konva', 'react-konva'],
+            'icons': ['lucide-react'],
+          },
+        },
+      },
+    },
+    esbuild: {
+      // Remove console em produção para economizar bytes
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
     },
   };
 });
