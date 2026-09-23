@@ -451,6 +451,11 @@ export default function App() {
   const lastHandledRoundRef = useRef<number>(-1);
   // Round em que o som de resultado (multiplayer) já tocou — evita repetir
   const resultSoundRoundRef = useRef<number>(-1);
+  // Fallback anti-travamento do quiz multiplayer (realtime pode perder evento):
+  const quizRoomSeenRef = useRef<string>(''); // "phase:round" já aplicado
+  const quizNextTimerForRef = useRef<string | null>(null); // round que o host já agendou
+  const resultCountdownTimerRef = useRef<any>(null);
+  const resultCountdownRoundRef = useRef<number>(-1);
   const botTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const lastBotRoundRef = useRef<number>(-1);
 
@@ -509,6 +514,8 @@ export default function App() {
 
   const [showPodium, setShowPodium] = useState(false);
   const [podiumStep, setPodiumStep] = useState(0); // 0: initial, 1: 3rd, 2: 2nd, 3: 1st
+  const showPodiumRef = useRef(false);
+  useEffect(() => { showPodiumRef.current = showPodium; }, [showPodium]);
 
   // Force showResult to false when podium is active
   useEffect(() => {
@@ -744,6 +751,10 @@ export default function App() {
       lastBotRoundRef.current = -1;
       botTimeoutsRef.current.forEach(clearTimeout);
       botTimeoutsRef.current = [];
+      if (resultCountdownTimerRef.current) { clearInterval(resultCountdownTimerRef.current); resultCountdownTimerRef.current = null; }
+      resultCountdownRoundRef.current = -1;
+      quizNextTimerForRef.current = null;
+      quizRoomSeenRef.current = '';
     }
   }, [view]);
 
@@ -883,6 +894,8 @@ export default function App() {
     return () => clearInterval(pollInterval);
   }, [roomId, isSolo, view]);
 
+
+
   // FIX: Ao voltar do background, re-sincroniza imediatamente (evita "não atualiza" 8s)
   useEffect(() => {
     if (!roomId || isSolo) return;
@@ -903,6 +916,171 @@ export default function App() {
     window.addEventListener('focus', onVisible);
     return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
   }, [roomId, isSolo]);
+
+  // Máquina de estados da sala do quiz multiplayer. useCallback estável (só refs +
+  // setState): alimenta o realtime E o polling de fallback a cada 3s. Sem o fallback,
+  // um único evento realtime perdido travava o jogo na mesma tela pra sempre.
+  const handleQuizRoomUpdate = React.useCallback((room: any) => {
+        // FIX: Host deletou sala -> convidados voltam pra home (antes ficava congelado)
+        if (!room) {
+          if (!isSoloRef.current && viewRef.current !== 'ranking' && viewRef.current !== 'home') {
+            setHostLeft(true);
+            setLeftPlayerName('O host encerrou a sala');
+            setTimeout(() => {
+              setView('home');
+              setRoomId(null);
+              setLocalPlayerId(null);
+              setHostLeft(false);
+            }, 2500);
+          }
+          return;
+        }
+
+        quizRoomSeenRef.current = room.phase + ':' + room.currentRound;
+
+        setRoundCount(room.roundCount);
+        const roomDifficulty = room.difficulty;
+
+        // Sync the correct state based on gameType
+        if (room.gameType === 'biblia') {
+          setBibliaGameMode(true);
+          setDifficulty(roomDifficulty as Difficulty);
+        } else {
+          setBibliaGameMode(false);
+          setHinoDifficulty(roomDifficulty as HinoDifficulty);
+        }
+
+        difficultyRef.current = roomDifficulty as any;
+
+        if (room.questions) {
+          console.log('[GAME] Questions received:', room.questions.length, room.questions[0]?.pergunta || room.questions[0]?.snippet);
+          setQuestions(room.questions);
+        }
+        setGameType(room.gameType || 'hino');
+
+        const clearResultCountdownTick = () => {
+          if (resultCountdownTimerRef.current) { clearInterval(resultCountdownTimerRef.current); resultCountdownTimerRef.current = null; }
+          resultCountdownRoundRef.current = -1;
+        };
+
+        // State Machine based on Phase
+        if (room.phase === 'lobby') {
+          if (viewRef.current !== 'lobby') setView('lobby');
+          setIsPreparing(false);
+          setIsGameActive(false);
+          setShowResult(false);
+          clearResultCountdownTick();
+        } else if (room.phase === 'preparing') {
+          if (viewRef.current !== 'game') setView('game');
+          setIsPreparing(true);
+          setIsGameActive(false);
+          setShowResult(false);
+          clearResultCountdownTick();
+
+          // Use fixed local countdown to avoid network/device clock drift
+          setGameCountdown(3);
+        } else if (room.phase === 'answering') {
+          if (viewRef.current !== 'game') setView('game');
+
+          // Always set startTime when entering answering phase
+          startTimeRef.current = Date.now();
+
+          // Reset UI if entering a new round from the DB
+          if (!isGameActiveRef.current || currentRoundRef.current !== room.currentRound) {
+             setIsPreparing(false);
+             setIsGameActive(true);
+             setShowResult(false);
+             setCurrentRound(room.currentRound);
+             setSelectedOption(null);
+             setFeedback(null);
+             setResultCountdown(null);
+             resultSoundRoundRef.current = -1;
+             clearResultCountdownTick();
+             setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
+
+             // Reset timer state for new round
+             const diff = difficultyRef.current;
+             if (diff !== 'sem_tempo') {
+               roomDeadlineRef.current = Date.now() + TIME_LIMITS[diff] * 1000;
+             } else {
+               roomDeadlineRef.current = null;
+             }
+             setTimeLeft(diff === 'sem_tempo' ? null : TIME_LIMITS[diff]);
+           }
+        } else if (room.phase === 'result') {
+          setIsGameActive(false);
+          setShowResult(true);
+          setResultCountdown(3);
+
+          // Contagem regressiva visível de verdade (antes congelava em "3s")
+          if (resultCountdownRoundRef.current !== room.currentRound) {
+            resultCountdownRoundRef.current = room.currentRound;
+            if (resultCountdownTimerRef.current) clearInterval(resultCountdownTimerRef.current);
+            resultCountdownTimerRef.current = setInterval(() => {
+              setResultCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
+            }, 1000);
+          }
+
+          // Som de acerto/erro adiado do multiplayer: toca 1x por round, só
+          // agora que o resultado foi revelado pra todos (justo).
+          if (!isSoloRef.current && resultSoundRoundRef.current !== room.currentRound) {
+            resultSoundRoundRef.current = room.currentRound;
+            const fb = feedbackRef.current;
+            if (fb) {
+              if (fb.correct) soundService.playCorrect();
+              else if (fb.option && fb.option !== "Tempo Esgotado") soundService.playWrong();
+            }
+          }
+
+          // FREEZE PLAYERS WHEN SHOWING LAST RESULT (before going to ranking!)
+          if (room.currentRound + 1 >= room.roundCount) {
+            setFrozenPlayers([...playersRef.current]);
+          }
+
+          // Host agenda o próximo round 1x por round (antes cada evento realtime
+          // agendava um timer novo — empilhava startRound duplicado)
+          const me = playersRef.current.find(p => p.id === localPlayerIdRef.current);
+          const rId = roomIdRef.current;
+          if (me?.isHost && rId) {
+            const timerKey = rId + ':' + room.currentRound;
+            if (quizNextTimerForRef.current !== timerKey) {
+              quizNextTimerForRef.current = timerKey;
+              setTimeout(() => {
+                if (room.currentRound + 1 < room.roundCount) {
+                  const timeLimitSec = TIME_LIMITS[difficultyRef.current];
+                  multiplayerService.startRound(rId, room.currentRound + 1, timeLimitSec);
+                } else {
+                  // IMPORTANT: Finish game but DON'T change view locally,
+                  // the phase ranking listener above will handle it for ALL players (including host)
+                  multiplayerService.finishGame(rId);
+                }
+              }, 4000);
+            }
+          }
+        } else if (room.phase === 'ranking') {
+          clearResultCountdownTick();
+          // Freeze players when entering ranking - copy current state for display
+          if (viewRef.current !== 'ranking' && !showPodiumRef.current) {
+            setFrozenPlayers([...playersRef.current]);
+            setShowResult(false); // ALWAYS CLEAR RESULT OVERLAY
+
+            // Trigger Cinematic Podium for everyone in multiplayer
+            setShowPodium(true);
+            setPodiumStep(0);
+
+            // Step-by-step podium revelation
+            setTimeout(() => setPodiumStep(1), 1500); // Show 3rd
+            setTimeout(() => { setPodiumStep(2); soundService.playTick(); }, 3500); // Show 2nd
+            setTimeout(() => { setPodiumStep(3); triggerConfetti(); soundService.playBell(); }, 6000); // Show 1st
+
+            // Finally go to ranking after celebration
+            setTimeout(() => {
+              setShowPodium(false);
+              setView('ranking');
+            }, 10000);
+          }
+        }
+  }, []);
 
   // Handle Multiplayer Subscriptions (STOP when in ranking!)
   useEffect(() => {
@@ -943,144 +1121,56 @@ export default function App() {
         }
       },
       (room) => {
-        // FIX: Host deletou sala -> convidados voltam pra home (antes ficava congelado)
-        if (!room) {
-          if (!isSoloRef.current && viewRef.current !== 'ranking' && viewRef.current !== 'home') {
-            setHostLeft(true);
-            setLeftPlayerName('O host encerrou a sala');
-            setTimeout(() => {
-              setView('home');
-              setRoomId(null);
-              setLocalPlayerId(null);
-              setHostLeft(false);
-            }, 2500);
-          }
-          return;
-        }
-        
-        setRoundCount(room.roundCount);
-        const roomDifficulty = room.difficulty;
-        
-        // Sync the correct state based on gameType
-        if (room.gameType === 'biblia') {
-          setBibliaGameMode(true);
-          setDifficulty(roomDifficulty as Difficulty);
-        } else {
-          setBibliaGameMode(false);
-          setHinoDifficulty(roomDifficulty as HinoDifficulty);
-        }
-        
-        difficultyRef.current = roomDifficulty as any;
-
-        if (room.questions) {
-          console.log('[GAME] Questions received:', room.questions.length, room.questions[0]?.pergunta || room.questions[0]?.snippet);
-          setQuestions(room.questions);
-        }
-        setGameType(room.gameType || 'hino');
-
-        // State Machine based on Phase
-        if (room.phase === 'lobby') {
-          if (viewRef.current !== 'lobby') setView('lobby');
-          setIsPreparing(false);
-          setIsGameActive(false);
-          setShowResult(false);
-        } else if (room.phase === 'preparing') {
-          if (viewRef.current !== 'game') setView('game');
-          setIsPreparing(true);
-          setIsGameActive(false);
-          setShowResult(false);
-          
-          // Use fixed local countdown to avoid network/device clock drift
-          setGameCountdown(3);
-        } else if (room.phase === 'answering') {
-          if (viewRef.current !== 'game') setView('game');
-          
-          // Always set startTime when entering answering phase
-          startTimeRef.current = Date.now();
-          
-          // Reset UI if entering a new round from the DB
-          if (!isGameActiveRef.current || currentRoundRef.current !== room.currentRound) {
-             setIsPreparing(false);
-             setIsGameActive(true);
-             setShowResult(false);
-             setCurrentRound(room.currentRound);
-             setSelectedOption(null);
-             setFeedback(null);
-             setResultCountdown(null);
-             resultSoundRoundRef.current = -1;
-             setPlayers(prev => prev.map(p => ({ ...p, hasAnswered: false })));
-               
-             // Reset timer state for new round
-             const diff = difficultyRef.current;
-             if (diff !== 'sem_tempo') {
-               roomDeadlineRef.current = Date.now() + TIME_LIMITS[diff] * 1000;
-             } else {
-               roomDeadlineRef.current = null;
-             }
-             setTimeLeft(diff === 'sem_tempo' ? null : TIME_LIMITS[diff]);
-           }
-        } else if (room.phase === 'result') {
-          setIsGameActive(false);
-          setShowResult(true);
-          setResultCountdown(3);
-
-          // Som de acerto/erro adiado do multiplayer: toca 1x por round, só
-          // agora que o resultado foi revelado pra todos (justo).
-          if (!isSoloRef.current && resultSoundRoundRef.current !== room.currentRound) {
-            resultSoundRoundRef.current = room.currentRound;
-            const fb = feedbackRef.current;
-            if (fb) {
-              if (fb.correct) soundService.playCorrect();
-              else if (fb.option && fb.option !== "Tempo Esgotado") soundService.playWrong();
-            }
-          }
-           
-          // FREEZE PLAYERS WHEN SHOWING LAST RESULT (before going to ranking!)
-          if (room.currentRound + 1 >= room.roundCount) {
-            setFrozenPlayers([...playersRef.current]);
-          }
-           
-          // Host automatically schedules next round after 4s (matches endRound deadline)
-          const me = playersRef.current.find(p => p.id === localPlayerId);
-          if (me?.isHost && roomId) {
-            setTimeout(() => {
-              if (room.currentRound + 1 < room.roundCount) {
-                const timeLimitSec = TIME_LIMITS[difficultyRef.current];
-                multiplayerService.startRound(roomId, room.currentRound + 1, timeLimitSec);
-              } else {
-                // IMPORTANT: Finish game but DON'T change view locally, 
-                // the phase ranking listener above will handle it for ALL players (including host)
-                multiplayerService.finishGame(roomId);
-              }
-            }, 4000);
-          }
-        } else if (room.phase === 'ranking') {
-          // Freeze players when entering ranking - copy current state for display
-          if (viewRef.current !== 'ranking' && !showPodium) {
-            setFrozenPlayers([...playersRef.current]);
-            setShowResult(false); // ALWAYS CLEAR RESULT OVERLAY
-            
-            // Trigger Cinematic Podium for everyone in multiplayer
-            setShowPodium(true);
-            setPodiumStep(0);
-            
-            // Step-by-step podium revelation
-            setTimeout(() => setPodiumStep(1), 1500); // Show 3rd
-            setTimeout(() => { setPodiumStep(2); soundService.playTick(); }, 3500); // Show 2nd
-            setTimeout(() => { setPodiumStep(3); triggerConfetti(); soundService.playBell(); }, 6000); // Show 1st
-            
-            // Finally go to ranking after celebration
-            setTimeout(() => {
-              setShowPodium(false);
-              setView('ranking');
-            }, 10000);
-          }
-        }
+        handleQuizRoomUpdate(room);
       }
     );
 
     return () => unsubscribe();
-  }, [roomId, isSolo, view]);
+  }, [roomId, isSolo, view, handleQuizRoomUpdate]);
+
+  // Fallback anti-travamento: o realtime pode perder o evento de fase
+  // (result/answering/ranking). Rele a sala a cada 3s e aplica se mudou.
+  // Também faz migração de host se o host sumiu (sem host ninguém avança).
+  useEffect(() => {
+    if (!roomId || isSolo || view === 'ranking') return;
+    const pollRoom = setInterval(async () => {
+      if (!roomIdRef.current || document.hidden || viewRef.current === 'ranking') return;
+      try {
+        const { data: row } = await supabase.from('rooms').select('id,host_id,phase,current_round,round_count,difficulty,deadline_at,questions,game_type').eq('id', roomIdRef.current).maybeSingle();
+        if (!row) return;
+        const key = (row as any).phase + ':' + (row as any).current_round;
+        if (key !== quizRoomSeenRef.current) {
+          handleQuizRoomUpdate({
+            id: (row as any).id,
+            hostId: (row as any).host_id,
+            phase: (row as any).phase,
+            currentRound: (row as any).current_round,
+            roundCount: (row as any).round_count,
+            difficulty: (row as any).difficulty,
+            deadlineAt: (row as any).deadline_at ? Number((row as any).deadline_at) : null,
+            questions: (row as any).questions,
+            gameType: (row as any).game_type || 'hino',
+          });
+        }
+        // Migração de host: linha do host sumiu (fechou o app) e eu sou o mais
+        // antigo — assumo pra partida não travar pra sempre.
+        try {
+          const list = playersRef.current;
+          const meRow = list.find(p => p.id === localPlayerIdRef.current);
+          const hasHost = list.some(p => p.isHost);
+          if (meRow && !hasHost && viewRef.current !== 'home') {
+            const ordered = [...list].sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+            if (ordered[0] && ordered[0].id === meRow.id && roomIdRef.current) {
+              console.log('[MP] host sumiu, assumindo host para destravar a sala');
+              supabase.from('players').update({ is_host: true }).eq('id', meRow.id).then(() => {});
+              supabase.from('rooms').update({ host_id: meRow.id }).eq('id', roomIdRef.current).then(() => {});
+            }
+          }
+        } catch {}
+      } catch {}
+    }, 3000);
+    return () => clearInterval(pollRoom);
+  }, [roomId, isSolo, view, handleQuizRoomUpdate]);
 
   // Handle Drawing Game Subscriptions
   useEffect(() => {
