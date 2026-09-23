@@ -2105,8 +2105,10 @@ export default function App() {
       // Se chegar aqui, o countdown já foi iniciado pelo useEffect em 1375
     }
 
-    if (!isSolo && localPlayerId && roomId) {
-      multiplayerService.submitAnswer(roomId, isUserCorrect, pointsToAdd, currentRoundRef.current);
+    // Usa REFS (callback tem deps [] e os states estariam stale = submit nunca disparava,
+    // cada um só se marcava local e o outro via "não marcou").
+    if (!isSoloRef.current && localPlayerIdRef.current && roomIdRef.current) {
+      multiplayerService.submitAnswer(roomIdRef.current, isUserCorrect, pointsToAdd, currentRoundRef.current);
     }
   }, []);
 

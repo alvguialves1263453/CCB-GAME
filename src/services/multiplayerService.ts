@@ -210,14 +210,18 @@ async createRoom(nickname: string, avatar?: string, difficulty: string = 'facil'
     if (localPlayerId) {
       // We must fetch the current score first, or do an RPC. For simplicity, since it's a quiz, 
       // we can read it from the local state array if needed, but it's safer to read from DB.
-      const { data } = await supabase.from('players').select('score').eq('id', localPlayerId).single();
+      const { data, error: readError } = await supabase.from('players').select('score').eq('id', localPlayerId).single();
+      if (readError) console.error("[MP] submitAnswer read ERRO:", readError.message);
       const currentScore = data?.score || 0;
 
-      await supabase.from('players').update({
+      const { error: writeError } = await supabase.from('players').update({
         has_answered: true,
         score: currentScore + score,
         round: round
       }).eq('id', localPlayerId);
+      if (writeError) console.error("[MP] submitAnswer write ERRO:", writeError.message);
+    } else {
+      console.error("[MP] submitAnswer sem localPlayerId! room:", roomId);
     }
   },
 
