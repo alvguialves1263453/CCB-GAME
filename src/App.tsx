@@ -326,6 +326,13 @@ export default function App() {
     bibliaTotal: 0
   });
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
+  // Meu ID de presença (sessionStorage): o selo <você> casa por ID, nunca por
+  // apelido+avatar — todo mundo novo usa o padrão "Maestro"+irmaos/1.png e
+  // marcava VOCÊ em vários cards ao mesmo tempo. Leitura ao vivo (não snapshot)
+  // porque o service pode regenerar o id após pagehide/visibility.
+  const myPresenceId: string | null = (() => {
+    try { return presenceService.getPresenceId(); } catch { return null; }
+  })();
   const [showOnlineList, setShowOnlineList] = useState(true);
   const [selectedOnlinePlayer, setSelectedOnlinePlayer] = useState<OnlinePlayer | null>(null);
 
@@ -2665,7 +2672,7 @@ export default function App() {
                               return (
                               <div className="p-2 flex flex-col gap-1.5 bg-white">
                                 {list.map((op) => {
-                                  const isMe = op.id === "self" || (op.nickname === profile.nickname && op.avatar === profile.avatarUrl);
+                                  const isMe = op.id === "self" || (myPresenceId !== null && op.id === myPresenceId);
                                   const isPlaying = op.status.includes("Jogando");
                                   const isLobby = op.status.includes("lobby") || op.status.includes("Online");
                                   return (
@@ -2726,7 +2733,7 @@ export default function App() {
                         <div className="text-center">
                           <h3 className="text-xl font-black text-slate-900 flex items-center justify-center gap-2">
                             {selectedOnlinePlayer.nickname}
-                            {(selectedOnlinePlayer.nickname === profile.nickname && selectedOnlinePlayer.avatar === profile.avatarUrl) && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-600 text-white">{"<você>"}</span>}
+                            {(selectedOnlinePlayer.id === "self" || (myPresenceId !== null && selectedOnlinePlayer.id === myPresenceId)) && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-600 text-white">{"<você>"}</span>}
                           </h3>
                         </div>
                         <button onClick={() => setSelectedOnlinePlayer(null)} className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-xs tracking-widest transition-colors">Fechar</button>
