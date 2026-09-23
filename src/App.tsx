@@ -5386,7 +5386,9 @@ export default function App() {
 
                 <p className="eyebrow text-[#A3E635]">Resultado final</p>
                 <h2 style={{ fontSize: 'clamp(2.25rem, 9vh, 5rem)' }} className="display-xl text-white leading-none">Vitória!</h2>
-                <p className="text-zinc-400 font-medium uppercase tracking-[0.2em] text-xs">O coro cantou bonito!</p>
+                <p className="text-zinc-400 font-medium uppercase tracking-[0.2em] text-xs">
+                  Parabéns, {players.sort((a, b) => b.score - a.score)[0]?.nickname || 'Campeão'}!
+                </p>
               </div>
 
               {/* Player list - use finalPlayersRef for ranking to ensure players don't disappear */}
